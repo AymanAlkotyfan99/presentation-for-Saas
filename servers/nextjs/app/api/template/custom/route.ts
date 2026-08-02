@@ -4,6 +4,10 @@ import {
   buildCustomTemplateLayoutPayload,
   type CustomLayoutCompileInput,
 } from "@/lib/server-template-layouts";
+import {
+  isUnsafeCustomLayoutServerEnabled,
+  UNSAFE_CUSTOM_LAYOUTS_ERROR_CODE,
+} from "@/lib/unsafe-custom-layouts";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +21,16 @@ type CustomCompileRequest = {
  * Called by FastAPI `get_layout_by_name` for `custom-*` templates.
  */
 export async function POST(request: Request) {
+  if (!isUnsafeCustomLayoutServerEnabled()) {
+    return NextResponse.json(
+      {
+        error: "Executable custom layouts are disabled",
+        code: UNSAFE_CUSTOM_LAYOUTS_ERROR_CODE,
+      },
+      { status: 503 },
+    );
+  }
+
   let body: CustomCompileRequest;
   try {
     body = (await request.json()) as CustomCompileRequest;

@@ -2,11 +2,11 @@ import json
 from typing import Any
 
 import aiohttp
-from openai import APIError as OpenAIAPIError
-from openai import AsyncOpenAI
 from google import genai
 from google.genai.errors import APIError as GoogleAPIError
 
+from api.operation_security import operation_guard
+from utils.outbound_http import SecureClientSession
 from utils.provider_error_messages import safe_provider_error_detail
 
 
@@ -78,14 +78,6 @@ async def _raise_for_model_response(
     )
 
 
-def _openai_error_message(error: OpenAIAPIError) -> str:
-    message = _payload_error_message(getattr(error, "body", None))
-    if message:
-        return message
-
-    return getattr(error, "message", None) or str(error)
-
-
 def _google_error_message(error: GoogleAPIError) -> str:
     return getattr(error, "message", None) or str(error)
 
@@ -140,10 +132,14 @@ async def list_together_models(url: str, api_key: str) -> list[str]:
     models_url = f"{base_url.rstrip('/')}/models"
     headers = {"Authorization": f"Bearer {(api_key or '').strip()}"}
 
-    async with aiohttp.ClientSession(headers=headers) as session:
-        async with session.get(models_url) as response:
-            await _raise_for_model_response(response, provider="Together")
-            data = await response.json()
+    async with operation_guard("provider_discovery"):
+        async with SecureClientSession(headers=headers) as session:
+            async with session.get(
+                models_url,
+                max_response_bytes=2 * 1024 * 1024,
+            ) as response:
+                await _raise_for_model_response(response, provider="Together")
+                data = await response.json()
 
     return _model_ids_from_openai_compatible_payload(data)
 
@@ -153,36 +149,37 @@ async def list_available_openai_compatible_models(url: str, api_key: str) -> lis
     if is_together_api_base_url(url):
         return await list_together_models(url, api_key)
 
-    # Local LiteLLM / OpenAI-compatible proxies often omit auth; SDK rejects a blank key.
-    effective_key = (api_key or "").strip() or "EMPTY"
-    client = AsyncOpenAI(api_key=effective_key, base_url=url)
-    try:
-        models = (await client.models.list()).data
-    except OpenAIAPIError as e:
-        raise ModelAvailabilityError(
-            "OpenAI-compatible provider",
-            _openai_error_message(e),
-            provider_status_code=getattr(e, "status_code", None) or 500,
-        ) from e
-
-    if models:
-        return [m.id for m in models if m.id]
-    return []
+    headers = {}
+    if (api_key or "").strip():
+        headers["Authorization"] = f"Bearer {api_key.strip()}"
+    async with operation_guard("provider_discovery"):
+        async with SecureClientSession(headers=headers) as session:
+            async with session.get(
+                f"{url.rstrip('/')}/models",
+                max_response_bytes=2 * 1024 * 1024,
+            ) as response:
+                await _raise_for_model_response(
+                    response, provider="OpenAI-compatible provider"
+                )
+                data = await response.json()
+    return _model_ids_from_openai_compatible_payload(data)
 
 
 async def list_available_anthropic_models(api_key: str) -> list[str]:
-    async with aiohttp.ClientSession(
-        headers={
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-        }
-    ) as session:
-        async with session.get(
-            "https://api.anthropic.com/v1/models",
-            params={"limit": 50},
-        ) as response:
-            await _raise_for_model_response(response, provider="Anthropic")
-            data = await response.json()
+    async with operation_guard("provider_discovery"):
+        async with SecureClientSession(
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+            }
+        ) as session:
+            async with session.get(
+                "https://api.anthropic.com/v1/models",
+                params={"limit": 50},
+                max_response_bytes=2 * 1024 * 1024,
+            ) as response:
+                await _raise_for_model_response(response, provider="Anthropic")
+                data = await response.json()
 
     models = data.get("data", [])
     return [model.get("id") for model in models if model.get("id")]

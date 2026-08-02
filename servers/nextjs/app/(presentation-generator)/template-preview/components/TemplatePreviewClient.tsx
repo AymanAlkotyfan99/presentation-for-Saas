@@ -208,18 +208,6 @@ const GroupLayoutPreview = ({
   }, [error, layouts.length, loading, template, templateId]);
 
   useEffect(() => {
-    const existingScript = document.querySelector(
-      'script[src*="tailwindcss.com"]',
-    );
-    if (!existingScript) {
-      const script = document.createElement("script");
-      script.src = "https://cdn.tailwindcss.com";
-      script.async = true;
-      document.head.appendChild(script);
-    }
-  }, []);
-
-  useEffect(() => {
     if (!fonts || typeof fonts !== "object") return;
     loadFontAssets(fonts as Record<string, string>);
   }, [fonts]);

@@ -117,7 +117,9 @@ def test_llm_error_handler_hides_openai_auth_raw_provider_response():
     assert "invalid_api_key" not in normalized.detail
 
 
-def test_image_generation_service_raises_provider_error_instead_of_placeholder():
+def test_image_generation_service_raises_provider_error_instead_of_placeholder(monkeypatch):
+    monkeypatch.setenv("DISABLE_IMAGE_GENERATION", "false")
+    monkeypatch.setenv("DISABLE_AI_IMAGE_GENERATION", "false")
     service = object.__new__(ImageGenerationService)
     service.output_directory = "/tmp"
     service.is_image_generation_disabled = False
@@ -131,7 +133,9 @@ def test_image_generation_service_raises_provider_error_instead_of_placeholder()
     assert "billing" in exc.value.detail
 
 
-def test_image_generation_service_preserves_existing_http_exception():
+def test_image_generation_service_preserves_existing_http_exception(monkeypatch):
+    monkeypatch.setenv("DISABLE_IMAGE_GENERATION", "false")
+    monkeypatch.setenv("DISABLE_AI_IMAGE_GENERATION", "false")
     service = object.__new__(ImageGenerationService)
     service.output_directory = "/tmp"
     service.is_image_generation_disabled = False
@@ -171,6 +175,8 @@ def test_parallel_image_generation_env(monkeypatch, raw, expected):
 def test_parallel_env_applies_to_presentation_and_assistant_generation(
     monkeypatch, parallel_env: str, expected_max_active: int
 ):
+    monkeypatch.setenv("DISABLE_IMAGE_GENERATION", "false")
+    monkeypatch.setenv("DISABLE_AI_IMAGE_GENERATION", "false")
     monkeypatch.setenv("ENABLE_PARALLEL_IMAGE_GENERATION", parallel_env)
     active_requests = 0
     max_active_requests = 0

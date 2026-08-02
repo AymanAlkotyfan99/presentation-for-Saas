@@ -2,11 +2,10 @@ import ipaddress
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
 
-from api.v1.auth.schemas import AuthCredentialsRequest, LoginCredentialsRequest
+from api.v1.auth.schemas import LoginCredentialsRequest
 from api.v1.auth.assets import is_app_data_path_authorized
 from api.v1.auth.rate_limit import LOGIN_RATE_LIMITER, login_rate_limit_key
 from api.v1.auth.principal import resolve_request_principal
@@ -19,11 +18,7 @@ from api.v1.auth.users import (
 from models.sql.user import User
 from services.database import get_async_session
 from utils.get_env import is_disable_auth_enabled
-from api.v1.auth.config import (
-    SESSION_COOKIE_NAME,
-    SESSION_TTL_SECONDS,
-    persist_admin_credentials,
-)
+from api.v1.auth.config import SESSION_COOKIE_NAME, SESSION_TTL_SECONDS
 from api.v1.auth.token import TOKEN_ROUTER
 
 
@@ -89,9 +84,12 @@ async def get_status(
             "user_id": None,
             "role": "admin",
         }
-    configured = await _account_count(session) > 0
+    # A successfully started authenticated deployment is always externally
+    # "configured": first-administrator provisioning now happens at startup.
+    # Keeping this field stable avoids exposing whether an operator has supplied
+    # bootstrap credentials and prevents clients from discovering a claim flow.
     return {
-        "configured": configured,
+        "configured": True,
         "authenticated": user is not None,
         "username": user.username if user else None,
         "user_id": str(user.id) if user else None,
@@ -128,51 +126,6 @@ async def verify_session(
     }
 
 
-@API_V1_AUTH_ROUTER.post("/setup")
-async def setup_credentials(
-    body: AuthCredentialsRequest,
-    request: Request,
-    session: AsyncSession = Depends(get_async_session),
-):
-    if await _account_count(session):
-        raise HTTPException(status_code=409, detail="Credentials already configured")
-
-    username = normalize_username(body.username)
-    if len(username) < 3:
-        raise HTTPException(
-            status_code=422,
-            detail="Username must be at least 3 characters",
-        )
-    password_hash = PASSWORD_HELPER.hash(body.password)
-    user = User(
-        username=username,
-        hashed_password=password_hash,
-        is_active=True,
-        is_verified=True,
-        is_superuser=True,
-        admin_slot="primary",
-        auth_version=1,
-    )
-    session.add(user)
-    try:
-        await session.flush()
-    except IntegrityError:
-        await session.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="Credentials already configured",
-        )
-    await session.commit()
-    await session.refresh(user)
-    persist_admin_credentials(username, password_hash)
-    return {
-        "configured": True,
-        "authenticated": False,
-        "username": user.username,
-        "role": "admin",
-    }
-
-
 @API_V1_AUTH_ROUTER.post("/login")
 async def login(
     body: LoginCredentialsRequest,
@@ -180,7 +133,7 @@ async def login(
     session: AsyncSession = Depends(get_async_session),
 ):
     if not await _account_count(session):
-        raise HTTPException(status_code=428, detail="Login setup is required")
+        raise HTTPException(status_code=503, detail="Authentication unavailable")
     username = normalize_username(body.username)
     rate_limit_key = login_rate_limit_key(
         _login_client_host(request),

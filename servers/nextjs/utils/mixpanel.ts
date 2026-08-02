@@ -1,8 +1,13 @@
 'use client';
 
 import mixpanel from 'mixpanel-browser';
+import {
+  MIXPANEL_PRIVACY_DEFAULTS,
+  TELEMETRY_ENABLED_ON_STATUS_FAILURE,
+} from '@/lib/telemetry-privacy.mjs';
+import { sanitizeTelemetryProperties } from '@/utils/analytics';
 
-const MIXPANEL_TOKEN = 'd726e8bea8ec147f4c7720060cb2e6d1';
+const MIXPANEL_TOKEN = process.env.NEXT_PUBLIC_MIXPANEL_TOKEN?.trim() ?? '';
 
 export enum MixpanelEvent {
   PageView = 'Page View',
@@ -211,9 +216,9 @@ async function ensureTelemetryStatus(): Promise<boolean> {
         window.__mixpanel_telemetry_enabled = enabled;
         return enabled;
       } catch {
-        // If the API call fails, default to enabling tracking
-        window.__mixpanel_telemetry_enabled = true;
-        return true;
+        // Consent/configuration status is unknown, so fail closed.
+        window.__mixpanel_telemetry_enabled = TELEMETRY_ENABLED_ON_STATUS_FAILURE;
+        return TELEMETRY_ENABLED_ON_STATUS_FAILURE;
       }
     })();
   }
@@ -233,19 +238,16 @@ export function initMixpanel(): void {
 
 function initializeMixpanelNow(): void {
   if (window.__mixpanel_initialized) return;
+  if (window.__mixpanel_telemetry_enabled !== true) return;
   mixpanel.init(MIXPANEL_TOKEN as string, {
-    track_pageview: false,
-    autocapture: false,
+    ...MIXPANEL_PRIVACY_DEFAULTS,
+    property_blacklist: [...MIXPANEL_PRIVACY_DEFAULTS.property_blacklist],
     api_host: 'https://api-eu.mixpanel.com',
-    record_sessions_percent: 100,
-    record_mask_text_selector: '',
-    record_block_selector: '',
-    record_collect_fonts: true,
-    record_canvas: true,
   });
   const appVersion = window.env?.APP_VERSION;
   if (appVersion) {
-    mixpanel.register({ app_version: appVersion });
+    const appProperties = sanitizeTelemetryProperties({ app_version: appVersion });
+    if (appProperties) mixpanel.register(appProperties);
   }
   mixpanel.identify(mixpanel.get_distinct_id());
   window.__mixpanel_initialized = true;
@@ -253,18 +255,20 @@ function initializeMixpanelNow(): void {
 
 export function track(eventName: string, props?: Record<string, unknown>): void {
   if (!canUseMixpanel()) return;
+  const safeProps = sanitizeTelemetryProperties(props);
   if (typeof window !== 'undefined' && window.__mixpanel_telemetry_enabled === false) {
     return;
   }
   if (!window.__mixpanel_initialized) {
     void ensureTelemetryStatus().then((enabled) => {
-      if (!enabled) return;
+      if (!enabled || window.__mixpanel_telemetry_enabled !== true) return;
       initializeMixpanelNow();
-      mixpanel.track(eventName, props);
+      if (!window.__mixpanel_initialized) return;
+      mixpanel.track(eventName, safeProps);
     });
     return;
   }
-  mixpanel.track(eventName, props);
+  mixpanel.track(eventName, safeProps);
 }
 
 export function trackEvent(event: MixpanelEvent, props?: MixpanelProps): void {
@@ -280,10 +284,12 @@ export async function trackEventImmediately(
   props?: MixpanelProps
 ): Promise<void> {
   if (!canUseMixpanel()) return;
+  const safeProps = sanitizeTelemetryProperties(props);
   const enabled = await ensureTelemetryStatus();
-  if (!enabled) return;
+  if (!enabled || window.__mixpanel_telemetry_enabled !== true) return;
   initializeMixpanelNow();
-  mixpanel.track(event, props, { transport: 'sendBeacon' });
+  if (!window.__mixpanel_initialized) return;
+  mixpanel.track(event, safeProps, { transport: 'sendBeacon' });
 }
 
 export function getDistinctId(): string | undefined {

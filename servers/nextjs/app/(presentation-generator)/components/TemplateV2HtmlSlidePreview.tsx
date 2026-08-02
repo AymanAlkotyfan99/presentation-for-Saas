@@ -876,6 +876,9 @@ export function TemplateV2HtmlSlidePreview({
           opacity: scale ? 1 : 0,
         }}
       >
+        {/* Security boundary: this markup comes only from
+            templateV2UiToHtmlFragment, whose text/attribute/style boundaries
+            are escaped and covered by hostile-field regression tests. */}
         <div
           ref={contentRef}
           aria-label="Template v2 slide preview"

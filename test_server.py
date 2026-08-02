@@ -16,6 +16,8 @@ import argparse
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
+# Synthetic historical fixture data for exercising the update banner. These are
+# deliberately not application-version declarations; package.json is authoritative.
 VERSIONS = {
     "latest": "0.7.0",
     "versions": [

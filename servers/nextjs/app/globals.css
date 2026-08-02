@@ -3,8 +3,13 @@
 @tailwind utilities;
 
 body {
-  font-family: var(--font-syne), var(--font-unbounded), var(--font-inter),
-    sans-serif;
+  /* Phase 0 uses the bundled font for every branded alias. This keeps clean
+     builds offline and deterministic until separately licensed font assets are
+     reviewed and checked into the repository. */
+  --font-syne: var(--font-inter);
+  --font-manrope: var(--font-inter);
+  --font-unbounded: var(--font-inter);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer utilities {

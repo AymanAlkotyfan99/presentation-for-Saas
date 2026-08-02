@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 
 from templates import fonts_and_slides_preview
 from templates import pptx_font_utils
@@ -530,6 +531,51 @@ def test_build_google_fonts_stylesheet_url_sorts_and_deduplicates_weights():
     )
 
 
+@pytest.mark.parametrize(
+    "hostile_url",
+    [
+        "http://fonts.googleapis.com/css2?family=Inter",
+        "https://fonts.googleapis.com.evil.example/css2?family=Inter",
+        "https://fonts.googleapis.com@127.0.0.1/style.css?family=Inter",
+        "https://127.0.0.1/internal.css?family=Inter",
+        "http://169.254.169.254/latest/meta-data.css?family=Inter",
+        "https://fonts.googleapis.com:444/css2?family=Inter",
+        "https://fonts.googleapis.com/other.css?family=Inter",
+        "javascript:alert(1).css?family=Inter",
+    ],
+)
+def test_font_stylesheet_links_reject_browser_ssrf_urls(hostile_url):
+    assert (
+        fonts_and_slides_preview._font_stylesheet_links_for_urls([hostile_url])
+        == ""
+    )
+
+
+def test_font_stylesheet_links_accept_only_canonical_google_fonts_url():
+    url = "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap"
+
+    links = fonts_and_slides_preview._font_stylesheet_links_for_urls(
+        [url, url, "https://example.com/theme.css"]
+    )
+
+    assert links == (
+        '<link href="https://fonts.googleapis.com/css2?'
+        'family=DM+Sans:wght@400;700&amp;display=swap" rel="stylesheet">'
+    )
+
+
+def test_selected_google_font_maps_rejects_hostile_stylesheet_url():
+    with pytest.raises(HTTPException) as exc_info:
+        fonts_and_slides_preview._selected_google_font_maps(
+            ["Arial"],
+            ["Inter"],
+            None,
+            ["https://fonts.googleapis.com.evil.example/theme.css?family=Inter"],
+        )
+
+    assert exc_info.value.status_code == 400
+
+
 def test_build_google_fonts_stylesheet_url_supports_italic_variants():
     assert (
         pptx_font_utils.build_google_fonts_stylesheet_url(
@@ -731,11 +777,9 @@ def test_build_slide_preview_html_adds_fixed_viewport_css(monkeypatch):
     )
 
     assert '<base href="http://backend.test/" />' in html
-    assert '<script src="https://cdn.tailwindcss.com"></script>' in html
-    assert (
-        '<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>'
-        in html
-    )
+    assert "cdn.tailwindcss.com" not in html
+    assert '<script src="/static/vendor/chart.umd.min.js"></script>' in html
+    assert "cdn.jsdelivr.net" not in html
     assert "width: 1024px;" in html
     assert "height: 768px;" in html
     assert ".slide-content" in html
@@ -1002,11 +1046,8 @@ async def test_create_slide_previews_from_html_uses_converter_dimensions_and_fon
     assert height == 768
     assert len(htmls) == 1
     html = htmls[0]
-    assert '<script src="https://cdn.tailwindcss.com"></script>' in html
-    assert (
-        '<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>'
-        in html
-    )
+    assert "cdn.tailwindcss.com" not in html
+    assert '<script src="/static/vendor/chart.umd.min.js"></script>' in html
     assert ".deck-font { color: black; }" in html
     assert 'font-family: "Khand Bold";' in html
     assert "fonts.googleapis.com/css2?family=Montserrat" in html

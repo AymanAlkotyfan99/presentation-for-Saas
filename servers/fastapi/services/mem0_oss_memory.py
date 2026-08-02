@@ -97,7 +97,6 @@ def _oss_config_from_env() -> tuple[str, str, str, str, int, dict[str, Any]]:
     ).strip() or "llama3.1:latest"
     llm_api_key = (
         os.getenv("MEM0_LLM_API_KEY")
-        or os.getenv("OPENAI_API_KEY")
         or "ollama"
     ).strip() or "ollama"
     llm_base_url = _normalize_openai_base_url(
@@ -151,7 +150,7 @@ def get_shared_mem0_client() -> Any | None:
     """Return the process-wide mem0 client, or ``None`` if disabled or init failed."""
     global _shared_client, _init_attempted
 
-    if not _to_bool(os.getenv("MEM0_ENABLED"), default=True):
+    if not _to_bool(os.getenv("MEM0_ENABLED"), default=False):
         return None
     if _shared_client is not None:
         return _shared_client

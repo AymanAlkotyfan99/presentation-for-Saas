@@ -94,27 +94,29 @@ Use an inference profile ARN in **Model**, with region **us-east-1**:
 | --- | --- |
 | Provider | `bedrock` |
 | Region | `us-east-1` |
-| Model | `arn:aws:bedrock:us-east-1:471112542209:inference-profile/us.anthropic.claude-sonnet-4-6` |
+| Model | `arn:aws:bedrock:us-east-1:YOUR_ACCOUNT_ID:inference-profile/us.anthropic.claude-sonnet-4-6` |
 | AWS Access Key ID | Your IAM user or role access key |
 | AWS Secret Access Key | Matching secret |
 
-Replace `471112542209` with **your** AWS account ID. The ARN must come from **your** Bedrock console for the profile you enabled.
+Replace `YOUR_ACCOUNT_ID` with **your** AWS account ID. The ARN must come from
+**your** Bedrock console for the profile you enabled.
 
 ### Docker
 
+Put the bootstrap and provider values in a mode-0600 environment file outside
+the repository, then pass the file rather than secrets on the command line:
+
 ```bash
 docker run -it --name presenton -p 5001:80 \
-  -e LLM="bedrock" \
-  -e BEDROCK_REGION="us-east-1" \
-  -e BEDROCK_AWS_ACCESS_KEY_ID="YOUR_ACCESS_KEY_ID" \
-  -e BEDROCK_AWS_SECRET_ACCESS_KEY="YOUR_SECRET_ACCESS_KEY" \
-  -e BEDROCK_MODEL="arn:aws:bedrock:us-east-1:471112542209:inference-profile/us.anthropic.claude-sonnet-4-6" \
-  -e IMAGE_PROVIDER="pexels" \
-  -e PEXELS_API_KEY="YOUR_PEXELS_KEY" \
-  -e CAN_CHANGE_KEYS="false" \
+  --env-file /secure/path/presenton-bedrock.env \
   -v "./app_data:/app_data" \
-  ghcr.io/presenton/presenton:latest
+  ghcr.io/presenton/presenton@sha256:REPLACE_WITH_VERIFIED_RELEASE_DIGEST
 ```
+
+The protected file supplies `AUTH_USERNAME`/`AUTH_PASSWORD` for the first boot,
+the Bedrock variables above, the selected image-provider values, and
+`CAN_CHANGE_KEYS=false`. Remove bootstrap credentials after the administrator is
+created. See `deployment-phase-0.md` for digest verification and secret rotation.
 
 ### On-demand model example (Haiku)
 

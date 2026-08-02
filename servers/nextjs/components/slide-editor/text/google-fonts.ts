@@ -1,3 +1,9 @@
+import {
+  buildFontFaceCss,
+  normalizeFontResource,
+} from "@/lib/font-loading-security.mjs";
+import { getFastAPIUrl } from "@/utils/api";
+
 export type GoogleFontOption = {
   family: string;
   cssUrl: string;
@@ -7,6 +13,10 @@ export type TemplateFontOption = {
   family: string;
   sourceUrl: string;
 };
+
+type NormalizedFontResource = NonNullable<
+  ReturnType<typeof normalizeFontResource>
+>;
 
 type GoogleFontCatalogRecord = {
   font_name?: unknown;
@@ -222,6 +232,7 @@ export const GOOGLE_FONT_OPTIONS: GoogleFontOption[] = [
 
 const GOOGLE_FONT_STYLESHEET_TIMEOUT_MS = 2500;
 const FONT_FACE_LOAD_TIMEOUT_MS = 3000;
+const FONT_POLICY_FALLBACK_ORIGIN = "https://presenton.invalid";
 const LOCAL_FONT_FAMILY_KEYS = new Set(
   [
     "arial",
@@ -288,12 +299,17 @@ export function ensureGoogleFontLoaded(family: string) {
 
   const cssUrl = syncGoogleFontCssUrl(normalizedFamily);
   if (cssUrl) {
-    return ensureStylesheetLoaded(normalizedFamily, cssUrl);
+    const resource = normalizeGoogleFontResource(normalizedFamily, cssUrl);
+    return resource
+      ? ensureStylesheetLoaded(resource.family, resource.url)
+      : null;
   }
 
   return lazyGoogleFontCssUrl(normalizedFamily).then((lazyCssUrl) => {
     if (!lazyCssUrl || typeof document === "undefined") return;
-    return ensureStylesheetLoaded(normalizedFamily, lazyCssUrl) ?? undefined;
+    const resource = normalizeGoogleFontResource(normalizedFamily, lazyCssUrl);
+    if (!resource) return;
+    return ensureStylesheetLoaded(resource.family, resource.url) ?? undefined;
   });
 }
 
@@ -348,6 +364,31 @@ function syncGoogleFontCssUrl(family: string) {
   );
 }
 
+function fontResourcePolicy() {
+  const documentOrigin =
+    typeof window === "undefined"
+      ? FONT_POLICY_FALLBACK_ORIGIN
+      : window.location.origin;
+  const trustedAssetOrigins = [documentOrigin];
+  if (typeof window !== "undefined") {
+    try {
+      trustedAssetOrigins.push(getFastAPIUrl());
+    } catch {
+      // Invalid runtime configuration must not widen the font URL policy.
+    }
+  }
+  return { documentOrigin, trustedAssetOrigins };
+}
+
+function normalizeGoogleFontResource(family: unknown, cssUrl: unknown) {
+  const resource = normalizeFontResource(
+    family,
+    cssUrl,
+    { documentOrigin: FONT_POLICY_FALLBACK_ORIGIN },
+  );
+  return resource?.kind === "stylesheet" ? resource : null;
+}
+
 function googleFontOptionsFromCatalog(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value
@@ -361,10 +402,10 @@ function googleFontOptionFromCatalogRecord(value: unknown) {
   if (typeof record.font_name !== "string") return null;
   if (typeof record.font_url !== "string") return null;
 
-  const family = record.font_name.trim();
-  const cssUrl = record.font_url.trim();
-  if (!family || !cssUrl) return null;
-  return { family, cssUrl };
+  const resource = normalizeGoogleFontResource(record.font_name, record.font_url);
+  return resource
+    ? { family: resource.family, cssUrl: resource.url }
+    : null;
 }
 
 function mergeGoogleFontOptions(
@@ -375,9 +416,10 @@ function mergeGoogleFontOptions(
 
   optionLists.forEach((options) => {
     options.forEach((option) => {
-      const family = option.family.trim();
-      const cssUrl = option.cssUrl.trim();
-      if (!family || !cssUrl) return;
+      const resource = normalizeGoogleFontResource(option.family, option.cssUrl);
+      if (!resource) return;
+      const family = resource.family;
+      const cssUrl = resource.url;
       if (!optionByFamily.has(family)) {
         orderedFamilies.push(family);
       }
@@ -421,11 +463,17 @@ export function templateFontOptionsFromMap(
 export function ensureTemplateFontLoaded(font: TemplateFontOption) {
   if (typeof document === "undefined") return null;
 
-  if (isFontStylesheetUrl(font.sourceUrl)) {
-    return ensureStylesheetLoaded(font.family, font.sourceUrl);
+  const resource = normalizeFontResource(
+    font.family,
+    font.sourceUrl,
+    fontResourcePolicy(),
+  );
+  if (!resource) return null;
+  if (resource.kind === "stylesheet") {
+    return ensureStylesheetLoaded(resource.family, resource.url);
   }
 
-  return ensureFontFaceLoaded(font.family, font.sourceUrl);
+  return ensureFontFaceLoaded(resource);
 }
 
 export function ensureTemplateFontsForDescriptors(
@@ -525,23 +573,25 @@ function ensureStylesheetLoaded(family: string, cssUrl: string) {
   return loadPromise;
 }
 
-function ensureFontFaceLoaded(family: string, sourceUrl: string) {
-  if (findFontFaceStyle(family, sourceUrl)) {
-    return waitForFontDescriptorsLoaded(fontFamilyLoadDescriptors(family));
+function ensureFontFaceLoaded(resource: NormalizedFontResource) {
+  if (resource.kind !== "font") return null;
+  if (findFontFaceStyle(resource.family, resource.url)) {
+    return waitForFontDescriptorsLoaded(
+      fontFamilyLoadDescriptors(resource.family),
+    );
   }
 
+  const css = buildFontFaceCss(resource);
+  if (!css) return null;
   const style = document.createElement("style");
-  style.setAttribute("data-font-url", sourceUrl);
-  style.setAttribute("data-font-family", family);
-  style.textContent = `@font-face {
-  font-family: "${escapeCssString(family)}";
-  src: url("${escapeCssString(sourceUrl)}");
-  font-style: normal;
-  font-display: swap;
-}`;
+  style.setAttribute("data-font-url", resource.url);
+  style.setAttribute("data-font-family", resource.family);
+  style.textContent = css;
   document.head.appendChild(style);
 
-  return waitForFontDescriptorsLoaded(fontFamilyLoadDescriptors(family));
+  return waitForFontDescriptorsLoaded(
+    fontFamilyLoadDescriptors(resource.family),
+  );
 }
 
 function findFontFaceStyle(family: string, sourceUrl: string) {
@@ -549,13 +599,6 @@ function findFontFaceStyle(family: string, sourceUrl: string) {
     (style) =>
       style.getAttribute("data-font-url") === sourceUrl &&
       style.getAttribute("data-font-family") === family,
-  );
-}
-
-function isFontStylesheetUrl(sourceUrl: string) {
-  return (
-    /\.css(\?|$)/i.test(sourceUrl) ||
-    /fonts\.googleapis\.com/.test(sourceUrl)
   );
 }
 
@@ -609,7 +652,7 @@ function withTimeout(promise: Promise<void>, timeoutMs: number) {
 }
 
 function fontFamilyLoadDescriptors(family: string) {
-  const escapedFamily = escapeCssString(family);
+  const escapedFamily = escapeFontDescriptorString(family);
   return [`400 16px "${escapedFamily}"`, `700 16px "${escapedFamily}"`];
 }
 
@@ -619,6 +662,6 @@ function fontFamilyFromFontDescriptor(descriptor: string) {
   return match[1].replace(/\\(["\\])/g, "$1");
 }
 
-function escapeCssString(value: string) {
+function escapeFontDescriptorString(value: string) {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }

@@ -55,17 +55,17 @@ export function initMainSentry(): void {
     return;
   }
 
-  const dsn = "https://48b091ed88ae147c0957a46a823c1449@o4509882707410944.ingest.us.sentry.io/4511171070394368";
-  const isEnabled = parseBoolean(process.env.SENTRY_ENABLED, true);
+  const dsn = process.env.SENTRY_DSN?.trim();
+  const isEnabled = parseBoolean(process.env.SENTRY_ENABLED, false);
 
-  if (!isEnabled) {
+  if (!isEnabled || !dsn) {
     return;
   }
 
-  const tracesSampleRate = parseSampleRate(
-    process.env.SENTRY_TRACES_SAMPLE_RATE,
-    app.isPackaged ? 0.2 : 1.0,
-  );
+  const enableTracing = parseBoolean(process.env.SENTRY_ENABLE_TRACING, false);
+  const tracesSampleRate = enableTracing
+    ? parseSampleRate(process.env.SENTRY_TRACES_SAMPLE_RATE, 0.1)
+    : 0;
 
   try {
     Sentry.init({
@@ -75,9 +75,9 @@ export function initMainSentry(): void {
       environment: getEnvironment(),
       debug: parseBoolean(process.env.SENTRY_DEBUG, false),
       sendDefaultPii: parseBoolean(process.env.SENTRY_SEND_DEFAULT_PII, false),
-      enableLogs: parseBoolean(process.env.SENTRY_ENABLE_LOGS, true),
+      enableLogs: parseBoolean(process.env.SENTRY_ENABLE_LOGS, false),
       tracesSampleRate,
-      integrations: [Sentry.startupTracingIntegration()],
+      integrations: enableTracing ? [Sentry.startupTracingIntegration()] : [],
     });
 
     isSentryInitialized = true;

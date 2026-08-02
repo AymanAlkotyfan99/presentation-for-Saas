@@ -3,10 +3,38 @@ import os
 import sys
 from types import SimpleNamespace
 
+import pytest
 from fastapi import HTTPException
 from services.export_task_service import ExportTaskService
 from services.liteparse_service import LiteParseService
 from utils.runtime_limits import BoundedTextBuffer
+
+
+@pytest.mark.parametrize(
+    "task_type",
+    [
+        "export",
+        "pptx-to-html",
+        "pptx-to-json",
+        "html-to-image",
+        "html-to-images",
+        "json-to-image",
+        "extract-schema",
+    ],
+)
+def test_every_export_runtime_task_fails_closed_by_default(
+    monkeypatch, task_type
+):
+    monkeypatch.delenv("ENABLE_UNVERIFIED_PRESENTATION_EXPORT", raising=False)
+    service = ExportTaskService(timeout_seconds=10)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(service._run_task({"type": task_type}, "unused"))
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail["code"] == (
+        "UNVERIFIED_PRESENTATION_EXPORT_DISABLED"
+    )
 
 
 def test_bounded_text_buffer_keeps_only_tail():

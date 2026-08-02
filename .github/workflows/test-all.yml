@@ -17,16 +17,21 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "20"
+          node-version-file: .nvmrc
           cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Audit locked npm dependencies
+        run: npm audit --audit-level=high
 
       - name: Run repository tests
         run: npm test
@@ -36,6 +41,19 @@ jobs:
 
       - name: Verify presentation export runtime
         run: npm run check:presentation-export
+
+      - name: Generate JavaScript SBOMs
+        run: npm run sbom:node
+
+      - name: Retain JavaScript and external-artifact SBOMs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: node-and-external-sboms
+          path: artifacts/sbom/*.cdx.json
+          if-no-files-found: error
+
+      - name: Validate Docker Compose
+        run: docker compose config --quiet
 
   test-fastapi:
     name: Test FastAPI
@@ -52,27 +70,51 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
+          version: 0.7.22
           enable-cache: true
           cache-dependency-glob: servers/fastapi/uv.lock
 
       - name: Install locked dependencies
         run: uv sync --locked --dev
 
+      - name: Audit locked Python dependencies
+        run: uv run --locked pip-audit --progress-spinner off
+
       - name: Create test directories
         run: mkdir -p "$APP_DATA_DIRECTORY" "$TEMP_DIRECTORY"
 
       - name: Run all pytest tests
         run: uv run --locked python -m pytest --verbose --tb=short
+
+      - name: Compile Python sources
+        run: uv run --locked python -m compileall -q api models services utils
+
+      - name: Verify checked-in OpenAPI contract
+        run: uv run --locked python scripts/generate_openapi_spec.py --check
+
+      - name: Generate Python SBOM
+        run: |
+          mkdir -p ../../artifacts/sbom
+          uv run --locked cyclonedx-py environment --pyproject pyproject.toml --output-reproducible --output-format JSON --output-file ../../artifacts/sbom/python.cdx.json
+
+      - name: Retain Python SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: python-sbom
+          path: artifacts/sbom/python.cdx.json
+          if-no-files-found: error
 
   test-nextjs:
     name: Test Next.js
@@ -83,17 +125,22 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "20"
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: servers/nextjs/package-lock.json
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Audit locked npm dependencies
+        run: npm audit --audit-level=high
 
       - name: Run Node.js tests
         run: npm test
@@ -108,4 +155,36 @@ jobs:
         run: npm run build
 
       - name: Run Cypress component tests
-        run: npx cypress run --component --browser electron
+        run: npm run test:cypress
+
+  test-electron:
+    name: Test Electron
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: electron
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: electron/.nvmrc
+          cache: npm
+          cache-dependency-path: electron/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit locked npm dependencies
+        run: npm audit --audit-level=high
+
+      - name: Run Electron security tests
+        run: npm test
+
+      - name: Type-check and validate main process
+        run: npm run lint:main

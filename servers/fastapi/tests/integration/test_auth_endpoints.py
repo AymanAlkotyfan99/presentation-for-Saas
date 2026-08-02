@@ -35,6 +35,60 @@ def _build_client(tmp_path) -> tuple[TestClient, object]:
     return TestClient(app), engine
 
 
+async def _seed_admin(
+    engine,
+    *,
+    username: str = "admin",
+    password: str = "unit-test-password",
+) -> None:
+    session_maker = async_sessionmaker(engine, expire_on_commit=False)
+    async with session_maker() as session:
+        session.add(
+            User(
+                username=username,
+                hashed_password=PASSWORD_HELPER.hash(password),
+                is_active=True,
+                is_verified=True,
+                is_superuser=True,
+                admin_slot="primary",
+            )
+        )
+        await session.commit()
+
+
+def test_public_setup_route_is_not_registered(monkeypatch, tmp_path):
+    monkeypatch.delenv("DISABLE_AUTH", raising=False)
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("USER_CONFIG_PATH", str(tmp_path / "userConfig.json"))
+    client, engine = _build_client(tmp_path)
+
+    for headers in (
+        {},
+        {"X-Bootstrap-Secret": "clearly-invalid-test-bootstrap-secret"},
+        {"X-Bootstrap-Secret": "clearly-expired-test-bootstrap-secret"},
+        {"X-Bootstrap-Secret": "clearly-disabled-test-bootstrap-secret"},
+    ):
+        response = client.post(
+            "/api/v1/auth/setup",
+            headers=headers,
+            json={"username": "attacker", "password": "unit-test-password"},
+        )
+        assert response.status_code == 404
+
+    status = client.get("/api/v1/auth/status")
+    assert status.status_code == 200
+    assert status.json() == {
+        "configured": True,
+        "authenticated": False,
+        "username": None,
+        "user_id": None,
+        "role": None,
+    }
+    assert "setup_required" not in status.json()
+    client.close()
+    asyncio.run(engine.dispose())
+
+
 def test_login_sets_http_only_jwt_cookie_for_username_only_account(
     monkeypatch, tmp_path
 ):
@@ -42,16 +96,12 @@ def test_login_sets_http_only_jwt_cookie_for_username_only_account(
     monkeypatch.delenv("DISABLE_AUTH", raising=False)
 
     client, engine = _build_client(tmp_path)
-    setup = client.post(
-        "/api/v1/auth/setup",
-        json={"username": "admin", "password": "secret123"},
-    )
+    asyncio.run(_seed_admin(engine))
     response = client.post(
         "/api/v1/auth/login",
-        json={"username": "ADMIN", "password": "secret123"},
+        json={"username": "ADMIN", "password": "unit-test-password"},
     )
 
-    assert setup.status_code == 200
     assert response.status_code == 200
     payload = response.json()
     assert payload["configured"] is True
@@ -61,6 +111,7 @@ def test_login_sets_http_only_jwt_cookie_for_username_only_account(
     assert SESSION_COOKIE_NAME in response.cookies
     assert "HttpOnly" in response.headers["set-cookie"]
 
+    client.close()
     asyncio.run(engine.dispose())
 
 
@@ -68,13 +119,10 @@ def test_admin_access_key_passes_internal_auth_check(monkeypatch, tmp_path):
     monkeypatch.setenv("USER_CONFIG_PATH", str(tmp_path / "userConfig.json"))
     monkeypatch.delenv("DISABLE_AUTH", raising=False)
     client, engine = _build_client(tmp_path)
-    client.post(
-        "/api/v1/auth/setup",
-        json={"username": "admin", "password": "secret123"},
-    )
+    asyncio.run(_seed_admin(engine))
     client.post(
         "/api/v1/auth/login",
-        json={"username": "admin", "password": "secret123"},
+        json={"username": "admin", "password": "unit-test-password"},
     )
     token_response = client.post("/api/v1/auth/token/create")
     token = token_response.json()["token"]
@@ -90,6 +138,7 @@ def test_admin_access_key_passes_internal_auth_check(monkeypatch, tmp_path):
     assert response.json()["method"] == "api_key"
     assert response.json()["role"] == "admin"
 
+    client.close()
     asyncio.run(engine.dispose())
 
 
@@ -121,6 +170,7 @@ def test_legacy_six_character_password_can_still_log_in(monkeypatch, tmp_path):
 
     assert response.status_code == 200
     assert response.json()["role"] == "admin"
+    client.close()
     asyncio.run(engine.dispose())
 
 
@@ -128,9 +178,12 @@ def test_failed_logins_are_rate_limited(monkeypatch, tmp_path):
     monkeypatch.setenv("USER_CONFIG_PATH", str(tmp_path / "userConfig.json"))
     monkeypatch.delenv("DISABLE_AUTH", raising=False)
     client, engine = _build_client(tmp_path)
-    client.post(
-        "/api/v1/auth/setup",
-        json={"username": "rate-admin", "password": "secret123"},
+    asyncio.run(
+        _seed_admin(
+            engine,
+            username="rate-admin",
+            password="unit-test-password",
+        )
     )
     key = login_rate_limit_key("testclient", "rate-admin")
     asyncio.run(LOGIN_RATE_LIMITER.clear(key))
@@ -150,6 +203,7 @@ def test_failed_logins_are_rate_limited(monkeypatch, tmp_path):
         assert blocked.status_code == 429
         assert int(blocked.headers["retry-after"]) > 0
     finally:
+        client.close()
         asyncio.run(LOGIN_RATE_LIMITER.clear(key))
         asyncio.run(engine.dispose())
 
@@ -157,10 +211,7 @@ def test_failed_logins_are_rate_limited(monkeypatch, tmp_path):
 def test_database_rejects_a_second_primary_administrator(monkeypatch, tmp_path):
     monkeypatch.setenv("USER_CONFIG_PATH", str(tmp_path / "userConfig.json"))
     client, engine = _build_client(tmp_path)
-    client.post(
-        "/api/v1/auth/setup",
-        json={"username": "first-admin", "password": "secret123"},
-    )
+    asyncio.run(_seed_admin(engine, username="first-admin"))
 
     async def insert_second_admin():
         session_maker = async_sessionmaker(engine, expire_on_commit=False)
@@ -168,7 +219,7 @@ def test_database_rejects_a_second_primary_administrator(monkeypatch, tmp_path):
             session.add(
                 User(
                     username="second-admin",
-                    hashed_password=PASSWORD_HELPER.hash("secret456"),
+                    hashed_password=PASSWORD_HELPER.hash("another-test-password"),
                     is_active=True,
                     is_verified=True,
                     is_superuser=True,
@@ -183,4 +234,5 @@ def test_database_rejects_a_second_primary_administrator(monkeypatch, tmp_path):
         return False
 
     assert asyncio.run(insert_second_admin()) is True
+    client.close()
     asyncio.run(engine.dispose())

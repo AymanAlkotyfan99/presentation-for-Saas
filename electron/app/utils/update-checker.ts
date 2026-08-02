@@ -171,16 +171,6 @@ function scheduleBannerInjection(
   }, INJECT_DELAY_MS);
 }
 
-/** Escape HTML to prevent XSS; preserve newlines for display. */
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/\n/g, "<br>");
-}
-
 /**
  * Injects an update banner at the bottom, aligned with the app UI.
  * Includes a "View details" overlay for changelog/message.
@@ -195,18 +185,30 @@ function injectUpdateBanner(
     return;
   }
 
-  const hasMessage = Boolean(message && message.trim());
-  const safeMessage = hasMessage ? escapeHtml(message!.trim()) : "";
-  const safeMessageJson = JSON.stringify(safeMessage);
-  const viewDetailsBtnHtml = hasMessage
-    ? '<button id="__presenton_view_details_btn__" style="color:#64748b;background:none;border:none;cursor:pointer;font-size:12px;padding:4px 8px;text-decoration:underline;text-underline-offset:2px;">View details</button>'
-    : "";
+  const payloadJson = JSON.stringify({
+    latest,
+    current: CURRENT_VERSION,
+    downloadUrl,
+    message: message?.trim() ?? "",
+  })
+    .split("<")
+    .join("\\u003c")
+    .split("\u2028")
+    .join("\\u2028")
+    .split("\u2029")
+    .join("\\u2029");
 
   const script = /* js */ `
     (function () {
       if (document.getElementById('__presenton_update_banner__')) return;
 
-      const msgHtml = ${safeMessageJson};
+      const payload = ${payloadJson};
+      const make = function(tag, cssText, text) {
+        const element = document.createElement(tag);
+        if (cssText) element.style.cssText = cssText;
+        if (text !== undefined) element.textContent = String(text);
+        return element;
+      };
 
       const banner = document.createElement('div');
       banner.id = '__presenton_update_banner__';
@@ -234,43 +236,62 @@ function injectUpdateBanner(
         'gap:12px',
       ].join(';');
 
-      banner.innerHTML = \`
-        <span style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
-          <span style="font-size:18px;">✨</span>
-          <span>
-            Presenton&nbsp;<strong style="color:#5141e5">${latest}</strong>&nbsp;is available
-            &mdash;&nbsp;you have&nbsp;<strong>${CURRENT_VERSION}</strong>
-          </span>
-        </span>
-        <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">
-          ${viewDetailsBtnHtml}
-          <a href="${downloadUrl}" target="_blank" style="color:#fff;text-decoration:none;background:#5141e5;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:500;white-space:nowrap;">Download update</a>
-          <button onclick="document.getElementById('__presenton_update_banner__').remove();var o=document.getElementById('__presenton_update_overlay__');if(o)o.remove();" title="Dismiss" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:20px;line-height:1;padding:0 2px;">&times;</button>
-        </div>
-      \`;
+      const summary = make('span', 'display:flex;align-items:center;gap:8px;flex:1;min-width:0;');
+      summary.appendChild(make('span', 'font-size:18px;', '✨'));
+      const versionText = make('span');
+      versionText.appendChild(document.createTextNode('Presenton '));
+      versionText.appendChild(make('strong', 'color:#5141e5;', payload.latest));
+      versionText.appendChild(document.createTextNode(' is available — you have '));
+      versionText.appendChild(make('strong', '', payload.current));
+      summary.appendChild(versionText);
+
+      const actions = make('div', 'display:flex;gap:8px;align-items:center;flex-shrink:0;');
+      let overlay = null;
+      if (payload.message) {
+        const detailsButton = make('button', 'color:#64748b;background:none;border:none;cursor:pointer;font-size:12px;padding:4px 8px;text-decoration:underline;text-underline-offset:2px;', 'View details');
+        detailsButton.type = 'button';
+        actions.appendChild(detailsButton);
+
+        overlay = make('div', 'position:fixed;inset:0;background:rgba(0,0,0,0.4);display:none;align-items:center;justify-content:center;z-index:2147483647;padding:24px;');
+        overlay.id = '__presenton_update_overlay__';
+        const panel = make('div', 'background:#fff;border-radius:16px;max-width:420px;width:100%;max-height:80vh;overflow:auto;box-shadow:0 24px 48px rgba(0,0,0,0.15);padding:24px;');
+        const headingRow = make('div', 'display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;');
+        const heading = make('h3', 'margin:0;font-size:18px;font-weight:600;color:#191919;');
+        heading.appendChild(document.createTextNode("What's new in "));
+        heading.appendChild(document.createTextNode(payload.latest));
+        const closeDetails = make('button', 'background:none;border:none;color:#94a3b8;cursor:pointer;font-size:24px;line-height:1;padding:0;', '×');
+        closeDetails.type = 'button';
+        closeDetails.setAttribute('aria-label', 'Close update details');
+        const details = make('div', 'color:#475569;font-size:14px;line-height:1.6;white-space:pre-wrap;', payload.message);
+        headingRow.append(heading, closeDetails);
+        panel.append(headingRow, details);
+        overlay.appendChild(panel);
+        overlay.addEventListener('click', function(event) { if (event.target === overlay) overlay.style.display = 'none'; });
+        panel.addEventListener('click', function(event) { event.stopPropagation(); });
+        closeDetails.addEventListener('click', function() { overlay.style.display = 'none'; });
+        detailsButton.addEventListener('click', function() { overlay.style.display = 'flex'; });
+      }
+
+      const download = make('a', 'color:#fff;text-decoration:none;background:#5141e5;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:500;white-space:nowrap;', 'Download update');
+      download.target = '_blank';
+      download.rel = 'noopener noreferrer';
+      try {
+        const parsedDownload = new URL(payload.downloadUrl);
+        if (parsedDownload.protocol === 'https:') download.href = parsedDownload.href;
+      } catch (_) {}
+
+      const dismiss = make('button', 'background:none;border:none;color:#94a3b8;cursor:pointer;font-size:20px;line-height:1;padding:0 2px;', '×');
+      dismiss.type = 'button';
+      dismiss.title = 'Dismiss';
+      dismiss.addEventListener('click', function() {
+        banner.remove();
+        if (overlay) overlay.remove();
+      });
+      actions.append(download, dismiss);
+      banner.append(summary, actions);
 
       document.body.appendChild(banner);
-
-      if (msgHtml) {
-        const overlay = document.createElement('div');
-        overlay.id = '__presenton_update_overlay__';
-        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);display:none;align-items:center;justify-content:center;z-index:2147483647;padding:24px;';
-        overlay.onclick = function(e) { if (e.target === overlay) overlay.style.display = 'none'; };
-        overlay.innerHTML = \`
-          <div style="background:#fff;border-radius:16px;max-width:420px;width:100%;max-height:80vh;overflow:auto;box-shadow:0 24px 48px rgba(0,0,0,0.15);padding:24px;" onclick="event.stopPropagation()">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-              <h3 style="margin:0;font-size:18px;font-weight:600;color:#191919;">What's new in ${latest}</h3>
-              <button onclick="document.getElementById('__presenton_update_overlay__').style.display='none'" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:24px;line-height:1;padding:0;">&times;</button>
-            </div>
-            <div style="color:#475569;font-size:14px;line-height:1.6;" id="__presenton_overlay_content__"></div>
-          </div>
-        \`;
-        document.body.appendChild(overlay);
-        document.getElementById('__presenton_overlay_content__').innerHTML = msgHtml;
-        document.getElementById('__presenton_view_details_btn__').onclick = function() {
-          document.getElementById('__presenton_update_overlay__').style.display = 'flex';
-        };
-      }
+      if (overlay) document.body.appendChild(overlay);
     })();
   `;
 

@@ -91,6 +91,17 @@ def test_icon_finder_falls_back_to_bold_when_weighted_icon_missing(monkeypatch):
     assert icon_url.endswith("/static/icons/bold/chart-line-up-bold.svg")
 
 
+def test_icon_finder_uses_bundled_lexical_search_by_default(monkeypatch):
+    monkeypatch.delenv("ENABLE_SEMANTIC_ICON_SEARCH", raising=False)
+    monkeypatch.delenv("ALLOW_UNVERIFIED_FASTEMBED_MODELS", raising=False)
+    service = IconFinderService()
+
+    results = asyncio.run(service.search_icons("airplane", k=1, weight="bold"))
+
+    assert service.semantic_enabled is False
+    assert results[0].endswith("/static/icons/bold/airplane-bold.svg")
+
+
 def test_process_slide_fetches_icons_with_template_weight(monkeypatch):
     captured = {}
 

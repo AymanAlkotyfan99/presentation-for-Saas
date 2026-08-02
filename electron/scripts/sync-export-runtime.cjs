@@ -1,7 +1,7 @@
 const fs = require("fs");
-const http = require("http");
 const https = require("https");
 const path = require("path");
+const crypto = require("crypto");
 const { execFileSync } = require("child_process");
 
 const electronRoot = path.join(__dirname, "..");
@@ -17,6 +17,12 @@ const versionManifestPath = path.join(
   "presenton-export-version.json",
 );
 const cacheDir = path.join(electronRoot, ".cache", "export-runtime");
+const artifactIntegrityFile = path.join(
+  electronRoot,
+  "..",
+  "config",
+  "artifact-integrity.json",
+);
 const exportRepoBase = "https://github.com/presenton/presenton-export/releases/download";
 const exportVersion = packageJson.exportVersion || "v0.1.0";
 
@@ -61,12 +67,70 @@ function readInstalledVersion() {
   }
 }
 
-function writeInstalledVersion(version, asset) {
+function sha256File(filePath) {
+  const hash = crypto.createHash("sha256");
+  hash.update(fs.readFileSync(filePath));
+  return hash.digest("hex");
+}
+
+function readArtifactPolicy(version, asset) {
+  if (!fs.existsSync(artifactIntegrityFile)) {
+    throw new Error("Missing config/artifact-integrity.json; refusing unverified export download.");
+  }
+  const policy = JSON.parse(fs.readFileSync(artifactIntegrityFile, "utf8"));
+  if (policy.presentationExport?.version !== version) {
+    throw new Error(`No integrity policy exists for presentation export ${version}.`);
+  }
+  const sha256 = policy.presentationExport.assets?.[asset];
+  if (!/^[a-f0-9]{64}$/.test(sha256 || "")) {
+    throw new Error(`No valid SHA-256 is pinned for ${asset}; refusing download.`);
+  }
+  return { sha256 };
+}
+
+function verifySha256(filePath, expectedSha256) {
+  const actual = sha256File(filePath);
+  if (actual !== expectedSha256) {
+    try {
+      fs.rmSync(filePath, { force: true });
+    } catch {
+      // Best effort; mismatch still fails closed.
+    }
+    throw new Error(
+      `SHA-256 mismatch for ${path.basename(filePath)}. Expected ${expectedSha256}; got ${actual}.`,
+    );
+  }
+}
+
+function writeInstalledVersion(version, asset, sourceSha256) {
   fs.writeFileSync(
     versionManifestPath,
-    `${JSON.stringify({ version, asset }, null, 2)}\n`,
+    `${JSON.stringify({ version, asset, sourceSha256 }, null, 2)}\n`,
     "utf8",
   );
+}
+
+function recordInstalledFileHashes() {
+  const version = readInstalledVersion();
+  if (!version.ok) throw new Error(version.reason);
+  const converterPath = getConverterCandidates().find((candidate) => fs.existsSync(candidate));
+  if (!converterPath || !fs.existsSync(targetIndex)) {
+    throw new Error("Cannot record export runtime integrity: required files are missing.");
+  }
+  const manifest = {
+    ...version.manifest,
+    files: {
+      index: {
+        path: path.relative(targetRoot, targetIndex),
+        sha256: sha256File(targetIndex),
+      },
+      converter: {
+        path: path.relative(targetRoot, converterPath),
+        sha256: sha256File(converterPath),
+      },
+    },
+  };
+  fs.writeFileSync(versionManifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 }
 
 function getPlatformAssetName() {
@@ -164,7 +228,7 @@ function isFormatCompatible(format) {
   return true;
 }
 
-function validateExistingRuntime(expectedVersion, expectedAsset) {
+function validateExistingRuntime(expectedVersion, expectedAsset, expectedSha256) {
   const installedVersion = readInstalledVersion();
   if (!installedVersion.ok) {
     return installedVersion;
@@ -180,6 +244,12 @@ function validateExistingRuntime(expectedVersion, expectedAsset) {
         `Expected: ${expectedVersion} (${expectedAsset})`,
         `Installed: ${installedVersion.manifest.version || "unknown"} (${installedVersion.manifest.asset || "unknown"})`,
       ].join("\n"),
+    };
+  }
+  if (installedVersion.manifest.sourceSha256 !== expectedSha256) {
+    return {
+      ok: false,
+      reason: "Installed export runtime does not match the pinned source SHA-256.",
     };
   }
 
@@ -213,7 +283,16 @@ function validateExistingRuntime(expectedVersion, expectedAsset) {
     };
   }
 
-  chmodIfPossible(converterPath);
+  const files = installedVersion.manifest.files || {};
+  if (
+    !/^[a-f0-9]{64}$/.test(files.index?.sha256 || "") ||
+    !/^[a-f0-9]{64}$/.test(files.converter?.sha256 || "") ||
+    sha256File(targetIndex) !== files.index.sha256 ||
+    sha256File(converterPath) !== files.converter.sha256
+  ) {
+    return { ok: false, reason: "Installed export runtime file-integrity validation failed." };
+  }
+
   return { ok: true, converterPath };
 }
 
@@ -246,8 +325,10 @@ function hasExportDirectoryContent() {
 }
 
 function request(url) {
-  const client = url.startsWith("https:") ? https : http;
-  return client;
+  if (!url.startsWith("https:")) {
+    throw new Error(`Refusing non-HTTPS export runtime request: ${url}`);
+  }
+  return https;
 }
 
 function requestJson(url, redirects = 5) {
@@ -517,7 +598,7 @@ function resolveExtractedRoot(extractDir) {
   );
 }
 
-async function downloadAndInstallRuntime(tag, assetName) {
+async function downloadAndInstallRuntime(tag, assetName, expectedSha256) {
   const downloadUrl = `${exportRepoBase}/${tag}/${assetName}`;
 
   ensureDir(cacheDir);
@@ -528,6 +609,7 @@ async function downloadAndInstallRuntime(tag, assetName) {
   console.log(`[export-runtime] Downloading ${downloadUrl}`);
   try {
     await downloadFileWithRetries(downloadUrl, zipPath);
+    verifySha256(zipPath, expectedSha256);
   } catch (err) {
     try {
       fs.unlinkSync(zipPath);
@@ -545,7 +627,7 @@ async function downloadAndInstallRuntime(tag, assetName) {
     fs.rmSync(targetRoot, { recursive: true, force: true });
     ensureDir(targetRoot);
     fs.cpSync(sourceRoot, targetRoot, { recursive: true, force: true });
-    writeInstalledVersion(tag, assetName);
+    writeInstalledVersion(tag, assetName, expectedSha256);
   } finally {
     fs.rmSync(extractDir, { recursive: true, force: true });
   }
@@ -556,7 +638,8 @@ async function downloadAndInstallRuntime(tag, assetName) {
 async function main() {
   const targetVersion = await getTargetVersion();
   const assetName = getPlatformAssetName();
-  const existing = validateExistingRuntime(targetVersion, assetName);
+  const { sha256: expectedSha256 } = readArtifactPolicy(targetVersion, assetName);
+  const existing = validateExistingRuntime(targetVersion, assetName, expectedSha256);
 
   if (checkOnly) {
     if (!existing.ok) {
@@ -570,7 +653,9 @@ async function main() {
   }
 
   if (existing.ok && !forceDownload) {
-    patchHtmlToImageRuntime();
+    if (patchHtmlToImageRuntime()) {
+      recordInstalledFileHashes();
+    }
     console.log("[export-runtime] Using existing runtime artifacts:");
     console.log(`  - ${targetIndex}`);
     console.log(`  - ${existing.converterPath}`);
@@ -585,9 +670,11 @@ async function main() {
   const { tag, downloadUrl } = await downloadAndInstallRuntime(
     targetVersion,
     assetName,
+    expectedSha256,
   );
   patchHtmlToImageRuntime();
-  const installed = validateExistingRuntime(targetVersion, assetName);
+  recordInstalledFileHashes();
+  const installed = validateExistingRuntime(targetVersion, assetName, expectedSha256);
   if (!installed.ok) {
     throw new Error(installed.reason);
   }
@@ -599,7 +686,11 @@ async function main() {
   console.log(`  - ${installed.converterPath}`);
 }
 
-main().catch((error) => {
-  console.error(`[export-runtime] ${error.message}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(`[export-runtime] ${error.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = { readArtifactPolicy, sha256File, verifySha256 };

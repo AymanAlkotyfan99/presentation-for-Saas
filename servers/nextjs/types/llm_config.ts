@@ -132,4 +132,5 @@ export interface LLMConfig {
 
   /** When `"true"`, anonymous analytics (Mixpanel) are off */
   DISABLE_ANONYMOUS_TRACKING?: string;
+  ENABLE_ANONYMOUS_TRACKING?: string;
 }

@@ -5,10 +5,13 @@ from urllib.parse import urlencode
 import uuid
 
 from pathvalidate import sanitize_filename
-
+from api.operation_security import guarded_operation
 from models.presentation_and_path import PresentationAndPath
 from utils.filename_utils import safe_export_basename
-from services.export_task_service import EXPORT_TASK_SERVICE
+from services.export_task_service import (
+    EXPORT_TASK_SERVICE,
+    ensure_unverified_export_enabled,
+)
 from utils.runtime_limits import log_memory
 
 
@@ -40,12 +43,14 @@ def _build_presentation_export_url(
     )
 
 
+@guarded_operation("export")
 async def export_presentation(
     presentation_id: uuid.UUID,
     title: str,
     export_as: Literal["pptx", "pdf"],
     cookie_header: str | None = None,
 ) -> PresentationAndPath:
+    ensure_unverified_export_enabled()
     log_memory(
         LOGGER,
         "presentation.export.start",

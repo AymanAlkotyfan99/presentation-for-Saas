@@ -60,24 +60,9 @@ if (process.platform === "darwin") {
   app.commandLine.appendSwitch("use-mock-keychain");
 }
 
-// Linux Chromium requires chrome-sandbox to be root-owned mode 4755; unpacked
-// dist/linux-unpacked builds usually lack that. Disable sandbox only when invalid.
+// Linux packages must provide a working setuid/user-namespace sandbox. Fail at
+// startup on broken packaging instead of silently disabling a security boundary.
 if (process.platform === "linux") {
-  try {
-    const sandboxPath = path.join(path.dirname(process.execPath), "chrome-sandbox");
-    if (fs.existsSync(sandboxPath)) {
-      const st = fs.statSync(sandboxPath);
-      const hasSetuid = (st.mode & 0o4777) === 0o4755;
-      const rootOwned = st.uid === 0;
-      if (!(hasSetuid && rootOwned)) {
-        app.commandLine.appendSwitch("no-sandbox");
-      }
-    } else {
-      app.commandLine.appendSwitch("no-sandbox");
-    }
-  } catch {
-    app.commandLine.appendSwitch("no-sandbox");
-  }
   // Fall back to /tmp instead of shared memory to avoid Chromium crashes
   // on systems where /dev/shm is unavailable/misconfigured.
   app.commandLine.appendSwitch("disable-dev-shm-usage");
@@ -262,7 +247,7 @@ const createWindow = (appOrigin: string) => {
         // the `contextBridge` API is exposed reliably to renderer pages.
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: false,
+        sandbox: true,
         preload: (() => {
           const p = path.join(__dirname, 'preloads/index.js');
           try {
@@ -481,7 +466,7 @@ app.whenReady().then(async () => {
   const [fastApiPort, nextjsPort] = await findUnusedPorts();
   safeLog(`FastAPI port: ${fastApiPort}, NextJS port: ${nextjsPort}`);
   setupEnv(fastApiPort, nextjsPort);
-  setupIpcHandlers();
+  setupIpcHandlers(`${localhost}:${nextjsPort}`);
 
   await finishChromiumCacheRecovery(
     electronAppPaths.userDataDir,

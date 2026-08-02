@@ -30,6 +30,22 @@ LOGGER = logging.getLogger(__name__)
 
 EXPORT_DIRECTORY_MODE = 0o755
 EXPORT_FILE_MODE = 0o644
+UNVERIFIED_EXPORT_DISABLED_DETAIL = {
+    "code": "UNVERIFIED_PRESENTATION_EXPORT_DISABLED",
+    "message": (
+        "The legacy presentation exporter is disabled pending "
+        "supply-chain and legal review."
+    ),
+}
+
+
+def ensure_unverified_export_enabled() -> None:
+    """Fail closed before any legacy export-runtime task can execute."""
+    if os.getenv("ENABLE_UNVERIFIED_PRESENTATION_EXPORT", "false").lower() != "true":
+        raise HTTPException(
+            status_code=503,
+            detail=UNVERIFIED_EXPORT_DISABLED_DETAIL,
+        )
 
 
 def _localize_json_image_assets(
@@ -203,9 +219,9 @@ class ExportTaskService:
     @staticmethod
     def _resolve_converter_path(export_dir: str) -> str:
         py_dir = os.path.join(export_dir, "py")
-        extension = ".exe" if os.name == "nt" else ""
         platform_name = sys_platform()
         arch_name = sys_arch()
+        extension = ".exe" if platform_name == "win32" else ""
 
         candidates: list[str] = []
         configured = (os.getenv("BUILT_PYTHON_MODULE_PATH") or "").strip()
@@ -368,6 +384,7 @@ class ExportTaskService:
         return await self._run_task_locked(task_payload, response_error_detail)
 
     async def _run_task_locked(self, task_payload: dict, response_error_detail: str) -> dict:
+        ensure_unverified_export_enabled()
         self._ensure_runtime_ready()
         temp_dir, task_path, response_path = self._create_task_paths()
 

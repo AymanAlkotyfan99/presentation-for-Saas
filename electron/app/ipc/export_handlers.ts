@@ -23,6 +23,7 @@ import {
   resolveLaunchableExportChromiumPath,
 } from "../utils/export-chromium";
 import { resolveExportSpawnTarget } from "../utils/export-msix-runtime";
+import { assertTrustedIpcSender } from "./security";
 
 type BinaryFormat = "elf" | "mach-o" | "pe" | "unknown";
 type RuntimeCandidate = {
@@ -53,10 +54,48 @@ export async function stopActiveExportProcesses(): Promise<void> {
   );
 }
 
-export function setupExportHandlers() {
-  ipcMain.handle("export-presentation", async (_, id: string, title: string, exportAs: "pptx" | "pdf") => {
+function assertValidExportRequest(
+  request: { id: unknown; title: unknown; exportAs: unknown },
+): asserts request is { id: string; title: string; exportAs: "pptx" | "pdf" } {
+  const { id, title, exportAs } = request;
+  if (
+    typeof id !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+  ) {
+    throw new Error("Invalid presentation id");
+  }
+  if (
+    typeof title !== "string" ||
+    title.length > 512 ||
+    /[\u0000-\u001f\u007f]/.test(title)
+  ) {
+    throw new Error("Invalid presentation title");
+  }
+  if (exportAs !== "pptx" && exportAs !== "pdf") {
+    throw new Error("Invalid export format");
+  }
+}
+
+export function setupExportHandlers(trustedOrigin: string) {
+  ipcMain.handle("export-presentation", async (event, rawId: unknown, rawTitle: unknown, rawExportAs: unknown) => {
     let exportTempDir: string | undefined;
+    let auditId: string | undefined;
+    let auditFormat: "pptx" | "pdf" | undefined;
     try {
+      assertTrustedIpcSender(event, trustedOrigin);
+      if (process.env.ENABLE_UNVERIFIED_PRESENTATION_EXPORT !== "true") {
+        return {
+          success: false,
+          code: "UNVERIFIED_PRESENTATION_EXPORT_DISABLED",
+          message:
+            "The legacy presentation exporter is disabled pending supply-chain and legal review.",
+        };
+      }
+      const request = { id: rawId, title: rawTitle, exportAs: rawExportAs };
+      assertValidExportRequest(request);
+      const { id, title, exportAs } = request;
+      auditId = id;
+      auditFormat = exportAs;
       await removeBrokenExportChromiumCaches();
       if (!isExportChromiumAvailable()) {
         return {
@@ -82,7 +121,7 @@ export function setupExportHandlers() {
         type: "export",
         url: pptUrl,
         format: exportAs,
-        title: title,
+        title,
         fastapiUrl: process.env.NEXT_PUBLIC_FAST_API,
       };
 
@@ -165,8 +204,8 @@ export function setupExportHandlers() {
     } catch (error: any) {
       safeError("[Export] Error exporting presentation:", error);
       addMainBreadcrumb("export", "electron.ipc_export.error", {
-        id,
-        exportAs,
+        id: auditId,
+        exportAs: auditFormat,
         message: error?.message,
         memory: memorySnapshotMb(),
       });

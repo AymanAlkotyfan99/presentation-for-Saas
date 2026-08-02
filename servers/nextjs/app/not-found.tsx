@@ -6,24 +6,15 @@ export const metadata: Metadata = {
   title: "Page not found | Presenton",
 };
 
-/**
- * Unknown routes only. Keep the 404.svg inside a fixed max height + object-contain
- * so the illustration never scales to full-viewport (the old w-3/4-only layout could).
- */
 export default function NotFound() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100 p-6 text-center">
       <div className="mx-auto w-full max-w-lg rounded-lg bg-white p-8 shadow-md">
-        <div className="mx-auto mb-6 flex h-48 w-full max-w-[300px] items-center justify-center overflow-hidden sm:h-56 sm:max-w-sm">
-          <img
-            src="/404.svg"
-            alt="Page not found"
-            width={500}
-            height={500}
-            className="h-full w-full object-contain object-center"
-            loading="eager"
-            decoding="async"
-          />
+        <div
+          aria-hidden="true"
+          className="mx-auto mb-6 flex h-48 w-full max-w-[300px] items-center justify-center rounded-3xl bg-gradient-to-br from-violet-100 to-indigo-50 text-7xl font-bold tracking-tight text-violet-700 sm:h-56 sm:max-w-sm sm:text-8xl"
+        >
+          404
         </div>
         <h1 className="mb-4 font-syne text-2xl font-bold text-gray-800 sm:text-3xl">
           Oops! Page Not Found

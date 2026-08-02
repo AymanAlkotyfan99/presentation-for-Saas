@@ -67,14 +67,14 @@ def test_list_models_returns_service_unavailable_when_ollama_is_unreachable(
     monkeypatch,
 ):
     monkeypatch.setenv("OLLAMA_URL", "http://host.docker.internal:11434/")
-    monkeypatch.setattr(ollama.aiohttp, "ClientSession", _FailingClientSession)
+    monkeypatch.setattr(ollama, "SecureClientSession", _FailingClientSession)
 
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(ollama.list_available_ollama_models("http://ollama.example:11434/"))
 
     assert exc_info.value.status_code == 503
-    assert "http://ollama.example:11434" in exc_info.value.detail
-    assert "instead of localhost" in exc_info.value.detail
+    assert "configured Ollama endpoint" in exc_info.value.detail
+    assert "OUTBOUND_HTTP_ALLOWLIST" in exc_info.value.detail
 
 
 def test_list_models_rejects_invalid_ollama_url():
@@ -86,10 +86,20 @@ def test_list_models_rejects_invalid_ollama_url():
 
 
 def test_list_models_rejects_invalid_ollama_payload(monkeypatch):
-    monkeypatch.setattr(ollama.aiohttp, "ClientSession", _BadPayloadClientSession)
+    monkeypatch.setattr(ollama, "SecureClientSession", _BadPayloadClientSession)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(ollama.list_available_ollama_models("https://ollama.example"))
+
+    assert exc_info.value.status_code == 502
+    assert exc_info.value.detail == "Ollama returned an invalid models response"
+
+
+def test_list_models_blocks_localhost_without_explicit_allowlist(monkeypatch):
+    monkeypatch.delenv("OUTBOUND_HTTP_ALLOWLIST", raising=False)
 
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(ollama.list_available_ollama_models("http://localhost:11434"))
 
-    assert exc_info.value.status_code == 502
-    assert exc_info.value.detail == "Ollama returned an invalid models response"
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail["code"] == "OUTBOUND_URL_BLOCKED"

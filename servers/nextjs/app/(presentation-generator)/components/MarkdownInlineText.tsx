@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { marked } from "marked";
+import React, { useMemo } from "react";
+import { renderSafeInlineMarkdown } from "@/lib/safe-markdown";
 
 interface MarkdownInlineTextProps {
   content: string;
@@ -18,23 +18,10 @@ const MarkdownInlineText: React.FC<MarkdownInlineTextProps> = ({
   className = "",
   style,
 }) => {
-  const [html, setHtml] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    const parse = async () => {
-      try {
-        const parsed = await marked.parseInline(content || "");
-        if (!cancelled) setHtml(parsed);
-      } catch {
-        if (!cancelled) setHtml(content || "");
-      }
-    };
-    void parse();
-    return () => {
-      cancelled = true;
-    };
-  }, [content]);
+  const html = useMemo(
+    () => renderSafeInlineMarkdown(content || ""),
+    [content]
+  );
 
   if (!html) {
     return (

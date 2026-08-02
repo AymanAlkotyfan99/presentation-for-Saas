@@ -1035,7 +1035,7 @@ const PresentonMode = ({
             </div>
             <div className='flex items-center gap-2 bg-[#F0F3F9B2] rounded-[8px]  px-6 py-2.5 my-[54px]'>
                 <Info className='w-4 h-4 fill-[#003399] stroke-white' />
-                <p className='text-sm text-[#5F6062] font-medium'>Runs locally on your device. Your API keys and generation setup stay on your machine.</p>
+                <p className='text-sm text-[#5F6062] font-medium'>Presenton runs on this deployment. Generation data may be sent to the providers you select, and keys and settings are stored on the deployment host.</p>
             </div>
 
             {providerStep === 1 && <>

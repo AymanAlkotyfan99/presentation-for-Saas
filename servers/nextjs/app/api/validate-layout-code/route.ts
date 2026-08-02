@@ -4,6 +4,10 @@ import {
   LayoutCodeValidationError,
   validateLayoutCode,
 } from "@/lib/validate-layout-code";
+import {
+  isUnsafeCustomLayoutServerEnabled,
+  UNSAFE_CUSTOM_LAYOUTS_ERROR_CODE,
+} from "@/lib/unsafe-custom-layouts";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +24,17 @@ function invalidResponse(error: string, line?: number, column?: number) {
 }
 
 export async function POST(request: Request) {
+  if (!isUnsafeCustomLayoutServerEnabled()) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Executable custom layouts are disabled",
+        code: UNSAFE_CUSTOM_LAYOUTS_ERROR_CODE,
+      },
+      { status: 503 },
+    );
+  }
+
   let payload: unknown;
   try {
     payload = await request.json();

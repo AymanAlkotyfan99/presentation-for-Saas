@@ -7,6 +7,7 @@ import * as Babel from "@babel/standalone";
 import * as d3 from "d3";
 import * as LucideReact from "lucide-react";
 import { resolveBackendAssetUrl } from "@/utils/api";
+import { isUnsafeCustomLayoutClientEnabled } from "@/lib/unsafe-custom-layouts";
 // import * as d3Cloud from "d3-cloud";
 
 /** Names already bound from Recharts (and core helpers) — do not shadow with Lucide. */
@@ -190,6 +191,11 @@ function normalizeHardcodedBackendUrlsInCode(layoutCode: string): string {
  * Compiles a layout code string into a usable React component
  */
 export function compileCustomLayout(layoutCode: string): CompiledLayout | null {
+    if (!isUnsafeCustomLayoutClientEnabled()) {
+        return createInvalidCompiledLayout(
+            "Executable custom layouts are disabled by the deployment security policy."
+        );
+    }
     console.log('compileCustomLayout called');
     try {
         const normalizedLayoutCode = normalizeHardcodedBackendUrlsInCode(layoutCode);

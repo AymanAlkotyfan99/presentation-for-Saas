@@ -3,6 +3,7 @@ const fs = require("fs");
 const https = require("https");
 const os = require("os");
 const path = require("path");
+const crypto = require("crypto");
 const { spawnSync } = require("child_process");
 const { path7za } = require("7zip-bin");
 
@@ -12,6 +13,107 @@ const ARCH = process.arch;
 const TARGET_DIR = path.join(__dirname, "..", "resources", "imagemagick", `${PLATFORM}-${ARCH}`);
 const CACHE_DIR = path.join(__dirname, "..", ".cache", "imagemagick", VERSION);
 const MANIFEST_NAME = "presenton-runtime.json";
+const MANIFEST_SCHEMA_VERSION = 1;
+const PREPARED_RUNTIME_TOKEN = Symbol("prepared-runtime-token");
+const EXPORT_ENABLED =
+  process.env.ENABLE_UNVERIFIED_PRESENTATION_EXPORT === "true";
+const MAC_SOURCE_TREE_SHA256 =
+  process.env.IMAGEMAGICK_MAC_SOURCE_TREE_SHA256?.trim().toLowerCase() || "";
+const INTEGRITY_FILE = path.join(
+  __dirname,
+  "..",
+  "..",
+  "config",
+  "artifact-integrity.json",
+);
+
+function sha256File(filePath) {
+  const hash = crypto.createHash("sha256");
+  hash.update(fs.readFileSync(filePath));
+  return hash.digest("hex");
+}
+
+function isSha256(value) {
+  return /^[a-f0-9]{64}$/.test(value || "");
+}
+
+function readImageMagickPolicy() {
+  if (!fs.existsSync(INTEGRITY_FILE)) {
+    throw new Error("Missing config/artifact-integrity.json; refusing unverified ImageMagick download.");
+  }
+  const policy = JSON.parse(fs.readFileSync(INTEGRITY_FILE, "utf8"));
+  if (policy.imageMagick?.version !== VERSION) {
+    throw new Error(`No integrity policy is pinned for ImageMagick ${VERSION}.`);
+  }
+  if (!policy.imageMagick.assets || typeof policy.imageMagick.assets !== "object") {
+    throw new Error(`ImageMagick ${VERSION} integrity policy has no asset map.`);
+  }
+  return policy.imageMagick;
+}
+
+function expectedSha256(assetName) {
+  const digest = readImageMagickPolicy().assets[assetName];
+  if (!isSha256(digest)) {
+    throw new Error(`No SHA-256 is pinned for ImageMagick asset ${assetName}.`);
+  }
+  return digest;
+}
+
+function sha256Tree(rootDir, options = {}) {
+  const excludeManifest = options.excludeManifest !== false;
+  const resolvedRoot = path.resolve(rootDir);
+  if (!fs.existsSync(resolvedRoot)) {
+    throw new Error(`Cannot hash missing runtime directory: ${resolvedRoot}`);
+  }
+  const rootStat = fs.lstatSync(resolvedRoot);
+  if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) {
+    throw new Error(`Runtime tree root must be a real directory: ${resolvedRoot}`);
+  }
+
+  const hash = crypto.createHash("sha256");
+  const walk = (currentDir, relativeDir = "") => {
+    const entries = fs
+      .readdirSync(currentDir, { withFileTypes: true })
+      .sort((left, right) => left.name.localeCompare(right.name, "en"));
+
+    for (const entry of entries) {
+      const relativePath = relativeDir
+        ? `${relativeDir}/${entry.name}`
+        : entry.name;
+      if (excludeManifest && relativePath === MANIFEST_NAME) {
+        continue;
+      }
+
+      const fullPath = path.join(currentDir, entry.name);
+      const stat = fs.lstatSync(fullPath);
+      if (stat.isSymbolicLink()) {
+        throw new Error(`Runtime tree contains a symbolic link: ${relativePath}`);
+      }
+      if (stat.isDirectory()) {
+        hash.update(`directory\0${relativePath}\0`);
+        walk(fullPath, relativePath);
+        continue;
+      }
+      if (!stat.isFile()) {
+        throw new Error(`Runtime tree contains an unsupported entry: ${relativePath}`);
+      }
+      hash.update(`file\0${relativePath}\0${sha256File(fullPath)}\0`);
+    }
+  };
+
+  walk(resolvedRoot);
+  return hash.digest("hex");
+}
+
+function verifyArtifact(filePath, expected) {
+  const actual = sha256File(filePath);
+  if (actual !== expected) {
+    fs.rmSync(filePath, { force: true });
+    throw new Error(
+      `SHA-256 mismatch for ${path.basename(filePath)}. Expected ${expected}; got ${actual}.`,
+    );
+  }
+}
 
 function log(message) {
   console.log(`[imagemagick] ${message}`);
@@ -29,7 +131,7 @@ function run(command, args, options = {}) {
     ...options,
   });
   if (result.status !== 0) {
-    fail(`${command} ${args.join(" ")} failed with code ${result.status}`);
+    throw new Error(`${command} ${args.join(" ")} failed with code ${result.status}`);
   }
   return result;
 }
@@ -77,7 +179,15 @@ function versionOutput(binaryPath) {
     return { ok: false, reason };
   }
   const output = `${result.stdout || ""}\n${result.stderr || ""}`.trim();
-  return { ok: output.toLowerCase().includes("imagemagick"), output };
+  const escapedVersion = VERSION.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const exactVersion = new RegExp(`\\bImageMagick\\s+${escapedVersion}(?:\\s|$)`, "i");
+  return {
+    ok: exactVersion.test(output),
+    output,
+    reason: exactVersion.test(output)
+      ? undefined
+      : `expected ImageMagick ${VERSION}, but the version probe returned: ${output || "no output"}`,
+  };
 }
 
 function readManifest(targetDir) {
@@ -93,29 +203,192 @@ function readManifest(targetDir) {
 }
 
 function writeManifest(targetDir, manifest) {
+  const manifestPath = path.join(targetDir, MANIFEST_NAME);
+  fs.rmSync(manifestPath, { force: true });
+  const binaryPath = resolveRuntimePath(targetDir, manifest.binary);
+  if (!fs.existsSync(binaryPath) || !fs.statSync(binaryPath).isFile()) {
+    throw new Error(`Cannot finalize ImageMagick manifest; missing binary ${manifest.binary}.`);
+  }
+  const completeManifest = {
+    ...manifest,
+    schemaVersion: MANIFEST_SCHEMA_VERSION,
+    version: VERSION,
+    platform: PLATFORM,
+    arch: ARCH,
+    createdAt: new Date().toISOString(),
+    binarySha256: sha256File(binaryPath),
+    installedTreeSha256: sha256Tree(targetDir),
+  };
   fs.writeFileSync(
-    path.join(targetDir, MANIFEST_NAME),
-    JSON.stringify(
-      {
-        version: VERSION,
-        platform: PLATFORM,
-        arch: ARCH,
-        createdAt: new Date().toISOString(),
-        ...manifest,
-      },
-      null,
-      2,
-    ),
+    manifestPath,
+    `${JSON.stringify(completeManifest, null, 2)}\n`,
+    "utf8",
   );
+  return Object.freeze({
+    token: PREPARED_RUNTIME_TOKEN,
+    binarySha256: completeManifest.binarySha256,
+    installedTreeSha256: completeManifest.installedTreeSha256,
+  });
 }
 
-function validateRuntime(targetDir) {
-  const manifest = readManifest(targetDir);
-  const binary = manifest?.binary || (PLATFORM === "win32" ? "magick.exe" : "bin/magick");
-  const binaryPath = path.join(targetDir, binary);
-  if (!fs.existsSync(binaryPath)) {
+function resolveRuntimePath(targetDir, relativePath) {
+  if (
+    typeof relativePath !== "string" ||
+    !relativePath ||
+    path.isAbsolute(relativePath)
+  ) {
+    throw new Error("Runtime manifest contains an invalid relative path.");
+  }
+  const resolvedRoot = path.resolve(targetDir);
+  const resolvedPath = path.resolve(resolvedRoot, relativePath);
+  if (!resolvedPath.startsWith(`${resolvedRoot}${path.sep}`)) {
+    throw new Error(`Runtime manifest path escapes its root: ${relativePath}`);
+  }
+  return resolvedPath;
+}
+
+function expectedRuntimeLayout(platform) {
+  if (platform === "win32") {
+    return { kind: "windows-portable", binary: "magick.exe" };
+  }
+  if (platform === "linux") {
+    return { kind: "linux-appimage", binary: "bin/magick" };
+  }
+  if (platform === "darwin") {
+    return { kind: "macos-vendored", binary: "bin/magick" };
+  }
+  throw new Error(`Unsupported platform for bundled ImageMagick: ${platform}`);
+}
+
+function validateRuntimeIntegrity(targetDir, options = {}) {
+  try {
+    const platform = options.platform || PLATFORM;
+    const arch = options.arch || ARCH;
+    const version = options.version || VERSION;
+    const sourceDigestResolver = options.expectedSha256 || expectedSha256;
+    const expectedBinarySha256 = options.expectedBinarySha256;
+    const expectedInstalledTreeSha256 = options.expectedInstalledTreeSha256;
+    const macSourceTreeSha256 =
+      options.macSourceTreeSha256 === undefined
+        ? MAC_SOURCE_TREE_SHA256
+        : options.macSourceTreeSha256;
+    const manifest = readManifest(targetDir);
+    if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+      throw new Error("ImageMagick runtime manifest is missing or invalid.");
+    }
+    if (manifest.schemaVersion !== MANIFEST_SCHEMA_VERSION) {
+      throw new Error(`Unsupported ImageMagick runtime manifest schema: ${manifest.schemaVersion}.`);
+    }
+    if (
+      manifest.version !== version ||
+      manifest.platform !== platform ||
+      manifest.arch !== arch
+    ) {
+      throw new Error(
+        `Runtime identity mismatch; expected ImageMagick ${version} for ${platform}-${arch}.`,
+      );
+    }
+
+    const layout = expectedRuntimeLayout(platform);
+    if (manifest.kind !== layout.kind || manifest.binary !== layout.binary) {
+      throw new Error(`Runtime layout does not match ${platform}-${arch}.`);
+    }
+
+    const binaryPath = resolveRuntimePath(targetDir, manifest.binary);
+    if (!fs.existsSync(binaryPath) || !fs.statSync(binaryPath).isFile()) {
+      throw new Error(`Runtime binary is missing: ${manifest.binary}`);
+    }
+    if (
+      !isSha256(expectedBinarySha256) ||
+      manifest.binarySha256 !== expectedBinarySha256
+    ) {
+      throw new Error("Runtime binary SHA-256 is not bound to the current verified preparation.");
+    }
+    if (sha256File(binaryPath) !== expectedBinarySha256) {
+      throw new Error("Runtime binary SHA-256 validation failed.");
+    }
+
+    if (
+      !isSha256(expectedInstalledTreeSha256) ||
+      manifest.installedTreeSha256 !== expectedInstalledTreeSha256
+    ) {
+      throw new Error("Runtime tree SHA-256 is not bound to the current verified preparation.");
+    }
+    if (sha256Tree(targetDir) !== expectedInstalledTreeSha256) {
+      throw new Error("Runtime installed-tree SHA-256 validation failed.");
+    }
+
+    if (platform === "darwin") {
+      if (manifest.source !== "explicit-vendor-tree") {
+        throw new Error("macOS runtime manifest does not identify an explicit vendor tree.");
+      }
+      if (!isSha256(macSourceTreeSha256)) {
+        throw new Error(
+          "IMAGEMAGICK_MAC_SOURCE_TREE_SHA256 is required to validate a macOS runtime.",
+        );
+      }
+      if (manifest.sourceTreeSha256 !== macSourceTreeSha256) {
+        throw new Error("macOS runtime source-tree SHA-256 does not match the explicit policy digest.");
+      }
+    } else {
+      if (typeof manifest.asset !== "string" || !manifest.asset) {
+        throw new Error("Runtime manifest does not identify its pinned source asset.");
+      }
+      if (
+        platform === "win32" &&
+        manifest.asset !== windowsArchiveName(platform, arch, version)
+      ) {
+        throw new Error(`Windows runtime source asset does not match ${platform}-${arch}.`);
+      }
+      if (
+        platform === "linux" &&
+        (arch !== "x64" || !manifest.asset.endsWith("-x86_64.AppImage"))
+      ) {
+        throw new Error(`Linux runtime source asset does not match ${platform}-${arch}.`);
+      }
+      const expectedSourceSha256 = sourceDigestResolver(manifest.asset);
+      if (manifest.sourceSha256 !== expectedSourceSha256) {
+        throw new Error("Runtime source SHA-256 does not match artifact-integrity policy.");
+      }
+      if (typeof manifest.source !== "string" || !manifest.source.startsWith("https://")) {
+        throw new Error("Runtime manifest source must be HTTPS.");
+      }
+      if (platform === "linux") {
+        if (manifest.appImage !== manifest.asset) {
+          throw new Error("Linux runtime AppImage does not match its pinned source asset.");
+        }
+        const appImagePath = resolveRuntimePath(targetDir, manifest.appImage);
+        if (!fs.existsSync(appImagePath) || !fs.statSync(appImagePath).isFile()) {
+          throw new Error(`Linux runtime AppImage is missing: ${manifest.appImage}`);
+        }
+        if (sha256File(appImagePath) !== expectedSourceSha256) {
+          throw new Error("Linux runtime AppImage SHA-256 does not match artifact-integrity policy.");
+        }
+      }
+    }
+
+    return { ok: true, binaryPath, manifest };
+  } catch (error) {
+    return { ok: false, reason: error?.message || String(error) };
+  }
+}
+
+function validateRuntime(targetDir, preparationProof) {
+  if (preparationProof?.token !== PREPARED_RUNTIME_TOKEN) {
+    log("Refusing to execute an ImageMagick runtime not derived during this verified preparation.");
     return null;
   }
+  const integrity = validateRuntimeIntegrity(targetDir, {
+    expectedBinarySha256: preparationProof.binarySha256,
+    expectedInstalledTreeSha256: preparationProof.installedTreeSha256,
+  });
+  if (!integrity.ok) {
+    if (fs.existsSync(targetDir)) {
+      log(`Runtime integrity validation failed for ${targetDir}: ${integrity.reason}`);
+    }
+    return null;
+  }
+  const { binaryPath } = integrity;
   if (PLATFORM !== "win32") {
     try {
       fs.chmodSync(binaryPath, 0o755);
@@ -125,21 +398,25 @@ function validateRuntime(targetDir) {
   }
   const result = versionOutput(binaryPath);
   if (!result.ok) {
-    log(`Runtime validation failed for ${binaryPath}: ${result.reason}`);
+    log(`Runtime version validation failed for ${binaryPath}: ${result.reason}`);
     return null;
   }
   return { binaryPath, output: result.output };
 }
 
-function archiveName() {
-  if (PLATFORM !== "win32") {
+function windowsArchiveName(platform = PLATFORM, arch = ARCH, version = VERSION) {
+  if (platform !== "win32") {
     return null;
   }
-  const archName = ARCH === "x64" ? "x64" : ARCH === "arm64" ? "arm64" : ARCH === "ia32" ? "x86" : null;
+  const archName = arch === "x64" ? "x64" : arch === "arm64" ? "arm64" : arch === "ia32" ? "x86" : null;
   if (!archName) {
-    fail(`No bundled ImageMagick Windows asset configured for ${PLATFORM}-${ARCH}`);
+    throw new Error(`No bundled ImageMagick Windows asset configured for ${platform}-${arch}`);
   }
-  return `ImageMagick-${VERSION}-portable-Q16-${archName}.7z`;
+  return `ImageMagick-${version}-portable-Q16-${archName}.7z`;
+}
+
+function archiveName() {
+  return windowsArchiveName();
 }
 
 function linuxAppImageArch() {
@@ -173,20 +450,28 @@ function downloadUrl(assetName) {
   return `https://github.com/ImageMagick/ImageMagick/releases/download/${VERSION}/${assetName}`;
 }
 
-function downloadFile(url, destination) {
+function downloadFile(url, destination, redirects = 5) {
   return new Promise((resolve, reject) => {
+    if (!url.startsWith("https:")) {
+      reject(new Error(`Refusing non-HTTPS ImageMagick download: ${url}`));
+      return;
+    }
     const request = https.get(
       url,
       { headers: { "User-Agent": "Presenton ImageMagick runtime fetcher" } },
       (response) => {
         if ([301, 302, 303, 307, 308].includes(response.statusCode || 0)) {
+          if (redirects <= 0) {
+            reject(new Error(`Too many redirects while downloading ${url}`));
+            return;
+          }
           const location = response.headers.location;
           if (!location) {
             reject(new Error(`Redirect from ${url} did not include Location`));
             return;
           }
           response.resume();
-          downloadFile(new URL(location, url).toString(), destination).then(resolve, reject);
+          downloadFile(new URL(location, url).toString(), destination, redirects - 1).then(resolve, reject);
           return;
         }
         if (response.statusCode !== 200) {
@@ -195,56 +480,34 @@ function downloadFile(url, destination) {
           return;
         }
         fs.mkdirSync(path.dirname(destination), { recursive: true });
-        const file = fs.createWriteStream(destination);
+        const temporaryPath = `${destination}.part-${process.pid}`;
+        fs.rmSync(temporaryPath, { force: true });
+        const file = fs.createWriteStream(temporaryPath, { flags: "wx", mode: 0o600 });
         response.pipe(file);
-        file.on("finish", () => file.close(resolve));
-        file.on("error", reject);
-      },
-    );
-    request.on("error", reject);
-  });
-}
-
-function fetchJson(url) {
-  return new Promise((resolve, reject) => {
-    const request = https.get(
-      url,
-      {
-        headers: {
-          "User-Agent": "Presenton ImageMagick runtime fetcher",
-          Accept: "application/vnd.github+json",
-        },
-      },
-      (response) => {
-        if ([301, 302, 303, 307, 308].includes(response.statusCode || 0)) {
-          const location = response.headers.location;
-          if (!location) {
-            reject(new Error(`Redirect from ${url} did not include Location`));
-            return;
-          }
-          response.resume();
-          fetchJson(new URL(location, url).toString()).then(resolve, reject);
-          return;
-        }
-        if (response.statusCode !== 200) {
-          reject(new Error(`Request failed with HTTP ${response.statusCode}: ${url}`));
-          response.resume();
-          return;
-        }
-
-        const chunks = [];
-        response.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-        response.on("end", () => {
-          try {
-            const body = Buffer.concat(chunks).toString("utf8");
-            resolve(JSON.parse(body));
-          } catch (error) {
-            reject(error);
-          }
+        file.on("finish", () => {
+          file.close(() => {
+            try {
+              fs.rmSync(destination, { force: true });
+              fs.renameSync(temporaryPath, destination);
+              resolve();
+            } catch (error) {
+              fs.rmSync(temporaryPath, { force: true });
+              reject(error);
+            }
+          });
         });
-        response.on("error", reject);
+        file.on("error", (error) => {
+          fs.rmSync(temporaryPath, { force: true });
+          reject(error);
+        });
+        response.on("error", (error) => {
+          file.destroy();
+          fs.rmSync(temporaryPath, { force: true });
+          reject(error);
+        });
       },
     );
+    request.setTimeout(120000, () => request.destroy(new Error(`Download timed out: ${url}`)));
     request.on("error", reject);
   });
 }
@@ -266,34 +529,22 @@ async function linuxAppImageCandidates() {
   }
 
   const fallbackName = linuxDefaultAppImageName();
-  const candidates = [fallbackName];
-  try {
-    const release = await fetchJson(`https://api.github.com/repos/ImageMagick/ImageMagick/releases/tags/${VERSION}`);
-    const assets = Array.isArray(release?.assets) ? release.assets : [];
-    const appImages = assets
-      .map((asset) => asset?.name)
-      .filter((name) => typeof name === "string" && name.endsWith(`-${arch}.AppImage`));
-
-    const scored = appImages
-      .map((name) => ({
-        name,
-        score: name === fallbackName
-          ? 100
-          : name.includes(`-gcc-${arch}.AppImage`)
-            ? 90
-            : name.includes(`-clang-${arch}.AppImage`)
-              ? 80
-              : 70,
-      }))
-      .sort((a, b) => b.score - a.score)
-      .map((entry) => entry.name);
-
-    candidates.push(...scored);
-  } catch (error) {
-    log(`Could not resolve Linux AppImage assets from release metadata: ${error?.message || error}`);
+  const pinnedAssets = Object.keys(readImageMagickPolicy().assets)
+    .filter((name) => name.endsWith(`-${arch}.AppImage`))
+    .sort((left, right) => {
+      const score = (name) => name === fallbackName
+        ? 100
+        : name.includes(`-gcc-${arch}.AppImage`)
+          ? 90
+          : name.includes(`-clang-${arch}.AppImage`)
+            ? 80
+            : 70;
+      return score(right) - score(left) || left.localeCompare(right, "en");
+    });
+  if (pinnedAssets.length === 0) {
+    throw new Error(`No Linux ${arch} AppImage is pinned in artifact-integrity policy.`);
   }
-
-  return uniqueNonEmpty(candidates);
+  return uniqueNonEmpty(pinnedAssets);
 }
 
 function findMagickDir(root) {
@@ -319,7 +570,9 @@ async function prepareWindows() {
   }
 
   const assetName = archiveName();
+  const expected = expectedSha256(assetName);
   const archivePath = path.join(CACHE_DIR, assetName);
+  const verifiedArchivePath = `${archivePath}.verified-${process.pid}`;
   const extractDir = path.join(CACHE_DIR, "extract");
   const tempTarget = `${TARGET_DIR}.tmp`;
 
@@ -330,11 +583,19 @@ async function prepareWindows() {
   } else {
     log(`Using cached archive: ${archivePath}`);
   }
+  verifyArtifact(archivePath, expected);
+  fs.rmSync(verifiedArchivePath, { force: true });
+  fs.copyFileSync(archivePath, verifiedArchivePath);
+  verifyArtifact(verifiedArchivePath, expected);
 
   fs.rmSync(extractDir, { recursive: true, force: true });
   fs.mkdirSync(extractDir, { recursive: true });
-  log(`Extracting ${archivePath}`);
-  run(path7za, ["x", archivePath, `-o${extractDir}`, "-y"]);
+  log(`Extracting verified source snapshot: ${archivePath}`);
+  try {
+    run(path7za, ["x", verifiedArchivePath, `-o${extractDir}`, "-y"]);
+  } finally {
+    fs.rmSync(verifiedArchivePath, { force: true });
+  }
 
   const magickDir = findMagickDir(extractDir);
   if (!magickDir) {
@@ -344,13 +605,15 @@ async function prepareWindows() {
   fs.rmSync(tempTarget, { recursive: true, force: true });
   fs.mkdirSync(path.dirname(tempTarget), { recursive: true });
   fs.cpSync(magickDir, tempTarget, { recursive: true });
-  writeManifest(tempTarget, {
+  const preparationProof = writeManifest(tempTarget, {
     kind: "windows-portable",
     binary: "magick.exe",
+    asset: assetName,
     source: downloadUrl(assetName),
+    sourceSha256: expected,
   });
 
-  if (!validateRuntime(tempTarget)) {
+  if (!validateRuntime(tempTarget, preparationProof)) {
     fail(`Prepared runtime failed validation at ${tempTarget}`);
   }
 
@@ -368,7 +631,14 @@ async function prepareLinux() {
 
   for (const candidate of candidates) {
     const candidatePath = path.join(CACHE_DIR, candidate);
+    let expected;
+    try {
+      expected = expectedSha256(candidate);
+    } catch {
+      continue;
+    }
     if (fs.existsSync(candidatePath)) {
+      verifyArtifact(candidatePath, expected);
       log(`Using cached AppImage: ${candidatePath}`);
       assetName = candidate;
       appImagePath = candidatePath;
@@ -379,6 +649,7 @@ async function prepareLinux() {
     log(`Downloading ${url}`);
     try {
       await downloadFile(url, candidatePath);
+      verifyArtifact(candidatePath, expected);
       assetName = candidate;
       appImagePath = candidatePath;
       break;
@@ -418,14 +689,16 @@ async function prepareLinux() {
     ].join("\n"),
   );
   fs.chmodSync(wrapperPath, 0o755);
-  writeManifest(tempTarget, {
+  const preparationProof = writeManifest(tempTarget, {
     kind: "linux-appimage",
     binary: "bin/magick",
+    asset: assetName,
     appImage: assetName,
     source: downloadUrl(assetName),
+    sourceSha256: expectedSha256(assetName),
   });
 
-  if (!validateRuntime(tempTarget)) {
+  if (!validateRuntime(tempTarget, preparationProof)) {
     fail(`Prepared runtime failed validation at ${tempTarget}`);
   }
 
@@ -443,97 +716,16 @@ function resolveCommandPath(command) {
   return result.status === 0 && resolved ? resolved : null;
 }
 
-function resolveMacPrefixFromMagickBinary(magickPath) {
-  if (!magickPath || !fs.existsSync(magickPath)) {
-    return null;
-  }
-  const realMagick = fs.realpathSync(magickPath);
-  const binDir = path.dirname(realMagick);
-  const prefix = path.dirname(binDir);
-  return fs.existsSync(path.join(prefix, "bin", "magick")) ? prefix : null;
-}
-
-function listBrewCandidates() {
-  return [resolveCommandPath("brew"), "/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
-    .filter(Boolean)
-    .filter((candidate, index, all) => all.indexOf(candidate) === index)
-    .filter((candidate) => fs.existsSync(candidate));
-}
-
-function resolveMacPrefixFromBrew() {
-  const brewCandidates = listBrewCandidates();
-  const formulas = ["imagemagick", "imagemagick@6"];
-
-  for (const brew of brewCandidates) {
-    for (const formula of formulas) {
-      const result = capture(brew, ["--prefix", formula]);
-      const prefix = (result.stdout || "").trim();
-      if (result.status !== 0 || !prefix) {
-        continue;
-      }
-      if (fs.existsSync(path.join(prefix, "bin", "magick"))) {
-        return prefix;
-      }
-    }
-  }
-  return null;
-}
-
-function ensureMacImageMagickWithBrew() {
-  for (const brew of listBrewCandidates()) {
-    log(`ImageMagick not found; trying to install with Homebrew (${brew} install imagemagick).`);
-    const install = spawnSync(brew, ["install", "imagemagick"], {
-      stdio: "inherit",
-      windowsHide: true,
-    });
-    if (install.status === 0) {
-      return true;
-    }
-    const reason = install.error?.message || `exit ${install.status}`;
-    log(`Homebrew installation attempt failed via ${brew}: ${reason}`);
-  }
-  return false;
-}
-
 function resolveMacSourcePrefix() {
   const configured = process.env.IMAGEMAGICK_VENDOR_DIR?.trim();
-  if (configured) {
-    return path.resolve(configured);
+  if (!configured) {
+    return null;
   }
-
-  const pathMagickPrefix = resolveMacPrefixFromMagickBinary(resolveCommandPath("magick"));
-  if (pathMagickPrefix) {
-    return pathMagickPrefix;
+  const sourcePrefix = path.resolve(configured);
+  if (!fs.existsSync(sourcePrefix) || !fs.statSync(sourcePrefix).isDirectory()) {
+    throw new Error(`IMAGEMAGICK_VENDOR_DIR is not a directory: ${sourcePrefix}`);
   }
-
-  for (const magickPath of ["/opt/homebrew/bin/magick", "/usr/local/bin/magick", "/opt/local/bin/magick"]) {
-    const prefix = resolveMacPrefixFromMagickBinary(magickPath);
-    if (prefix) {
-      return prefix;
-    }
-  }
-
-  const brewPrefix = resolveMacPrefixFromBrew();
-  if (brewPrefix) {
-    return brewPrefix;
-  }
-
-  for (const optPrefix of ["/opt/homebrew/opt/imagemagick", "/usr/local/opt/imagemagick"]) {
-    if (fs.existsSync(path.join(optPrefix, "bin", "magick"))) {
-      return optPrefix;
-    }
-  }
-
-  if (ensureMacImageMagickWithBrew()) {
-    const installedPrefix = resolveMacPrefixFromMagickBinary(resolveCommandPath("magick"))
-      || resolveMacPrefixFromBrew();
-    if (installedPrefix) {
-      return installedPrefix;
-    }
-    log("Homebrew install succeeded but ImageMagick prefix was not auto-detected; continuing with fallback checks.");
-  }
-
-  fail("Could not find a macOS ImageMagick runtime to vendor. Install ImageMagick (brew install imagemagick) and rerun, or set IMAGEMAGICK_VENDOR_DIR.");
+  return sourcePrefix;
 }
 
 function parseOtoolDeps(filePath) {
@@ -546,7 +738,6 @@ function parseOtoolDeps(filePath) {
     .slice(1)
     .map((line) => line.trim().split(/\s+/)[0])
     .filter(Boolean)
-    .filter((dep) => dep.startsWith("/"))
     .filter((dep) => !dep.startsWith("/System/Library/") && !dep.startsWith("/usr/lib/"));
 }
 
@@ -576,7 +767,14 @@ function walkFiles(rootDir) {
   return files;
 }
 
-function relinkMacDylibs(targetDir, mainExecutable) {
+function isPathInside(rootDir, candidatePath) {
+  const resolvedRoot = path.resolve(rootDir);
+  const resolvedCandidate = path.resolve(candidatePath);
+  return resolvedCandidate === resolvedRoot ||
+    resolvedCandidate.startsWith(`${resolvedRoot}${path.sep}`);
+}
+
+function relinkMacDylibs(targetDir, mainExecutable, verifiedSourceRoot) {
   for (const tool of ["otool", "install_name_tool", "file"]) {
     if (!resolveCommandPath(tool)) {
       fail(`macOS runtime vendoring requires ${tool}.`);
@@ -599,12 +797,51 @@ function relinkMacDylibs(targetDir, mainExecutable) {
 
     const deps = parseOtoolDeps(current);
     for (const dep of deps) {
+      if (dep.startsWith("@loader_path/") || dep.startsWith("@executable_path/")) {
+        const token = dep.startsWith("@loader_path/")
+          ? "@loader_path/"
+          : "@executable_path/";
+        const baseDir = token === "@loader_path/"
+          ? path.dirname(current)
+          : path.dirname(mainExecutable);
+        const relativeDependency = path.resolve(baseDir, dep.slice(token.length));
+        if (
+          !isPathInside(targetDir, relativeDependency) ||
+          !fs.existsSync(relativeDependency)
+        ) {
+          fail(`Refusing unresolved or external macOS dependency: ${dep} (${current})`);
+        }
+        queue.push(relativeDependency);
+        continue;
+      }
+      if (!path.isAbsolute(dep)) {
+        fail(
+          `Refusing unresolved macOS dependency ${dep}; pre-relocate @rpath dependencies inside IMAGEMAGICK_VENDOR_DIR.`,
+        );
+      }
+      const resolvedDependency = path.resolve(dep);
+      if (!isPathInside(verifiedSourceRoot, resolvedDependency)) {
+        fail(
+          `Refusing unverified macOS dependency outside IMAGEMAGICK_VENDOR_DIR: ${dep}`,
+        );
+      }
+      const snapshotDependency = path.join(
+        targetDir,
+        path.relative(path.resolve(verifiedSourceRoot), resolvedDependency),
+      );
+      if (
+        !isPathInside(targetDir, snapshotDependency) ||
+        !fs.existsSync(snapshotDependency) ||
+        !fs.statSync(snapshotDependency).isFile()
+      ) {
+        fail(`Verified macOS snapshot does not contain dependency: ${dep}`);
+      }
       const depBase = path.basename(dep);
       let vendored = copiedBySource.get(dep);
       if (!vendored) {
         vendored = path.join(libDir, depBase);
         if (!fs.existsSync(vendored)) {
-          fs.copyFileSync(dep, vendored);
+          fs.copyFileSync(snapshotDependency, vendored);
           fs.chmodSync(vendored, 0o755);
         }
         copiedBySource.set(dep, vendored);
@@ -641,34 +878,48 @@ function adHocSignMacRuntime(targetDir, mainExecutable) {
 
 async function prepareMacOS() {
   const sourcePrefix = resolveMacSourcePrefix();
-  const sourceMagick = path.join(sourcePrefix, "bin", "magick");
-  if (!fs.existsSync(sourceMagick)) {
-    fail(`macOS ImageMagick prefix does not contain bin/magick: ${sourcePrefix}`);
+  if (!sourcePrefix) {
+    throw new Error(
+      "Set IMAGEMAGICK_VENDOR_DIR to an explicit, self-contained macOS runtime tree.",
+    );
   }
-
+  if (!isSha256(MAC_SOURCE_TREE_SHA256)) {
+    throw new Error(
+      "IMAGEMAGICK_MAC_SOURCE_TREE_SHA256 must be a 64-character lowercase hexadecimal digest.",
+    );
+  }
   const tempTarget = `${TARGET_DIR}.tmp`;
   fs.rmSync(tempTarget, { recursive: true, force: true });
-  fs.mkdirSync(tempTarget, { recursive: true });
   fs.cpSync(sourcePrefix, tempTarget, {
     recursive: true,
-    dereference: true,
-    filter(source) {
-      const base = path.basename(source);
-      return base !== ".brew" && base !== "INSTALL_RECEIPT.json";
-    },
+    dereference: false,
+    verbatimSymlinks: true,
   });
+  const snapshotSourceTreeSha256 = sha256Tree(tempTarget, {
+    excludeManifest: false,
+  });
+  if (snapshotSourceTreeSha256 !== MAC_SOURCE_TREE_SHA256) {
+    fs.rmSync(tempTarget, { recursive: true, force: true });
+    throw new Error(
+      `macOS ImageMagick source-tree SHA-256 mismatch. Expected ${MAC_SOURCE_TREE_SHA256}; got ${snapshotSourceTreeSha256}.`,
+    );
+  }
 
   const targetMagick = path.join(tempTarget, "bin", "magick");
+  if (!fs.existsSync(targetMagick) || !fs.statSync(targetMagick).isFile()) {
+    throw new Error(`macOS ImageMagick snapshot does not contain bin/magick: ${sourcePrefix}`);
+  }
   fs.chmodSync(targetMagick, 0o755);
-  relinkMacDylibs(tempTarget, targetMagick);
+  relinkMacDylibs(tempTarget, targetMagick, sourcePrefix);
   adHocSignMacRuntime(tempTarget, targetMagick);
-  writeManifest(tempTarget, {
+  const preparationProof = writeManifest(tempTarget, {
     kind: "macos-vendored",
     binary: "bin/magick",
-    source: sourcePrefix,
+    source: "explicit-vendor-tree",
+    sourceTreeSha256: MAC_SOURCE_TREE_SHA256,
   });
 
-  if (!validateRuntime(tempTarget)) {
+  if (!validateRuntime(tempTarget, preparationProof)) {
     fail(`Prepared runtime failed validation at ${tempTarget}`);
   }
 
@@ -678,10 +929,35 @@ async function prepareMacOS() {
 }
 
 async function main() {
-  const existing = validateRuntime(TARGET_DIR);
-  if (existing) {
-    log(`Existing runtime OK: ${existing.binaryPath}`);
+  if (process.argv[2] === "--print-tree-sha256") {
+    const sourceDir = process.argv[3];
+    if (!sourceDir) {
+      throw new Error("Usage: prepare-imagemagick.cjs --print-tree-sha256 <directory>");
+    }
+    console.log(sha256Tree(path.resolve(sourceDir), { excludeManifest: false }));
     return;
+  }
+
+  if (PLATFORM === "darwin") {
+    const sourcePrefix = resolveMacSourcePrefix();
+    if (sourcePrefix && !MAC_SOURCE_TREE_SHA256) {
+      throw new Error(
+        "IMAGEMAGICK_VENDOR_DIR requires IMAGEMAGICK_MAC_SOURCE_TREE_SHA256.",
+      );
+    }
+    if (!MAC_SOURCE_TREE_SHA256 && !EXPORT_ENABLED) {
+      fs.rmSync(TARGET_DIR, { recursive: true, force: true });
+      fs.rmSync(`${TARGET_DIR}.tmp`, { recursive: true, force: true });
+      log(
+        "macOS runtime safe-disabled because presentation export is disabled and no verified vendor tree was supplied.",
+      );
+      return;
+    }
+    if (!isSha256(MAC_SOURCE_TREE_SHA256)) {
+      throw new Error(
+        "IMAGEMAGICK_MAC_SOURCE_TREE_SHA256 must be a 64-character lowercase hexadecimal digest.",
+      );
+    }
   }
 
   if (PLATFORM === "win32") {
@@ -700,4 +976,14 @@ async function main() {
   fail(`Unsupported platform for bundled ImageMagick: ${PLATFORM}-${ARCH}`);
 }
 
-main().catch((error) => fail(error?.stack || error?.message || String(error)));
+if (require.main === module) {
+  main().catch((error) => fail(error?.stack || error?.message || String(error)));
+}
+
+module.exports = {
+  MANIFEST_NAME,
+  readManifest,
+  sha256File,
+  sha256Tree,
+  validateRuntimeIntegrity,
+};

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { Manrope, Syne, Unbounded } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import MixpanelInitializer from "./MixpanelInitializer";
@@ -14,24 +13,6 @@ const inter = localFont({
     },
   ],
   variable: "--font-inter",
-});
-
-const syne = Syne({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-syne",
-});
-
-const manrope = Manrope({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-manrope",
-});
-
-const unbounded = Unbounded({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-unbounded",
 });
 
 export const metadata: Metadata = {
@@ -90,7 +71,7 @@ export default function RootLayout({
         <link rel="preload" href="/Presenton_Splash.png" as="image" />
       </head>
       <body
-        className={`${inter.variable} ${syne.variable} ${manrope.variable} ${unbounded.variable} antialiased`}
+        className={`${inter.variable} antialiased`}
       >
         <Providers>
           <MixpanelInitializer>

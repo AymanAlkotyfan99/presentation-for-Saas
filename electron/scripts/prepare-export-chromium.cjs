@@ -1,6 +1,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const crypto = require("crypto");
 const { spawnSync } = require("child_process");
 const {
   Browser,
@@ -24,6 +25,14 @@ const windowsRequiredRuntimeFiles = [
   "v8_context_snapshot.bin",
   path.join("locales", "en-US.pak"),
 ];
+const allowUnverifiedDownload =
+  process.env.ALLOW_UNVERIFIED_ELECTRON_CHROMIUM_DOWNLOAD === "true";
+
+function sha256File(filePath) {
+  const hash = crypto.createHash("sha256");
+  hash.update(fs.readFileSync(filePath));
+  return hash.digest("hex");
+}
 
 function resolveExportBrowserConfig() {
   if (process.platform === "darwin") {
@@ -232,6 +241,8 @@ function writeManifest(platform, executablePath) {
         nodePlatform: process.platform,
         arch: process.arch,
         executable: path.relative(cacheDir, executablePath),
+        executableSha256: sha256File(executablePath),
+        sourceVerification: "EXPLICIT_UNVERIFIED_OPT_IN",
         createdAt: new Date().toISOString(),
       },
       null,
@@ -462,7 +473,16 @@ function removeIncompleteRuntime(platform, executablePath) {
 
 async function main() {
   if (process.env.SKIP_BUNDLED_CHROMIUM === "1") {
-    console.log("[Chromium] SKIP_BUNDLED_CHROMIUM=1; leaving runtime unbundled.");
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+    console.log("[Chromium] SKIP_BUNDLED_CHROMIUM=1; removed any stale bundled runtime.");
+    return;
+  }
+
+  if (!allowUnverifiedDownload) {
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+    console.log(
+      "[Chromium] Bundling disabled: no source archive SHA-256 is pinned; stale runtimes removed.",
+    );
     return;
   }
 

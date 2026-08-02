@@ -115,7 +115,13 @@ def _selected_google_font_maps(
             url = url.strip()
             if not original_name or not replacement_name or not url:
                 continue
-            selected_fonts[replacement_name] = url
+            normalized_url = _normalize_google_font_stylesheet_url(url)
+            if not normalized_url:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid Google Fonts stylesheet URL",
+                )
+            selected_fonts[replacement_name] = normalized_url
             replacements[original_name] = replacement_name
         return selected_fonts, replacements
 
@@ -123,7 +129,13 @@ def _selected_google_font_maps(
         replacement_name = replacement_name.strip()
         url = url.strip()
         if replacement_name and url:
-            selected_fonts[replacement_name] = url
+            normalized_url = _normalize_google_font_stylesheet_url(url)
+            if not normalized_url:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid Google Fonts stylesheet URL",
+                )
+            selected_fonts[replacement_name] = normalized_url
     return selected_fonts, replacements
 
 
@@ -140,8 +152,7 @@ class _PreviewLogger:
 
 PREVIEW_WIDTH = 1280
 PREVIEW_HEIGHT = 720
-TAILWIND_CDN_URL = "https://cdn.tailwindcss.com"
-DEFAULT_CHART_JS_URL = "https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"
+DEFAULT_CHART_JS_URL = "/static/vendor/chart.umd.min.js"
 MAX_TEMPLATE_PREVIEW_SLIDES = 50
 MAX_FONT_CHECK_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024
 FONT_CHECK_UPLOAD_SIZE_ERROR = "File size must be less than 100MB."
@@ -324,21 +335,58 @@ def _font_stylesheet_links_for_slide_html(
     )
 
 
-def _is_font_stylesheet_url(url: str) -> bool:
-    return bool(re.search(r"\.css(?:\?|$)", url, flags=re.IGNORECASE)) or (
-        "fonts.googleapis.com" in url
+def _normalize_google_font_stylesheet_url(url: str) -> str | None:
+    """Return a canonical Google Fonts stylesheet URL or reject it.
+
+    These URLs are later loaded by headless Chromium, so accepting arbitrary
+    ``.css`` URLs would create a browser-side SSRF and CSS-injection boundary.
+    """
+    candidate = (url or "").strip()
+    if not candidate or len(candidate) > 2048:
+        return None
+    if any(character in candidate for character in ("\\", "\r", "\n", "\t", "\0")):
+        return None
+
+    try:
+        parsed = urllib.parse.urlsplit(candidate)
+        port = parsed.port
+    except ValueError:
+        return None
+
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != "fonts.googleapis.com"
+        or parsed.username is not None
+        or parsed.password is not None
+        or port not in (None, 443)
+        or parsed.path not in ("/css", "/css2")
+        or parsed.fragment
+    ):
+        return None
+
+    query_items = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+    if not any(key == "family" and value for key, value in query_items):
+        return None
+
+    return urllib.parse.urlunsplit(
+        ("https", "fonts.googleapis.com", parsed.path, parsed.query, "")
     )
+
+
+def _is_font_stylesheet_url(url: str) -> bool:
+    return _normalize_google_font_stylesheet_url(url) is not None
 
 
 def _font_stylesheet_links_for_urls(urls: List[str]) -> str:
     links: List[str] = []
     seen: Set[str] = set()
     for url in urls:
-        if not url or url in seen or not _is_font_stylesheet_url(url):
+        normalized_url = _normalize_google_font_stylesheet_url(url)
+        if not normalized_url or normalized_url in seen:
             continue
-        seen.add(url)
+        seen.add(normalized_url)
         links.append(
-            f'<link href="{html.escape(url, quote=True)}" rel="stylesheet">'
+            f'<link href="{html.escape(normalized_url, quote=True)}" rel="stylesheet">'
         )
     return "\n".join(links)
 
@@ -584,11 +632,7 @@ def _get_template_preview_session_dir(session_id: uuid.UUID) -> str:
 
 
 def _chart_js_url() -> str:
-    return (
-        os.getenv("NEXT_PUBLIC_CHART_JS_URL")
-        or os.getenv("CHART_JS_URL")
-        or DEFAULT_CHART_JS_URL
-    )
+    return DEFAULT_CHART_JS_URL
 
 
 def _build_slide_preview_html(
@@ -604,7 +648,6 @@ def _build_slide_preview_html(
 <head>
   <meta charset="utf-8" />
   <base href="{fastapi_base}" />
-  <script src="{html.escape(TAILWIND_CDN_URL, quote=True)}"></script>
   <script src="{html.escape(_chart_js_url(), quote=True)}"></script>
   {font_links}
   <style>

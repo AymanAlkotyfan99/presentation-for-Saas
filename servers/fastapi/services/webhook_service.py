@@ -1,13 +1,19 @@
 import asyncio
-import aiohttp
+import logging
+
 from sqlmodel import select
+
+from api.operation_security import operation_guard
 from enums.webhook_event import WebhookEvent
 from models.sql.webhook_subscription import WebhookSubscription
 from services.database import get_async_session
+from utils.outbound_http import secure_http_request
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class WebhookService:
-
     @classmethod
     async def send_webhook(cls, event: WebhookEvent, data: dict):
         async for sql_session in get_async_session():
@@ -20,36 +26,32 @@ class WebhookService:
             if not webhook_subscriptions:
                 return
 
-            async_tasks = []
-            for webhook_subscription in webhook_subscriptions:
-                async_tasks.append(
-                    cls.send_request_to_webhook(webhook_subscription, data)
+            await asyncio.gather(
+                *(
+                    cls.send_request_to_webhook(subscription, data)
+                    for subscription in webhook_subscriptions
                 )
-
-            await asyncio.gather(*async_tasks)
-
+            )
             break
 
     @classmethod
     async def send_request_to_webhook(
         cls, subscription: WebhookSubscription, data: dict
     ):
-
-        headers = {
-            "Content-Type": "application/json",
-        }
+        headers = {"Content-Type": "application/json"}
         if subscription.secret:
             headers["Authorization"] = f"Bearer {subscription.secret}"
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
+            async with operation_guard("webhook_delivery"):
+                await secure_http_request(
+                    "POST",
                     subscription.url,
-                    json=data,
+                    json_body=data,
                     headers=headers,
-                ) as _:
-                    pass
-
-        except Exception as e:
-            print(f"Error sending request to webhook {subscription.id}: {e}")
-            pass
+                    max_response_bytes=1024 * 1024,
+                )
+        except Exception:
+            LOGGER.exception(
+                "Webhook delivery failed: subscription_id=%s", subscription.id
+            )

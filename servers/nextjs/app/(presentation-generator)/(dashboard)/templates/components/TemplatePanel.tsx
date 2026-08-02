@@ -31,24 +31,16 @@ const LayoutPreview = () => {
     }
 
     trackEvent(MixpanelEvent.Templates_Page_Viewed);
-    const existingScript = document.querySelector('script[src*="tailwindcss.com"]');
-    if (!existingScript) {
-      const script = document.createElement("script");
-      script.src = "https://cdn.tailwindcss.com";
-      script.async = true;
-      document.head.appendChild(script);
-    }
   }, []);
 
   const handleOpenTemplate = useCallback(
-    (templateId: string, templateName: string, isDefault: boolean) => {
+    (templateId: string, isDefault: boolean) => {
       trackEvent(
         isDefault
           ? MixpanelEvent.Templates_Inbuilt_Opened
           : MixpanelEvent.Templates_Custom_Opened,
         {
           template_id: templateId,
-          template_name: templateName,
         }
       );
       router.push(`/template-preview?templateV2Id=${templateId}`);
@@ -107,7 +99,7 @@ const LayoutPreview = () => {
                   key={template.id}
                   template={template}
                   showArrow
-                  onClick={() => handleOpenTemplate(template.id, template.name, false)}
+                  onClick={() => handleOpenTemplate(template.id, false)}
                 />
               ))}
             </div>
@@ -120,7 +112,7 @@ const LayoutPreview = () => {
                   key={template.id}
                   template={template}
                   showArrow
-                  onClick={() => handleOpenTemplate(template.id, template.name, true)}
+                  onClick={() => handleOpenTemplate(template.id, true)}
                 />
               ))}
             </div>

@@ -1,7 +1,8 @@
 import logging
 import os
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, select, text, update
+from sqlalchemy.exc import IntegrityError
 
 from api.v1.auth.users import PASSWORD_HELPER
 from models.sql.access_token import AccessToken
@@ -25,9 +26,15 @@ from api.v1.auth.config import (
     get_legacy_admin_credentials,
     persist_admin_credentials,
 )
+from utils.get_env import is_disable_auth_enabled
 
 
 logger = logging.getLogger(__name__)
+
+# A PostgreSQL transaction-scoped advisory lock serializes administrator
+# provisioning across application replicas. The unique ``admin_slot`` column is
+# still the final database invariant for every supported database.
+_POSTGRES_BOOTSTRAP_LOCK_ID = 5_070_119_843_873_401
 
 
 def _truthy(value: str | None) -> bool:
@@ -44,9 +51,31 @@ def _validate_new_environment_username(username: str) -> None:
         raise RuntimeError("AUTH_USERNAME must be at least 3 characters")
 
 
+async def _acquire_bootstrap_lock(session) -> None:
+    """Serialize first-administrator provisioning where the database supports it."""
+    dialect = session.get_bind().dialect.name
+    if dialect == "postgresql":
+        await session.execute(
+            text("SELECT pg_advisory_xact_lock(:lock_id)"),
+            {"lock_id": _POSTGRES_BOOTSTRAP_LOCK_ID},
+        )
+    elif dialect == "sqlite":
+        # SQLite has no row to lock before the first account exists. Taking the
+        # write lock before reading makes concurrent first-boot attempts observe
+        # the committed administrator instead of racing the unique constraint.
+        await session.execute(text("BEGIN IMMEDIATE"))
+
+
 async def bootstrap_database_admin() -> None:
-    """Migrate the old single-admin account or initialize it from environment."""
+    """Provision the primary administrator from deployment-time credentials.
+
+    The public HTTP setup flow is intentionally not involved. Provisioning and
+    legacy migration happen under a database lock and commit once, so two
+    replicas cannot both create privileged users or leave partially migrated
+    ownership behind.
+    """
     async with async_session_maker() as session:
+        await _acquire_bootstrap_lock(session)
         admin = await session.scalar(
             select(User).where(User.is_superuser.is_(True)).limit(1)
         )
@@ -72,7 +101,9 @@ async def bootstrap_database_admin() -> None:
                     delete(AccessToken).where(AccessToken.user_id == admin.id)
                 )
                 await session.flush()
-                await session.commit()
+            await _backfill_legacy_ownership(session, admin)
+            await session.commit()
+            if reset_requested or override_requested:
                 persist_admin_credentials(
                     admin.username,
                     admin.hashed_password,
@@ -81,9 +112,6 @@ async def bootstrap_database_admin() -> None:
                 logger.warning(
                     "Recovered bootstrap administrator credentials from environment."
                 )
-            else:
-                await session.commit()
-            await _backfill_legacy_ownership(session, admin)
             return
 
         account_count = int(
@@ -100,7 +128,16 @@ async def bootstrap_database_admin() -> None:
             env_username if use_environment and env_username else legacy_username
         ) or env_username
         if not username:
-            return
+            if is_disable_auth_enabled():
+                logger.warning(
+                    "Authentication is explicitly disabled; no administrator was "
+                    "provisioned."
+                )
+                return
+            raise RuntimeError(
+                "No administrator is configured. Set AUTH_USERNAME and AUTH_PASSWORD "
+                "at deployment time before starting the service."
+            )
 
         if use_environment and env_password:
             _validate_new_environment_password(env_password)
@@ -111,7 +148,15 @@ async def bootstrap_database_admin() -> None:
             _validate_new_environment_password(env_password)
             password_hash = PASSWORD_HELPER.hash(env_password)
         else:
-            return
+            if is_disable_auth_enabled():
+                logger.warning(
+                    "Authentication is explicitly disabled; no administrator was "
+                    "provisioned."
+                )
+                return
+            raise RuntimeError(
+                "AUTH_PASSWORD is required to provision the initial administrator."
+            )
 
         admin = User(
             username=username,
@@ -123,12 +168,26 @@ async def bootstrap_database_admin() -> None:
             auth_version=1,
         )
         session.add(admin)
-        await session.flush()
-        await session.commit()
-        await session.refresh(admin)
+        try:
+            await session.flush()
+            await _backfill_legacy_ownership(session, admin)
+            await session.commit()
+        except IntegrityError:
+            # The unique primary-admin slot remains the last line of defense on
+            # databases without a first-row/advisory lock. A concurrent winner
+            # is a successful bootstrap outcome, not a second administrator.
+            await session.rollback()
+            concurrent_admin = await session.scalar(
+                select(User).where(User.is_superuser.is_(True)).limit(1)
+            )
+            if concurrent_admin is not None:
+                logger.info(
+                    "Another process completed administrator provisioning first."
+                )
+                return
+            raise
         persist_admin_credentials(username, password_hash)
-        await _backfill_legacy_ownership(session, admin)
-        logger.info("Migrated the bootstrap administrator into the user database.")
+        logger.info("Provisioned the deployment administrator in the user database.")
 
 
 async def _backfill_legacy_ownership(session, admin: User) -> None:
@@ -162,4 +221,3 @@ async def _backfill_legacy_ownership(session, admin: User) -> None:
         .where(KeyValueSqlModel.key == "presentation_custom_themes")
         .values(key=f"presentation_custom_themes:{admin.id}")
     )
-    await session.commit()
