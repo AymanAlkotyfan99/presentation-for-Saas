@@ -9,6 +9,15 @@ class TestImageGenerationOpenAICompatible:
     def anyio_backend(self):
         return "asyncio"
 
+    @pytest.fixture(autouse=True)
+    def outbound_validation(self):
+        # Unit tests never resolve or contact the configured provider host.
+        with patch(
+            "services.image_generation_service.validate_outbound_url",
+            new=AsyncMock(),
+        ):
+            yield
+
     @pytest.fixture
     def mock_images_directory(self, tmp_path):
         images_dir = tmp_path / "images"
@@ -196,7 +205,7 @@ class TestImageGenerationOpenAICompatible:
                         mock_session.__aexit__ = AsyncMock(return_value=False)
 
                         with patch(
-                            "services.image_generation_service.aiohttp.ClientSession",
+                            "services.image_generation_service.SecureClientSession",
                             return_value=mock_session,
                         ):
                             image_path = await service.generate_image_openai_compatible(
@@ -252,7 +261,7 @@ class TestImageGenerationOpenAICompatible:
                         mock_session.__aexit__ = AsyncMock(return_value=False)
 
                         with patch(
-                            "services.image_generation_service.aiohttp.ClientSession",
+                            "services.image_generation_service.SecureClientSession",
                             return_value=mock_session,
                         ) as MockSession:
                             image_path = await service.generate_image_openai_compatible(
@@ -310,7 +319,7 @@ class TestImageGenerationOpenAICompatible:
                         mock_session.__aexit__ = AsyncMock(return_value=False)
 
                         with patch(
-                            "services.image_generation_service.aiohttp.ClientSession",
+                            "services.image_generation_service.SecureClientSession",
                             return_value=mock_session,
                         ):
                             image_path = await service.generate_image_openai_compatible(

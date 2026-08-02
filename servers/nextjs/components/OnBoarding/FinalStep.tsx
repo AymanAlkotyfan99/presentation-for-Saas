@@ -42,31 +42,33 @@ const FinalStep = () => {
                 const response = await fetch('/api/telemetry-status');
                 if (!response.ok) throw new Error(`telemetry-status returned ${response.status}`);
                 const data = await response.json();
-                setTrackingEnabled(data.telemetryEnabled);
+                setTrackingEnabled(data?.telemetryEnabled === true);
             } catch {
-                setTrackingEnabled(true);
+                setTrackingEnabled(false);
+                setTelemetryEnabled(false);
             }
         }
         fetchStatus();
     }, []);
 
     const handleTrackingToggle = useCallback(async (enabled: boolean) => {
-        const prev = trackingEnabled;
         setTrackingEnabled(enabled);
-        setTelemetryEnabled(enabled);
+        if (!enabled) setTelemetryEnabled(false);
         try {
             const response = await fetch('/api/user-config', {
                 method: 'POST',
                 body: JSON.stringify({
+                    ENABLE_ANONYMOUS_TRACKING: enabled ? 'true' : 'false',
                     DISABLE_ANONYMOUS_TRACKING: enabled ? 'false' : 'true',
                 }),
             });
             if (!response.ok) throw new Error(`user-config returned ${response.status}`);
+            setTelemetryEnabled(enabled);
         } catch {
-            setTrackingEnabled(prev);
-            setTelemetryEnabled(prev ?? true);
+            setTrackingEnabled(false);
+            setTelemetryEnabled(false);
         }
-    }, [trackingEnabled]);
+    }, []);
 
     const handleGoToDashboard = () => {
         trackEvent(MixpanelEvent.Navigation, { from: pathname, to: "/dashboard" });
@@ -88,7 +90,7 @@ const FinalStep = () => {
                     <div className='flex items-center gap-3 mt-8 px-5 py-3.5 rounded-[10px] border border-[#EDEEEF] bg-white'>
                         <div>
                             <p className='text-sm font-medium text-[#191919] font-syne'>Usage analytics</p>
-                            <p className='text-[11px] text-[#9CA3AF] font-syne leading-tight mt-0.5'>Help improve Presenton by sharing anonymous usage data.</p>
+                            <p className='text-[11px] text-[#9CA3AF] font-syne leading-tight mt-0.5'>Share limited product-usage events and basic network/device metadata with Mixpanel. This may include a device identifier; presentation content, filenames, and titles are excluded.</p>
                         </div>
                         <Switch
                             checked={trackingEnabled}

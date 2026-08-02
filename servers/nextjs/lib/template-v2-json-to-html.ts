@@ -1,4 +1,5 @@
-import { resolveBackendAssetUrl } from "@/utils/api";
+import { normalizeFontResource } from "@/lib/font-loading-security.mjs";
+import { getFastAPIUrl, resolveBackendAssetUrl } from "@/utils/api";
 import { markdownToPlainChartText } from "@/components/slide-editor/charts/chart-data";
 import { normalizeRawTextMarkdownElement } from "@/components/slide-editor/text/template-v2-text";
 
@@ -93,7 +94,7 @@ const ELEMENT_TYPES = new Set([
 ]);
 
 const DEFAULT_CHART_JS_URL =
-  "https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js";
+  "/vendor/chart.umd.min.js";
 
 const DEFAULT_CHART_COLORS = [
   "#7F22FE",
@@ -107,6 +108,18 @@ const DEFAULT_CHART_COLORS = [
 ];
 
 const CHART_FONT_FAMILY = "Inter, Arial, sans-serif";
+const TEMPLATE_FONT_POLICY_ORIGIN = "https://presenton.invalid";
+const MAX_EMBEDDED_FONT_CSS_LENGTH = 256 * 1024;
+const MAX_EMBEDDED_FONT_FACE_RULES = 128;
+const SAFE_FONT_FORMATS = new Map([
+  ["embedded-opentype", "embedded-opentype"],
+  ["opentype", "opentype"],
+  ["otf", "opentype"],
+  ["truetype", "truetype"],
+  ["ttf", "truetype"],
+  ["woff", "woff"],
+  ["woff2", "woff2"],
+]);
 
 export const TEMPLATE_V2_HTML_WIDTH = 1280;
 export const TEMPLATE_V2_HTML_HEIGHT = 720;
@@ -258,30 +271,301 @@ function renderSlideRoot(
 function renderFontAssetTags(fonts: unknown): string {
   const css = readStringValueOrNull(fonts);
   if (css) {
-    return `<style>${escapeStyleText(css)}${fontCssFamilyAliases(css)}</style>`;
+    return renderEmbeddedFontFaceCss(css);
   }
 
   const tags: string[] = [];
   const records = readRecord(fonts);
   const embeddedCss = readStringValueOrNull(records.css ?? records.font_css);
   if (embeddedCss) {
-    tags.push(
-      `<style>${escapeStyleText(embeddedCss)}${fontCssFamilyAliases(embeddedCss)}</style>`
-    );
+    tags.push(renderEmbeddedFontFaceCss(embeddedCss));
   }
 
   const faceEntries = readArray(records.fonts).length ? records.fonts : fonts;
   tags.push(...normalizeFontFaces(faceEntries).map(renderFontFaceDefinition));
 
-  const stylesheets = normalizeFontStylesheetUrls(faceEntries);
+  const stylesheets = [...new Set(normalizeFontStylesheetUrls(faceEntries))];
   tags.push(
     ...stylesheets.map(
       (url) =>
-        `<link rel="stylesheet" href="${escapeAttribute(resolveBackendAssetUrl(url))}">`
+        `<link rel="stylesheet" href="${escapeAttribute(url)}">`
     )
   );
 
   return tags.join("");
+}
+
+function renderEmbeddedFontFaceCss(css: string): string {
+  return parseEmbeddedFontFaces(css).map(renderFontFaceDefinition).join("");
+}
+
+function parseEmbeddedFontFaces(css: string): FontFaceDefinition[] {
+  if (css.length > MAX_EMBEDDED_FONT_CSS_LENGTH) return [];
+
+  const definitions: FontFaceDefinition[] = [];
+  for (const match of css.matchAll(/@font-face\s*\{([^{}]*)\}/gi)) {
+    if (definitions.length >= MAX_EMBEDDED_FONT_FACE_RULES) break;
+    const definition = parseEmbeddedFontFaceBlock(match[1] ?? "");
+    if (definition) definitions.push(definition);
+  }
+  return definitions;
+}
+
+function parseEmbeddedFontFaceBlock(block: string): FontFaceDefinition | null {
+  if (!block || block.length > 16 * 1024 || /\/\*|\*\//.test(block)) {
+    return null;
+  }
+
+  const parts = splitCssDeclarations(block);
+  if (!parts || parts.length > 16) return null;
+  const declarations = new Map<string, string>();
+  const allowedProperties = new Set([
+    "font-display",
+    "font-family",
+    "font-style",
+    "font-weight",
+    "src",
+  ]);
+
+  for (const part of parts) {
+    const separator = part.indexOf(":");
+    if (separator <= 0) return null;
+    const property = part.slice(0, separator).trim().toLowerCase();
+    const value = part.slice(separator + 1).trim();
+    if (
+      !/^[a-z-]+$/.test(property) ||
+      !allowedProperties.has(property) ||
+      !value ||
+      declarations.has(property)
+    ) {
+      return null;
+    }
+    declarations.set(property, value);
+  }
+
+  const familyValue = declarations.get("font-family");
+  const sourceValue = declarations.get("src");
+  if (!familyValue || !sourceValue) return null;
+  const family = parseCssFamily(familyValue);
+  const source = parseCssFontSource(sourceValue);
+  if (!family || !source) return null;
+
+  const display = declarations.get("font-display")?.toLowerCase();
+  if (
+    display &&
+    !new Set(["auto", "block", "swap", "fallback", "optional"]).has(display)
+  ) {
+    return null;
+  }
+
+  const rawWeight = declarations.get("font-weight");
+  const weight = rawWeight ? readEmbeddedFontWeight(rawWeight) : undefined;
+  if (rawWeight && !weight) return null;
+  const rawStyle = declarations.get("font-style");
+  const style = rawStyle ? readFontStyle(rawStyle) : undefined;
+  if (rawStyle && !style) return null;
+
+  const resource = normalizeTemplateFontResource(family, source.url);
+  if (!resource || resource.kind !== "font") return null;
+  return {
+    family: resource.family,
+    url: resource.url,
+    format: source.format,
+    weight: weight ?? inferFontWeight(`${resource.family} ${resource.url}`),
+    style: style ?? inferFontStyle(`${resource.family} ${resource.url}`),
+  };
+}
+
+function splitCssDeclarations(value: string): string[] | null {
+  const parts: string[] = [];
+  let start = 0;
+  let quote: "'" | '"' | null = null;
+  let escaped = false;
+  let parenthesisDepth = 0;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (quote) {
+      if (escaped) {
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (character === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+    } else if (character === "(") {
+      parenthesisDepth += 1;
+    } else if (character === ")") {
+      parenthesisDepth -= 1;
+      if (parenthesisDepth < 0) return null;
+    } else if (character === ";" && parenthesisDepth === 0) {
+      const part = value.slice(start, index).trim();
+      if (part) parts.push(part);
+      start = index + 1;
+    }
+  }
+
+  if (quote || escaped || parenthesisDepth !== 0) return null;
+  const tail = value.slice(start).trim();
+  if (tail) parts.push(tail);
+  return parts;
+}
+
+function parseCssFamily(value: string): string | null {
+  const decoded = parseCssStringLiteral(value);
+  if (decoded != null) return decoded;
+  return /^[\p{L}\p{N}_. -]{1,160}$/u.test(value) ? value.trim() : null;
+}
+
+function parseCssStringLiteral(value: string): string | null {
+  const quote = value[0];
+  if ((quote !== "'" && quote !== '"') || value.at(-1) !== quote) return null;
+
+  let decoded = "";
+  for (let index = 1; index < value.length - 1; index += 1) {
+    const character = value[index];
+    if (character !== "\\") {
+      if (character === quote || /[\n\r\f]/.test(character)) return null;
+      decoded += character;
+      continue;
+    }
+
+    const next = value[index + 1];
+    if (!next || /[\n\r\f]/.test(next)) return null;
+    const hexMatch = /^[0-9a-f]{1,6}/i.exec(value.slice(index + 1));
+    if (hexMatch) {
+      const codePoint = Number.parseInt(hexMatch[0], 16);
+      if (
+        codePoint === 0 ||
+        codePoint > 0x10ffff ||
+        (codePoint >= 0xd800 && codePoint <= 0xdfff)
+      ) {
+        return null;
+      }
+      decoded += String.fromCodePoint(codePoint);
+      index += hexMatch[0].length;
+      if (/\s/.test(value[index + 1] ?? "")) index += 1;
+    } else {
+      decoded += next;
+      index += 1;
+    }
+  }
+  return decoded;
+}
+
+function readCssFunction(
+  value: string,
+  expectedName: string
+): { argument: string; remainder: string } | null {
+  const prefix = new RegExp(`^${expectedName}\\s*\\(`, "i").exec(value);
+  if (!prefix) return null;
+  const argumentStart = prefix[0].length;
+  let quote: "'" | '"' | null = null;
+  let escaped = false;
+  let depth = 1;
+
+  for (let index = argumentStart; index < value.length; index += 1) {
+    const character = value[index];
+    if (quote) {
+      if (escaped) {
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (character === quote) {
+        quote = null;
+      }
+      continue;
+    }
+    if (character === "'" || character === '"') {
+      quote = character;
+    } else if (character === "(") {
+      depth += 1;
+    } else if (character === ")") {
+      depth -= 1;
+      if (depth === 0) {
+        return {
+          argument: value.slice(argumentStart, index).trim(),
+          remainder: value.slice(index + 1).trim(),
+        };
+      }
+    }
+  }
+  return null;
+}
+
+function parseCssFontSource(
+  value: string
+): { url: string; format?: string } | null {
+  const urlFunction = readCssFunction(value, "url");
+  if (!urlFunction) return null;
+  const quotedUrl = parseCssStringLiteral(urlFunction.argument);
+  const url = quotedUrl ??
+    (/^[^\s'"()\\]+$/.test(urlFunction.argument)
+      ? urlFunction.argument
+      : null);
+  if (!url) return null;
+
+  if (!urlFunction.remainder) return { url };
+  const formatFunction = readCssFunction(urlFunction.remainder, "format");
+  if (!formatFunction || formatFunction.remainder) return null;
+  const rawFormat =
+    parseCssStringLiteral(formatFunction.argument) ?? formatFunction.argument;
+  const format = normalizeFontFormat(rawFormat);
+  return format ? { url, format } : null;
+}
+
+function readEmbeddedFontWeight(value: string): string | undefined {
+  const normalized = value.trim().toLowerCase().replace(/\s+/g, " ");
+  const named = readFontWeight(normalized);
+  if (named && Number(named) >= 1 && Number(named) <= 1000) return named;
+  const range = /^(\d{1,4}) (\d{1,4})$/.exec(normalized);
+  if (!range) return undefined;
+  const start = Number(range[1]);
+  const end = Number(range[2]);
+  return start >= 1 && end <= 1000 && start <= end ? `${start} ${end}` : undefined;
+}
+
+function normalizeFontFormat(value: unknown): string | undefined {
+  const format = readString(value)?.toLowerCase();
+  return format ? SAFE_FONT_FORMATS.get(format) : undefined;
+}
+
+function templateFontResourcePolicy() {
+  const trustedAssetOrigins = [TEMPLATE_FONT_POLICY_ORIGIN];
+  try {
+    trustedAssetOrigins.push(getFastAPIUrl());
+  } catch {
+    // Invalid runtime configuration must not widen the font URL policy.
+  }
+  return {
+    documentOrigin: TEMPLATE_FONT_POLICY_ORIGIN,
+    trustedAssetOrigins,
+    preserveRelativeUrls: true,
+  };
+}
+
+function normalizeTemplateFontResource(family: unknown, url: unknown) {
+  const resource = normalizeFontResource(
+    family,
+    url,
+    templateFontResourcePolicy()
+  );
+  if (!resource || typeof url !== "string") return null;
+
+  // The synthetic origin exists only to resolve relative paths server-side.
+  // It must never become an allowlisted absolute network destination.
+  if (/^https?:\/\//i.test(url.trim())) {
+    try {
+      if (new URL(url.trim()).origin === TEMPLATE_FONT_POLICY_ORIGIN) return null;
+    } catch {
+      return null;
+    }
+  }
+  return resource;
 }
 
 function normalizeFontFaces(fonts: unknown): FontFaceDefinition[] {
@@ -306,15 +590,16 @@ function normalizeFontFaceEntry(
 
   const url = readString(value);
   if (url) {
-    if (isFontStylesheetUrl(url)) return [];
     const family = fallbackFamily?.trim();
-    return family
+    if (!family) return [];
+    const resource = normalizeTemplateFontResource(family, url);
+    return resource?.kind === "font"
       ? [
         {
-          family,
-          url,
-          weight: inferFontWeight(`${family} ${url}`),
-          style: inferFontStyle(`${family} ${url}`),
+          family: resource.family,
+          url: resource.url,
+          weight: inferFontWeight(`${resource.family} ${resource.url}`),
+          style: inferFontStyle(`${resource.family} ${resource.url}`),
         },
       ]
       : [];
@@ -327,19 +612,21 @@ function normalizeFontFaceEntry(
   const source = readString(
     record.url ?? record.src ?? record.href ?? record.data ?? record.source
   );
-  if (!family || !source || isFontStylesheetUrl(source)) return [];
+  if (!family || !source) return [];
+  const resource = normalizeTemplateFontResource(family, source);
+  if (!resource || resource.kind !== "font") return [];
 
   return [
     {
-      family,
-      url: source,
-      format: readString(record.format) ?? undefined,
+      family: resource.family,
+      url: resource.url,
+      format: normalizeFontFormat(record.format),
       weight:
         readFontWeight(record.weight ?? record.fontWeight ?? record.font_weight) ??
-        inferFontWeight(`${family} ${source}`),
+        inferFontWeight(`${resource.family} ${resource.url}`),
       style:
         readFontStyle(record.style ?? record.fontStyle ?? record.font_style) ??
-        inferFontStyle(`${family} ${source}`),
+        inferFontStyle(`${resource.family} ${resource.url}`),
     },
   ];
 }
@@ -350,17 +637,34 @@ function normalizeFontStylesheetUrls(fonts: unknown): string[] {
   }
 
   const directUrl = readString(fonts);
-  if (directUrl && isFontStylesheetUrl(directUrl)) return [directUrl];
+  if (directUrl) {
+    const resource = normalizeTemplateFontResource(
+      "Presenton Font Stylesheet",
+      directUrl
+    );
+    return resource?.kind === "stylesheet" ? [resource.url] : [];
+  }
 
   return Object.values(readRecord(fonts)).flatMap((value) => {
     const url = readString(value);
-    if (url && isFontStylesheetUrl(url)) return [url];
+    if (url) {
+      const resource = normalizeTemplateFontResource(
+        "Presenton Font Stylesheet",
+        url
+      );
+      if (resource?.kind === "stylesheet") return [resource.url];
+    }
 
     const record = readRecord(value);
     const source = readString(
       record.url ?? record.src ?? record.href ?? record.data ?? record.source
     );
-    return source && isFontStylesheetUrl(source) ? [source] : [];
+    if (!source) return [];
+    const resource = normalizeTemplateFontResource(
+      "Presenton Font Stylesheet",
+      source
+    );
+    return resource?.kind === "stylesheet" ? [resource.url] : [];
   });
 }
 
@@ -370,35 +674,15 @@ function renderFontFaceDefinition(definition: FontFaceDefinition): string {
     }`;
   return aliases
     .map(
-      (family) =>
-        `<style>@font-face{font-family:${escapeCssFont(
+      (family) => {
+        const css = `@font-face{font-family:${escapeCssFont(
           family
         )};src:${src};font-weight:${definition.weight ?? "400"};font-style:${definition.style ?? "normal"
-        };font-display:swap}</style>`
+        };font-display:swap}`;
+        return `<style>${escapeStyleText(css)}</style>`;
+      }
     )
     .join("");
-}
-
-function fontCssFamilyAliases(css: string): string {
-  const aliases: string[] = [];
-  const facePattern = /@font-face\s*\{[^}]*font-family\s*:\s*(['"]?)([^;'"}]+)\1[^}]*\}/gi;
-  for (const match of css.matchAll(facePattern)) {
-    const block = match[0];
-    const family = match[2]?.trim();
-    if (!family) continue;
-    const weight = /font-weight\s*:\s*([^;}]+)/i.exec(block)?.[1]?.trim();
-    for (const alias of fontFamilyAliases(family, weight).filter(
-      (item) => item !== family
-    )) {
-      aliases.push(
-        block.replace(
-          /font-family\s*:\s*(['"]?)([^;'"}]+)\1/i,
-          `font-family:${escapeCssFont(alias)}`
-        )
-      );
-    }
-  }
-  return aliases.join("");
 }
 
 function fontFamilyAliases(family: string, weight?: string): string[] {
@@ -917,9 +1201,20 @@ function renderEllipseVector(item: JsonRecord, mode: RenderMode): string {
 function renderSvg(item: JsonRecord, mode: RenderMode): string {
   const svg = readStringValue(item.svg);
   if (!svg) return "";
+  // Raw inline SVG can contain script, event handlers, foreignObject, and
+  // active links. Rendering it through an image resource preserves its visual
+  // role while keeping its document in the browser's inert image context.
+  let source: string;
+  try {
+    source = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  } catch {
+    return "";
+  }
   return `<div style="${frameStyle(item, mode)}${transformStyle(
     item
-  )}overflow:hidden">${svg}</div>`;
+  )}overflow:hidden"><img alt="" src="${escapeAttribute(
+    source
+  )}" style="display:block;width:100%;height:100%;object-fit:contain"></div>`;
 }
 
 function renderChart(item: JsonRecord, mode: RenderMode): string {
@@ -1824,14 +2119,7 @@ function renderChartScripts(): string {
 }
 
 function readChartJsUrl(): string {
-  const runtime = globalThis as typeof globalThis & {
-    process?: { env?: Record<string, string | undefined> };
-  };
-  return (
-    runtime.process?.env?.NEXT_PUBLIC_CHART_JS_URL ||
-    runtime.process?.env?.CHART_JS_URL ||
-    DEFAULT_CHART_JS_URL
-  );
+  return DEFAULT_CHART_JS_URL;
 }
 
 function chartRendererScript(): string {
@@ -2795,11 +3083,11 @@ function escapeAttribute(value: string): string {
 }
 
 function escapeScriptText(value: string): string {
-  return value.replaceAll("</script", "<\\/script").replaceAll("<!--", "<\\!--");
+  return value.replace(/<\/script/gi, "<\\/script").replaceAll("<!--", "<\\!--");
 }
 
 function escapeStyleText(value: string): string {
-  return value.replaceAll("</style", "<\\/style");
+  return value.replace(/<\/style/gi, "<\\/style");
 }
 
 function escapeCssColor(value: string): string {
@@ -2807,7 +3095,7 @@ function escapeCssColor(value: string): string {
 }
 
 function escapeCssFont(value: string): string {
-  return `'${value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
+  return `'${escapeCssStringValue(value)}'`;
 }
 
 function cssUrl(value: string): string {
@@ -2815,14 +3103,20 @@ function cssUrl(value: string): string {
 }
 
 function escapeCssUrl(value: string): string {
-  return value
-    .replaceAll("\\", "\\\\")
-    .replaceAll('"', '\\"')
-    .replaceAll("'", "\\'")
-    .replaceAll("\n", "")
-    .replaceAll("\r", "");
+  return escapeCssStringValue(value);
 }
 
-function isFontStylesheetUrl(url: string): boolean {
-  return /\.css(\?|$)/i.test(url) || /fonts\.googleapis\.com/.test(url);
+function escapeCssStringValue(value: string): string {
+  // CSS backslash escapes also avoid HTML raw-text/attribute delimiters. This
+  // function is used for both generated <style> blocks and style attributes.
+  return value
+    .replaceAll("\\", "\\5c ")
+    .replaceAll("&", "\\26 ")
+    .replaceAll('"', "\\22 ")
+    .replaceAll("'", "\\27 ")
+    .replaceAll("<", "\\3c ")
+    .replaceAll(">", "\\3e ")
+    .replaceAll("\n", "\\a ")
+    .replaceAll("\r", "\\d ")
+    .replaceAll("\f", "\\c ");
 }

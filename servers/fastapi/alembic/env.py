@@ -42,7 +42,7 @@ if alembic_config.config_file_name is not None:
 target_metadata = SQLModel.metadata
 
 # alembic.ini sets this so Config validates; treat it as "unset" for URL resolution.
-_CLI_PLACEHOLDER_DB_URL = "sqlite:///placeholder"
+_CLI_PLACEHOLDER_DB_URL = "sqlite:///:memory:"
 
 
 def _get_url() -> str:

@@ -1,12 +1,16 @@
 import asyncio
 import os
 import mimetypes
+import logging
 from typing import List, Optional
 from urllib.parse import urlparse
 
-import aiohttp
-
 import uuid
+from utils.outbound_http import SecureClientSession, safe_url_for_log
+
+
+LOGGER = logging.getLogger(__name__)
+MAX_DOWNLOAD_BYTES = 25 * 1024 * 1024
 
 
 async def download_file(
@@ -18,43 +22,44 @@ async def download_file(
         parsed_url = urlparse(url)
         filename = os.path.basename(parsed_url.path)
 
-        if not filename or "." not in filename:
-            async with aiohttp.ClientSession(trust_env=True) as session:
-                async with session.head(url, headers=headers) as response:
-                    if response.status == 200:
-                        content_disposition = response.headers.get(
-                            "Content-Disposition", ""
-                        )
-                        if "filename=" in content_disposition:
-                            filename = content_disposition.split("filename=")[1].strip(
-                                "\"'"
-                            )
-                        else:
-                            content_type = response.headers.get("Content-Type", "")
-                            if content_type:
-                                extension = mimetypes.guess_extension(
-                                    content_type.split(";")[0]
-                                )
-                                if extension:
-                                    filename = f"{uuid.uuid4()}{extension}"
-
-        filename = filename or str(uuid.uuid4())
-        save_path = os.path.join(save_directory, filename)
-
-        async with aiohttp.ClientSession(trust_env=True) as session:
-            async with session.get(url, headers=headers) as response:
-                if response.status == 200:
-                    with open(save_path, "wb") as file:
-                        async for chunk in response.content.iter_chunked(8192):
-                            file.write(chunk)
-                    print(f"File downloaded successfully: {save_path}")
-                    return save_path
-                else:
-                    print(f"Failed to download file. HTTP status: {response.status}")
+        async with SecureClientSession() as session:
+            async with session.get(
+                url,
+                headers=headers,
+                max_response_bytes=MAX_DOWNLOAD_BYTES,
+            ) as response:
+                if response.status != 200:
+                    LOGGER.warning(
+                        "File download failed: origin=%s status=%s",
+                        safe_url_for_log(url),
+                        response.status,
+                    )
                     return None
+                if not filename or "." not in filename:
+                    content_disposition = response.headers.get(
+                        "Content-Disposition", ""
+                    )
+                    if "filename=" in content_disposition:
+                        filename = os.path.basename(
+                            content_disposition.split("filename=")[1].strip("\"'")
+                        )
+                    else:
+                        content_type = response.headers.get("Content-Type", "")
+                        if content_type:
+                            extension = mimetypes.guess_extension(
+                                content_type.split(";")[0]
+                            )
+                            if extension:
+                                filename = f"{uuid.uuid4()}{extension}"
+                filename = os.path.basename(filename or str(uuid.uuid4()))
+                save_path = os.path.join(save_directory, filename)
+                with open(save_path, "wb") as file:
+                    file.write(await response.read())
+                LOGGER.info("File download completed: origin=%s", safe_url_for_log(url))
+                return save_path
 
-    except Exception as e:
-        print(f"Error downloading file from {url}: {e}")
+    except Exception:
+        LOGGER.exception("File download failed: origin=%s", safe_url_for_log(url))
         return None
 
 

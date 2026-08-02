@@ -9,6 +9,7 @@ from urllib.parse import urlparse, urlunparse
 import aiohttp
 from fastapi import HTTPException
 
+from api.operation_security import operation_guard
 from enums.llm_provider import LLMProvider
 from enums.web_search_provider import WebSearchProvider
 from utils.get_env import (
@@ -21,6 +22,7 @@ from utils.get_env import (
     get_web_search_provider_env,
 )
 from utils.llm_provider import get_llm_provider
+from utils.outbound_http import SecureClientSession
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_MAX_RESULTS = 5
@@ -116,25 +118,26 @@ async def search_web(query: str, max_results: int | None = None) -> list[WebSear
     )
 
     try:
-        async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=15),
-            headers={"User-Agent": "Presenton/1.0"},
-        ) as session:
-            if provider == WebSearchProvider.SEARXNG:
-                results = await _search_searxng(session, query, limit)
-            elif provider == WebSearchProvider.TAVILY:
-                results = await _search_tavily(session, query, limit)
-            elif provider == WebSearchProvider.EXA:
-                results = await _search_exa(session, query, limit)
-            elif provider == WebSearchProvider.BRAVE:
-                results = await _search_brave(session, query, limit)
-            elif provider == WebSearchProvider.SERPER:
-                results = await _search_serper(session, query, limit)
-            else:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Unsupported web search provider: {provider.value}",
-                )
+        async with operation_guard("web_search"):
+            async with SecureClientSession(
+                timeout=aiohttp.ClientTimeout(total=15),
+                headers={"User-Agent": "Presenton/1.0"},
+            ) as session:
+                if provider == WebSearchProvider.SEARXNG:
+                    results = await _search_searxng(session, query, limit)
+                elif provider == WebSearchProvider.TAVILY:
+                    results = await _search_tavily(session, query, limit)
+                elif provider == WebSearchProvider.EXA:
+                    results = await _search_exa(session, query, limit)
+                elif provider == WebSearchProvider.BRAVE:
+                    results = await _search_brave(session, query, limit)
+                elif provider == WebSearchProvider.SERPER:
+                    results = await _search_serper(session, query, limit)
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Unsupported web search provider: {provider.value}",
+                    )
     except Exception:
         LOGGER.exception(
             "Web search failed: provider=%s query=%r",

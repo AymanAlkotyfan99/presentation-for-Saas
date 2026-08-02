@@ -36,9 +36,11 @@ What makes Presenton different?
 - Or Download [Desktop App](https://presenton.ai/download) (Mac, Windows & Linux)
 - Works with Ollama, LM Studio, OpenAI, Gemini, Vertex AI, Azure OpenAI, Amazon Bedrock, Fireworks, Together AI, Anthropic, or any other OpenAI compatible providers
 - Comes with AI Presentation Generation API
-- Fully open-source (Apache 2.0)
+- Core source code is Apache-2.0 licensed; bundled third-party assets and optional
+  runtimes have separate provenance/license gates documented in
+  `docs/license-and-asset-provenance.md`
 - Works with your own design/templates
-- **Fully editable PPTX export**
+- Legacy PPTX/PDF export is **disabled by default** pending supply-chain, legal, and compatibility review
 
 > [!TIP]
 > **Star us!** A ⭐ shows your support and encourages us to keep building! 😇
@@ -51,7 +53,11 @@ What makes Presenton different?
 
 ### 🎛 Features
 
-Create presentations from a prompt, an uploaded document, or your own PowerPoint design. Choose from built-in templates, bring your preferred AI provider and API key, polish manually with drag-edit interface and export a fully editable deck.
+Create presentations from a prompt, an uploaded document, or your own PowerPoint
+design. Choose from built-in templates, bring your preferred AI provider and API
+key, and polish manually with the drag-edit interface. PPTX/PDF export is an
+experimental default-off path; output fidelity and editability are not commercially
+verified.
 
 <p align="center">
   <img src="./readme_assets/images/drag-and-edit.gif" alt="Drag-and-drop editing in the Presenton slide editor" />
@@ -62,14 +68,18 @@ Create presentations from a prompt, an uploaded document, or your own PowerPoint
 </p>
 
 <p align="center">
-  <img src="./readme_assets/images/chatgpt-2-1.png" alt="Create presentations with your existing ChatGPT subscription: secure and private, with instant access and no API keys" />
+  <img src="./readme_assets/images/chatgpt-2-1.png" alt="Create presentations with an existing ChatGPT subscription without a separate API key" />
 </p>
 
 #
 
 ### 🎨 In-Built AI Presentation Templates for PowerPoint
 
-Browse in-built AI presentation templates for pitch decks, business reports, executive updates, educational presentations, and more. Preview each editable slide layout, choose a design, and use Presenton to generate fully editable PowerPoint (`.pptx`) or PDF presentations from a prompt or document.
+Browse in-built AI presentation templates for pitch decks, business reports,
+executive updates, educational presentations, and more. Preview each slide layout,
+choose a design, and generate a presentation from a prompt or document. The
+experimental exporter can produce PowerPoint (`.pptx`) or PDF only when explicitly
+enabled; compatibility and editability remain unverified for paid production.
 
 <table border="1" cellpadding="16" cellspacing="0" width="100%">
 <tr>
@@ -154,7 +164,9 @@ Browse in-built AI presentation templates for pitch decks, business reports, exe
 
 ### 💻 Presenton Desktop
 
-Create AI-powered presentations using your own model provider (BYOK) or run everything locally on your own machine for full control and data privacy.
+Create AI-powered presentations using your own model provider (BYOK), or run core
+generation locally with local providers. A no-egress deployment must also disable
+or replace external fonts, search/image integrations, telemetry, and update checks.
 
 <p align="center">
   <a href="https://presenton.ai/download">
@@ -217,23 +229,32 @@ Create AI-powered presentations using your own model provider (BYOK) or run ever
 
 #
 
-Presenton gives you complete control over your AI presentation workflow. Choose your models, customize your experience, and keep your data private.
+Presenton gives you control over your AI presentation workflow. Privacy depends on
+the providers and optional external assets you configure; local-only operation
+requires local models/services and externally loaded resources to remain disabled.
 
-- Custom Templates & Themes — Create unlimited presentation designs with HTML and Tailwind CSS
+- Custom Templates & Themes — Use declarative designs; legacy executable
+  HTML/Tailwind layout compilation is production-disabled unless its explicit
+  unsafe development flag is enabled
 - AI Template Generation — Create presentation templates from existing Powerpoint documents.
 - Flexible Generation — Build presentations from prompts or uploaded documents
-- Export Ready — Save as PowerPoint (PPTX) and PDF with professional formatting
+- Experimental export — The legacy PPTX/PDF runtime requires `ENABLE_UNVERIFIED_PRESENTATION_EXPORT=true` and remains unsuitable for paid production until Sprint 16 review
 - Built-In MCP Server — Generate presentations over Model Context Protocol
 - Bring Your Own Key — Use your own API keys for OpenAI, Google Gemini, Vertex AI, Azure OpenAI, Anthropic Claude, or any compatible provider. Only pay for what you use, no hidden fees or subscriptions.
-- Ollama Integration — Run open-source models locally with full privacy
+- Ollama Integration — Run text-model inference locally; other configured assets
+  and integrations can still make external requests
 - OpenAI API Compatible — Connect to any OpenAI-compatible endpoint with your own models
 - Multi-Provider Support — Mix and match text and image generation providers
 - Versatile Image Generation — Choose from DALL-E 3, Gemini Flash, Pexels, or Pixabay
 - Rich Media Support — Icons, charts, and custom graphics for professional presentations
-- Runs Locally — All processing happens on your device, no cloud dependencies
+- Local-capable — Processing can remain on your device with local providers;
+  configured cloud AI/search/image providers and live Google Fonts make external
+  requests
 - API Deployment — Host as your own API service for your team
 - Multi-User Workspaces — Give each user a private workspace and manage accounts from a built-in admin panel
-- Fully Open-Source — Apache 2.0 licensed, inspect, modify, and contribute
+- Open core source — Presenton's source is Apache-2.0 licensed and inspectable;
+  optional runtimes, native packages, models, fonts, and media retain their own
+  license/provenance requirements
 - Docker Ready — One-command deployment with GPU support for local models
 - Electron Desktop App — Run Presenton as a native desktop application on Windows, macOS, and Linux (no browser required)
 - Sign in with ChatGPT — Use your free or paid ChatGPT account to sign in and start creating presentations instantly — no separate API key required
@@ -258,7 +279,8 @@ Run Presenton directly in your browser — no installation, no setup required. S
     You can run Presenton in two ways:
     <strong>Docker</strong> for a one-command setup without installing a local dev
     stack, or the <strong>Electron desktop app</strong> for a native app
-    experience (ideal for development or offline use).
+    experience (ideal for development; offline generation requires local
+    providers and locally available assets).
   </p>
 
 **Option 1: Electron (Desktop App)**
@@ -270,7 +292,8 @@ Run Presenton directly in your browser — no installation, no setup required. S
   </p>
 
   <p>
-    <strong>Prerequisites:</strong> Node.js (LTS), npm, Python 3.11, and
+    <strong>Prerequisites:</strong> Node.js 22.17.1 for Electron (use
+    <code>electron/.nvmrc</code>), npm, Python 3.11, and
     <a href="https://docs.astral.sh/uv/">uv</a>
     (for the shared FastAPI backend in <code>servers/fastapi</code>).
   </p>
@@ -306,12 +329,18 @@ Run Presenton directly in your browser — no installation, no setup required. S
 
 **Option 2: Docker**
 
-- Start Presenton
+- Start Presenton (development-only quick start)
+
+  A fresh data volume has no public setup screen and fails closed unless the
+  primary administrator is provisioned from a protected first-boot environment
+  file. Create that file as described in
+  [Set up the primary administrator](#set-up-the-primary-administrator), then run:
+
   Linux/MacOS (Bash/Zsh Shell):
-  <pre><code class="language-bash">docker run -it --name presenton -p 5001:80 -v "./app_data:/app_data" ghcr.io/presenton/presenton:latest</code></pre>
+  <pre><code class="language-bash">docker run -it --name presenton -p 5001:80 --env-file /secure/path/presenton-bootstrap.env -v "./app_data:/app_data" ghcr.io/presenton/presenton:latest</code></pre>
 
   Windows (PowerShell):
-  <pre><code class="language-bash">docker run -it --name presenton -p 5001:80 -v "${PWD}\app_data:/app_data" ghcr.io/presenton/presenton:latest</code></pre>
+  <pre><code class="language-bash">docker run -it --name presenton -p 5001:80 --env-file "C:\secure\presenton-bootstrap.env" -v "${PWD}\app_data:/app_data" ghcr.io/presenton/presenton:latest</code></pre>
 
 - Open Presenton
   <p>
@@ -325,6 +354,9 @@ Run Presenton directly in your browser — no installation, no setup required. S
     number of your choice to run Presenton on a different port number. If you use
     Docker Compose, set <code>PRESENTON_HTTP_HOST_PORT</code>, for example
     <code>PRESENTON_HTTP_HOST_PORT=8080 docker compose up production</code>.
+    The <code>latest</code> tag is suitable only for this local walkthrough. Pin
+    production deployments to a reviewed immutable image digest and follow
+    <a href="docs/deployment-phase-0.md">the Phase 0 deployment runbook</a>.
   </p>
   </blockquote>
 
@@ -403,18 +435,20 @@ Use when **LLM** is **ollama**:
 
 - **OLLAMA_URL**: Base URL of the Ollama HTTP API (e.g. `http://host.docker.internal:11434` from Docker).
 - **OLLAMA_MODEL**: Model name in Ollama (e.g. `llama3.2:3b`).
-- **START_OLLAMA**=[true/false]: Container entrypoint (`start.js`): optional install + `ollama serve`. Default **false** (`development` / `production` compose).
+- **START_OLLAMA**=[true/false]: Start an Ollama binary already installed and verified in the image. Runtime installation is prohibited; startup fails if this is `true` and no binary exists. Default **false**.
 
 #### Presentation memory (Mem0 OSS)
 
-Mem0 uses local Qdrant + SQLite (OSS); memory is scoped per presentation.
+Mem0 uses local Qdrant + SQLite (OSS); memory is scoped per presentation. It is
+disabled by default during Phase 0 because the embedding-model artifacts are not
+yet checksum-pinned and legally reviewed.
 
 By default the Docker runtime now points Mem0 at a local Ollama-compatible LLM endpoint, so it no longer needs an OpenAI key just to initialize. If you want to use OpenAI instead, set `MEM0_LLM_BASE_URL`/`MEM0_LLM_API_KEY` to your OpenAI-compatible endpoint and key.
 Docker images install the default spaCy model (`en_core_web_sm`) during build so Mem0 can start without extra setup on each run.
 
 | Variable                     | Purpose                                                                                                          |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **MEM0_ENABLED**             | **true**/false (compose default **true**).                                                                       |
+| **MEM0_ENABLED**             | true/**false** (compose default **false** pending model provenance review).                                      |
 | **MEM0_LLM_MODEL**           | Mem0 LLM model name (compose default **`llama3.1:latest`** or `OLLAMA_MODEL`).                                   |
 | **MEM0_LLM_API_KEY**         | Mem0 LLM API key placeholder for OpenAI-compatible clients (compose default **`ollama`**).                       |
 | **MEM0_LLM_BASE_URL**        | Mem0 LLM base URL (compose default **`OLLAMA_URL`** or `http://host.docker.internal:11434`).                     |
@@ -456,12 +490,14 @@ The parallel image generation option applies everywhere images are generated: in
 
 #### Telemetry
 
-- **DISABLE_ANONYMOUS_TRACKING**=[true/false]: Set to **true** to disable anonymous telemetry.
+- **ENABLE_ANONYMOUS_TRACKING**=[true/false]: Legacy variable name for explicit opt-in to pseudonymous usage analytics; telemetry remains off unless this is **true**.
+- **DISABLE_ANONYMOUS_TRACKING**=[true/false]: Emergency/privacy override. **true** always disables telemetry.
+- **NEXT_PUBLIC_MIXPANEL_TOKEN**: Required in addition to explicit consent; there is no built-in project token and session replay remains disabled.
 
 #### Multi-user authentication
 
 Presenton supports multiple accounts with a private workspace for each user. The
-first account becomes the primary administrator and can create, reset, or remove
+deployment-provisioned primary administrator can create, reset, or remove
 other accounts from **Admin → Users**.
 
 Existing single-user installations are upgraded automatically: the current account
@@ -470,18 +506,25 @@ other owned data stay attached to the same account.
 
 ##### Set up the primary administrator
 
-On a new installation, open Presenton and follow the account setup screen. For an
-unattended Docker deployment, you can create the primary administrator on first boot
-with environment variables:
+The public first-run setup screen and endpoint were removed as an intentional
+breaking security change. A new authenticated deployment fails closed until the
+primary administrator is supplied at process startup through the deployment secret
+store. For Docker, create a mode-0600 bootstrap environment file outside the
+repository and inject it only for the first successful boot:
 
 ```bash
 docker run -it --name presenton \
   -p 5001:80 \
-  -e AUTH_USERNAME=admin \
-  -e AUTH_PASSWORD=change-this-password \
+  --env-file /secure/path/presenton-bootstrap.env \
   -v "./app_data:/app_data" \
-  ghcr.io/presenton/presenton:latest
+  ghcr.io/presenton/presenton@sha256:REPLACE_WITH_VERIFIED_RELEASE_DIGEST
 ```
+
+The protected file contains `AUTH_USERNAME` and a unique `AUTH_PASSWORD` of at
+least eight characters. Remove those values from the steady-state deployment after
+the administrator exists. Do not commit the file or place the password directly in
+shell history. Concurrent replicas are serialized by a PostgreSQL advisory lock (or
+an immediate SQLite write transaction) and a database uniqueness invariant.
 
 Usernames must contain at least 3 characters, and new passwords must contain at least
 8 characters. Older six- or seven-character passwords remain valid after an upgrade.
@@ -490,8 +533,8 @@ Usernames must contain at least 3 characters, and new passwords must contain at 
 
 | Variable | Purpose |
 | --- | --- |
-| **AUTH_USERNAME** | Username used to create the primary administrator on first boot. It can also change the username during a rotation or recovery. |
-| **AUTH_PASSWORD** | Password used for first-time setup, rotation, or recovery. Required when using either flag below. |
+| **AUTH_USERNAME** | Deployment-secret username used to provision the primary administrator on first boot. It can also change the username during a controlled rotation or recovery. |
+| **AUTH_PASSWORD** | Deployment secret used only for first-time provisioning, rotation, or recovery. Required when using either flag below; remove it after successful startup. |
 | **AUTH_OVERRIDE_FROM_ENV**=[true/false] | Replace the primary administrator's credentials from the environment on the next startup. Use this for a deployment-managed credential rotation. |
 | **RESET_AUTH**=[true/false] | Recover access to the existing primary administrator without replacing the account or its data. |
 
@@ -502,11 +545,10 @@ docker stop presenton
 docker rm presenton
 docker run -it --name presenton \
   -p 5001:80 \
-  -e AUTH_USERNAME=admin \
-  -e AUTH_PASSWORD=new-secure-password \
+  --env-file /secure/path/presenton-recovery.env \
   -e AUTH_OVERRIDE_FROM_ENV=true \
   -v "./app_data:/app_data" \
-  ghcr.io/presenton/presenton:latest
+  ghcr.io/presenton/presenton@sha256:REPLACE_WITH_VERIFIED_RELEASE_DIGEST
 ```
 
 For account recovery, use the same command with `RESET_AUTH=true` instead of
@@ -565,7 +607,11 @@ Notes:
 
 **Docker Run Examples by Provider**
 
-Same variables as compose; use `-e` instead of `.env` when running `docker run` directly.
+Same variables as compose; use `-e` instead of `.env` when running `docker run`
+directly. The examples below are development examples for an already-bootstrapped
+`app_data` volume; do not put bootstrap credentials or provider secrets in shell
+history. For production, replace the mutable `latest` tag with a reviewed immutable
+digest as shown above.
 
 - Using OpenAI
     <pre><code class="language-bash">docker run -it --name presenton -p 5001:80 -e LLM="openai" -e OPENAI_API_KEY="******" -e IMAGE_PROVIDER="dall-e-3" -e CAN_CHANGE_KEYS="false" -v "./app_data:/app_data" ghcr.io/presenton/presenton:latest</code></pre>

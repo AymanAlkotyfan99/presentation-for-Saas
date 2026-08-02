@@ -16,7 +16,7 @@ const PrivacySettings = () => {
         const data = await response.json();
         setTrackingEnabled(data.telemetryEnabled);
       } catch {
-        setTrackingEnabled(true);
+        setTrackingEnabled(false);
       }
     }
     fetchStatus();
@@ -31,13 +31,14 @@ const PrivacySettings = () => {
       const response = await fetch("/api/user-config", {
         method: "POST",
         body: JSON.stringify({
+          ENABLE_ANONYMOUS_TRACKING: enabled ? "true" : "false",
           DISABLE_ANONYMOUS_TRACKING: enabled ? "false" : "true",
         }),
       });
       if (!response.ok) throw new Error(`user-config returned ${response.status}`);
     } catch {
       setTrackingEnabled(prev);
-      setTelemetryEnabled(prev ?? true);
+      setTelemetryEnabled(prev ?? false);
     } finally {
       setSaving(false);
     }
@@ -58,7 +59,10 @@ const PrivacySettings = () => {
           Usage analytics
         </h4>
         <p className="text-xs text-[#6B7280] mb-6 leading-relaxed max-w-lg">
-          Share anonymous usage data to help us improve Presenton. No personal information or presentation content is collected.
+          Share limited product-usage events to help improve Presenton.
+          Presentation content is not intentionally included, but the analytics
+          provider may process network/device metadata and a persistent
+          pseudonymous identifier.
         </p>
 
         <div className="flex items-center justify-between gap-4 rounded-[10px] bg-white border border-[#EDEEEF] p-4">
@@ -67,12 +71,12 @@ const PrivacySettings = () => {
               htmlFor="tracking-toggle"
               className="text-sm font-medium text-[#191919] cursor-pointer select-none block"
             >
-              Share anonymous usage data
+              Share product usage analytics
             </label>
             <p className="text-xs text-[#9CA3AF] mt-0.5">
               {trackingEnabled
-                ? "Anonymous usage data is being shared."
-                : "Anonymous usage data is not being shared"}
+                ? "Product usage analytics are enabled."
+                : "Product usage analytics are disabled."}
             </p>
           </div>
           <div className="flex items-center gap-2">

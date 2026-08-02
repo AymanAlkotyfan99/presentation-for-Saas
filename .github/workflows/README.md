@@ -9,20 +9,19 @@ started manually. It enforces the checks that exist in the current repository:
 - FastAPI: every pytest test using the Python version and locked dependencies
   declared in `servers/fastapi`;
 - Next.js: all Node.js unit tests, ESLint, a production build, and Cypress
-  component tests.
+  component tests;
+- Electron: security tests plus TypeScript/main-process validation;
+- repository policy: Docker Compose validation, checksum-mismatch regressions,
+  and reproducible CycloneDX SBOMs retained as workflow artifacts.
 
 No test step is allowed to fail silently.
 
 ## Run the CI checks locally
 
-Install Node.js 20+, npm, Python 3.11, and `uv`, then run:
-
-```bash
-./test-local.sh
-```
-
-The script installs locked dependencies and runs the same commands as the
-GitHub Actions workflow.
+Install Node.js 20.19.6 for repository/Next.js work, Node.js 22.17.1 for
+Electron, npm, Python 3.11, and uv 0.7.22. The checked-in `.nvmrc`,
+`electron/.nvmrc`, and `.python-version` files are authoritative. Run each
+group below; together they mirror the GitHub Actions workflow.
 
 ## Run one test group
 
@@ -50,7 +49,7 @@ npm run lint
 NEXT_PUBLIC_FAST_API=http://localhost:8000 \
 NEXT_PUBLIC_URL=http://localhost:3000 \
 npm run build
-npx cypress run --component --browser electron
+npm run test:cypress
 ```
 
 ### Repository tooling
@@ -60,4 +59,23 @@ npm ci
 npm test
 npm run sync:presentation-export
 npm run check:presentation-export
+npm run sbom:node
 ```
+
+### Electron
+
+```bash
+cd electron
+npm ci
+npm test
+npm run lint:main
+```
+
+### Complete SBOM set
+
+```bash
+npm run sbom
+```
+
+Outputs are written to the ignored `artifacts/sbom/` directory. Review the
+policy and exception process in `docs/sbom-and-license-policy.md`.

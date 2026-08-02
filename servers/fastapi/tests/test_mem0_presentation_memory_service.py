@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from pathlib import Path
 from unittest.mock import patch
 
 import services.mem0_oss_memory as mem0_oss
@@ -81,7 +82,11 @@ class TestMem0PresentationMemoryService:
             client = mem0_oss.get_shared_mem0_client()
 
         assert client is not None
-        assert captured["telemetry_base"].endswith("/mem0/telemetry/oss")
+        assert Path(captured["telemetry_base"]).parts[-3:] == (
+            "mem0",
+            "telemetry",
+            "oss",
+        )
         assert captured["config"]["llm"]["provider"] == "openai"
         assert captured["config"]["llm"]["config"]["model"] == "llama3.1:8b"
         assert captured["config"]["llm"]["config"]["api_key"] == "ollama"

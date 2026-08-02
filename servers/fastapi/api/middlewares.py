@@ -29,14 +29,12 @@ class SessionAuthMiddleware(BaseHTTPMiddleware):
     _PUBLIC_AUTH_PATHS = {
         "/api/v1/auth/status",
         "/api/v1/auth/verify",
-        "/api/v1/auth/setup",
         "/api/v1/auth/login",
         "/api/v1/auth/logout",
+        "/api/v1/health/live",
+        "/api/v1/health/ready",
     }
-    _PUBLIC_APP_DATA_PREFIXES = (
-        "/app_data/fonts/",
-        "/app_data/templates/",
-    )
+    _PUBLIC_APP_DATA_PREFIXES: tuple[str, ...] = ()
     _PROTECTED_NON_API_PATHS = {"/docs", "/openapi.json", "/redoc"}
 
     def _requires_auth(self, path: str) -> bool:
@@ -66,11 +64,8 @@ class SessionAuthMiddleware(BaseHTTPMiddleware):
             )
             if not configured:
                 return JSONResponse(
-                    status_code=428,
-                    content={
-                        "detail": "Login setup is required",
-                        "setup_required": True,
-                    },
+                    status_code=503,
+                    content={"detail": "Authentication unavailable"},
                 )
             principal, user = await resolve_request_principal(request, session)
             if principal is None:

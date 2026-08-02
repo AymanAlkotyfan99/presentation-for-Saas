@@ -1,29 +1,18 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo } from "react";
 
-import { marked } from "marked";
+import { renderSafeMarkdown } from "@/lib/safe-markdown";
 
 interface MarkdownRendererProps {
   content: string;
 }
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
-  const [markdownContent, setMarkdownContent] = useState<string>("");
-
-  useEffect(() => {
-    const parseMarkdown = async () => {
-      try {
-        const parsed = await marked.parse(content);
-        setMarkdownContent(parsed);
-      } catch (error) {
-        console.error("Error parsing markdown:", error);
-        setMarkdownContent("");
-      }
-    };
-
-    parseMarkdown();
-  }, [content]);
+  const markdownContent = useMemo(
+    () => renderSafeMarkdown(content),
+    [content]
+  );
 
   return (
     <div

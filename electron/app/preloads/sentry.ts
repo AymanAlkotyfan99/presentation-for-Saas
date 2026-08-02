@@ -28,14 +28,14 @@ export function initRendererSentry(): void {
     return;
   }
 
-  const dsn = 'https://48b091ed88ae147c0957a46a823c1449@o4509882707410944.ingest.us.sentry.io/4511171070394368';
-  const isEnabled = parseBoolean(process.env.SENTRY_ENABLED, true);
+  const dsn = process.env.SENTRY_DSN?.trim();
+  const isEnabled = parseBoolean(process.env.SENTRY_ENABLED, false);
 
-  if (!isEnabled) {
+  if (!isEnabled || !dsn) {
     return;
   }
 
-  const enableTracing = parseBoolean(process.env.SENTRY_ENABLE_TRACING, true);
+  const enableTracing = parseBoolean(process.env.SENTRY_ENABLE_TRACING, false);
   const enableReplay = parseBoolean(process.env.SENTRY_ENABLE_REPLAY, false);
   const enableFeedback = parseBoolean(process.env.SENTRY_ENABLE_FEEDBACK, false);
 
@@ -56,16 +56,16 @@ export function initRendererSentry(): void {
 
   Sentry.init({
     dsn,
-    enableLogs: parseBoolean(process.env.SENTRY_ENABLE_LOGS, true),
+    enableLogs: parseBoolean(process.env.SENTRY_ENABLE_LOGS, false),
     sendDefaultPii: parseBoolean(process.env.SENTRY_SEND_DEFAULT_PII, false),
     tracesSampleRate: enableTracing
-      ? parseSampleRate(process.env.SENTRY_TRACES_SAMPLE_RATE, 1.0)
+      ? parseSampleRate(process.env.SENTRY_TRACES_SAMPLE_RATE, 0.1)
       : undefined,
     replaysSessionSampleRate: enableReplay
-      ? parseSampleRate(process.env.SENTRY_REPLAYS_SESSION_SAMPLE_RATE, 0.1)
+      ? parseSampleRate(process.env.SENTRY_REPLAYS_SESSION_SAMPLE_RATE, 0)
       : undefined,
     replaysOnErrorSampleRate: enableReplay
-      ? parseSampleRate(process.env.SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE, 1.0)
+      ? parseSampleRate(process.env.SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE, 0.1)
       : undefined,
     integrations,
   });

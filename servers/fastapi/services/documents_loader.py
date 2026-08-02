@@ -10,6 +10,7 @@ from typing import Any, List, Optional, Tuple
 import pdfplumber
 from fastapi import HTTPException
 
+from api.operation_security import guarded_operation
 from constants.documents import (
     IMAGE_EXTENSIONS,
     OFFICE_EXTENSIONS,
@@ -189,6 +190,7 @@ class DocumentsLoader:
     def images(self):
         return self._images
 
+    @guarded_operation("document_parsing")
     async def load_documents(
         self,
         temp_dir: Optional[str] = None,

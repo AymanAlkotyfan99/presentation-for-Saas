@@ -3,6 +3,7 @@ import path from "path";
 
 import { compileTemplateSchema } from "@/lib/compile-template-schema";
 import { getFastApiBaseUrl } from "@/lib/fastapi-internal";
+import { isUnsafeCustomLayoutServerEnabled } from "@/lib/unsafe-custom-layouts";
 
 export type BuiltinLayoutSlide = {
   id: string;
@@ -136,6 +137,9 @@ export function buildCustomTemplateLayoutPayload(
   icon_weight: string;
   slides: BuiltinLayoutSlide[];
 } | null {
+  if (!isUnsafeCustomLayoutServerEnabled()) {
+    return null;
+  }
   if (!group.startsWith("custom-") || layouts.length === 0) {
     return null;
   }

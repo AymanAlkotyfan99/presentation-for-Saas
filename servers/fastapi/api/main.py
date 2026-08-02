@@ -4,10 +4,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
-from starlette.responses import FileResponse
+from starlette.responses import FileResponse, JSONResponse
+from sqlalchemy import text
 
 from api.lifespan import app_lifespan
 from api.middlewares import SessionAuthMiddleware, UserConfigEnvUpdateMiddleware
+from api.operation_security import (
+    OperationSecurityMiddleware,
+    healthcheck_operation_controls,
+)
 from api.v1.async_tasks.router import API_V1_ASYNC_TASKS_ROUTER
 from api.v1.auth.router import API_V1_AUTH_ROUTER
 from api.v1.admin.router import API_V1_ADMIN_ROUTER
@@ -22,6 +27,11 @@ from utils.get_env import (
 )
 from utils.mime_types import init_sandbox_safe_mimetypes
 from utils.path_helpers import get_resource_path
+from utils.sentry_config import (
+    parse_sentry_sample_rate,
+    parse_sentry_send_default_pii,
+)
+from services.database import async_session_maker
 
 
 init_sandbox_safe_mimetypes()
@@ -40,16 +50,8 @@ def _maybe_init_sentry() -> None:
 
     traces_sample_rate = get_sentry_traces_sample_rate_env()
     send_default_pii = get_sentry_send_default_pii_env()
-    try:
-        parsed_sample_rate = (
-            float(traces_sample_rate) if traces_sample_rate is not None else 1.0
-        )
-    except ValueError:
-        parsed_sample_rate = 1.0
-
-    parsed_send_default_pii = (
-        send_default_pii.lower() == "true" if send_default_pii is not None else True
-    )
+    parsed_sample_rate = parse_sentry_sample_rate(traces_sample_rate)
+    parsed_send_default_pii = parse_sentry_send_default_pii(send_default_pii)
 
     sentry_sdk.init(
         dsn=sentry_dsn,
@@ -95,7 +97,30 @@ app.add_middleware(
 )
 
 app.add_middleware(UserConfigEnvUpdateMiddleware)
+app.add_middleware(OperationSecurityMiddleware)
 app.add_middleware(SessionAuthMiddleware)
+
+
+@app.get("/api/v1/health/live", include_in_schema=False)
+async def liveness() -> dict[str, str]:
+    return {"status": "live"}
+
+
+@app.get("/api/v1/health/ready", include_in_schema=False)
+async def readiness():
+    checks = {"database": False, "operation_controls": False}
+    try:
+        async with async_session_maker() as session:
+            await session.execute(text("SELECT 1"))
+        checks["database"] = True
+    except Exception:
+        pass
+    checks["operation_controls"] = await healthcheck_operation_controls()
+    ready = all(checks.values())
+    return JSONResponse(
+        status_code=200 if ready else 503,
+        content={"status": "ready" if ready else "not_ready", "checks": checks},
+    )
 
 
 @app.middleware("http")

@@ -57,3 +57,12 @@ def test_openapi_prepare_returns_minimal_response():
 
     prepare_response = spec["components"]["schemas"]["PresentationPrepareResponse"]
     assert set(prepare_response["properties"]) == {"presentation_id"}
+
+
+def test_openapi_does_not_advertise_retired_public_setup():
+    openapi_spec_path = Path(__file__).resolve().parents[2] / "openai_spec.json"
+    spec = json.loads(openapi_spec_path.read_text(encoding="utf-8"))
+
+    assert "/api/v1/auth/setup" not in spec["paths"]
+    serialized = json.dumps(spec, sort_keys=True)
+    assert "setup_credentials_api_v1_auth_setup_post" not in serialized

@@ -14,6 +14,7 @@ from utils.model_availability import (
 )
 from utils.user_config import update_env_with_user_config
 from api.v1.auth.bootstrap import bootstrap_database_admin
+from api.operation_security import reset_operation_control_backend
 
 logger = logging.getLogger(__name__)
 
@@ -64,5 +65,6 @@ async def app_lifespan(_: FastAPI):
         update_env_with_user_config()
     await check_llm_and_image_provider_api_or_model_availability()
     yield
+    await reset_operation_control_backend()
     # Shutdown: release all database connections to prevent stale/leaked pools.
     await dispose_engines()

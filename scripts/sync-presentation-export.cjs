@@ -9,13 +9,13 @@
  * CLI: --force  re-download even if valid runtime already exists
  *       --check-only  verify index.cjs + converter exist and exit 0/1
  *
- * On every run (including --check-only), index.cjs is overwritten from index.js
- * so the CommonJS entrypoint never drifts from the bundled ESM build.
+ * `--check-only` is strictly read-only. Layout normalization and CommonJS alias
+ * creation happen only during installation.
  */
 const fs = require("fs");
 const path = require("path");
 const https = require("https");
-const http = require("http");
+const crypto = require("crypto");
 const { execFileSync } = require("child_process");
 
 const repoRoot = path.join(__dirname, "..");
@@ -28,6 +28,11 @@ const versionManifestPath = path.join(
   "presenton-export-version.json"
 );
 const packageJsonFile = path.join(repoRoot, "package.json");
+const artifactIntegrityFile = path.join(
+  repoRoot,
+  "config",
+  "artifact-integrity.json"
+);
 const cacheDir = path.join(repoRoot, ".cache", "presentation-export");
 const exportRepoBase =
   "https://github.com/presenton/presenton-export/releases/download";
@@ -55,6 +60,43 @@ function resolveLinuxAssetName() {
 }
 
 const linuxAssetName = resolveLinuxAssetName();
+
+function readArtifactPolicy(version, assetName) {
+  if (!fs.existsSync(artifactIntegrityFile)) {
+    throw new Error("Missing config/artifact-integrity.json; refusing unverified export download.");
+  }
+  const policy = JSON.parse(fs.readFileSync(artifactIntegrityFile, "utf8"));
+  if (policy.presentationExport?.version !== version) {
+    throw new Error(
+      `No integrity policy for presentation export ${version}. Update config/artifact-integrity.json first.`
+    );
+  }
+  const sha256 = policy.presentationExport.assets?.[assetName];
+  if (!/^[a-f0-9]{64}$/.test(sha256 || "")) {
+    throw new Error(`No valid SHA-256 is pinned for ${assetName}; refusing download.`);
+  }
+  return { sha256 };
+}
+
+function sha256File(filePath) {
+  const hash = crypto.createHash("sha256");
+  hash.update(fs.readFileSync(filePath));
+  return hash.digest("hex");
+}
+
+function verifySha256(filePath, expectedSha256) {
+  const actual = sha256File(filePath);
+  if (actual !== expectedSha256) {
+    try {
+      fs.rmSync(filePath, { force: true });
+    } catch {
+      // Best effort only; the mismatch still fails closed.
+    }
+    throw new Error(
+      `SHA-256 mismatch for ${path.basename(filePath)}. Expected ${expectedSha256}; got ${actual}.`
+    );
+  }
+}
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
@@ -107,18 +149,35 @@ function readInstalledVersion() {
   }
 }
 
-function writeInstalledVersion(version) {
+function writeInstalledVersion(version, sourceSha256, entrypointPath, converterPath) {
   fs.writeFileSync(
     versionManifestPath,
-    `${JSON.stringify({ version, asset: linuxAssetName }, null, 2)}\n`,
+    `${JSON.stringify({
+      version,
+      asset: linuxAssetName,
+      sourceSha256,
+      files: {
+        entrypoint: {
+          path: path.relative(targetRoot, entrypointPath),
+          sha256: sha256File(entrypointPath),
+        },
+        converter: {
+          path: path.relative(targetRoot, converterPath),
+          sha256: sha256File(converterPath),
+        },
+      },
+    }, null, 2)}\n`,
     "utf8"
   );
 }
 
 function requestJson(url, redirects = 5) {
   return new Promise((resolve, reject) => {
-    const client = url.startsWith("https:") ? https : http;
-    const req = client.get(
+    if (!url.startsWith("https:")) {
+      reject(new Error(`Refusing non-HTTPS JSON request: ${url}`));
+      return;
+    }
+    const req = https.get(
       url,
       {
         headers: {
@@ -243,13 +302,17 @@ function normalizeRuntimeLayout() {
   }
 }
 
-function ensureCommonJsEntrypoint() {
+function ensureCommonJsEntrypoint(create = false) {
   if (!fs.existsSync(targetIndexJs)) {
     return { ok: false, reason: `Missing runtime bundle: ${targetIndexJs}` };
   }
 
   try {
-    fs.copyFileSync(targetIndexJs, targetIndexCjs);
+    if (create) {
+      fs.copyFileSync(targetIndexJs, targetIndexCjs);
+    } else if (!fs.existsSync(targetIndexCjs)) {
+      return { ok: false, reason: `Missing CommonJS runtime bundle: ${targetIndexCjs}` };
+    }
     return { ok: true, entrypointPath: targetIndexCjs };
   } catch (err) {
     return {
@@ -259,7 +322,7 @@ function ensureCommonJsEntrypoint() {
   }
 }
 
-function validateExistingRuntime(expectedVersion) {
+function validateExistingRuntime(expectedVersion, expectedSha256) {
   const installedVersion = readInstalledVersion();
   if (!installedVersion.ok) {
     return installedVersion;
@@ -277,10 +340,14 @@ function validateExistingRuntime(expectedVersion) {
       ].join("\n"),
     };
   }
+  if (installedVersion.manifest.sourceSha256 !== expectedSha256) {
+    return {
+      ok: false,
+      reason: "Installed export runtime was not created from the currently pinned SHA-256 artifact.",
+    };
+  }
 
-  normalizeRuntimeLayout();
-
-  const entrypoint = ensureCommonJsEntrypoint();
+  const entrypoint = ensureCommonJsEntrypoint(false);
   if (!entrypoint.ok) {
     return { ok: false, reason: entrypoint.reason };
   }
@@ -293,8 +360,29 @@ function validateExistingRuntime(expectedVersion) {
       reason: `No Linux converter binary under ${targetPyDir} or ${targetRoot}.`,
     };
   }
-  chmodIfPossible(converterPath);
-  const currentConverterPath = ensureCurrentConverterLink(converterPath);
+  const currentConverterPath = path.join(targetPyDir, "convert-linux-current");
+  if (!fs.existsSync(currentConverterPath)) {
+    return {
+      ok: false,
+      reason: `Missing verified converter alias: ${currentConverterPath}`,
+    };
+  }
+
+  const installedFiles = installedVersion.manifest.files || {};
+  const expectedEntrypointHash = installedFiles.entrypoint?.sha256;
+  const expectedConverterHash = installedFiles.converter?.sha256;
+  if (
+    !/^[a-f0-9]{64}$/.test(expectedEntrypointHash || "") ||
+    !/^[a-f0-9]{64}$/.test(expectedConverterHash || "") ||
+    sha256File(entrypoint.entrypointPath) !== expectedEntrypointHash ||
+    sha256File(converterPath) !== expectedConverterHash ||
+    sha256File(currentConverterPath) !== expectedConverterHash
+  ) {
+    return {
+      ok: false,
+      reason: "Installed export runtime file-integrity validation failed.",
+    };
+  }
   return {
     ok: true,
     entrypointPath: entrypoint.entrypointPath,
@@ -305,8 +393,11 @@ function validateExistingRuntime(expectedVersion) {
 
 function downloadFile(url, outputPath, redirects = 5) {
   return new Promise((resolve, reject) => {
-    const client = url.startsWith("https:") ? https : http;
-    const req = client.get(
+    if (!url.startsWith("https:")) {
+      reject(new Error(`Refusing non-HTTPS export download: ${url}`));
+      return;
+    }
+    const req = https.get(
       url,
       {
         headers: {
@@ -344,6 +435,27 @@ function downloadFile(url, outputPath, redirects = 5) {
 
 function unzipArchive(zipPath, destDir) {
   ensureDir(destDir);
+  if (process.platform === "win32") {
+    execFileSync(
+      "powershell.exe",
+      [
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "Expand-Archive -LiteralPath $env:PRESENTON_EXPORT_ARCHIVE_PATH -DestinationPath $env:PRESENTON_EXPORT_EXTRACT_PATH -Force",
+      ],
+      {
+        env: {
+          ...process.env,
+          PRESENTON_EXPORT_ARCHIVE_PATH: zipPath,
+          PRESENTON_EXPORT_EXTRACT_PATH: destDir,
+        },
+        stdio: "inherit",
+      }
+    );
+    return;
+  }
   execFileSync("unzip", ["-o", zipPath, "-d", destDir], { stdio: "inherit" });
 }
 
@@ -363,7 +475,7 @@ function resolveExtractedRoot(extractDir) {
   throw new Error(`Unable to locate export runtime root under ${extractDir}`);
 }
 
-async function downloadAndInstallRuntime(tag) {
+async function downloadAndInstallRuntime(tag, expectedSha256) {
   const downloadUrl = `${exportRepoBase}/${tag}/${linuxAssetName}`;
 
   ensureDir(cacheDir);
@@ -373,6 +485,7 @@ async function downloadAndInstallRuntime(tag) {
 
   console.log(`[presentation-export] Downloading ${downloadUrl}`);
   await downloadFile(downloadUrl, zipPath);
+  verifySha256(zipPath, expectedSha256);
 
   console.log(`[presentation-export] Extracting ${zipPath}`);
   unzipArchive(zipPath, extractDir);
@@ -381,7 +494,21 @@ async function downloadAndInstallRuntime(tag) {
   fs.rmSync(targetRoot, { recursive: true, force: true });
   ensureDir(targetRoot);
   fs.cpSync(sourceRoot, targetRoot, { recursive: true, force: true });
-  writeInstalledVersion(tag);
+
+  normalizeRuntimeLayout();
+  const entrypoint = ensureCommonJsEntrypoint(true);
+  if (!entrypoint.ok) {
+    throw new Error(entrypoint.reason);
+  }
+  const converterPath = getConverterCandidates().find((candidate) =>
+    fs.existsSync(candidate)
+  );
+  if (!converterPath) {
+    throw new Error(`Downloaded runtime does not include a converter for ${linuxAssetName}.`);
+  }
+  chmodIfPossible(converterPath);
+  ensureCurrentConverterLink(converterPath);
+  writeInstalledVersion(tag, expectedSha256, entrypoint.entrypointPath, converterPath);
 
   fs.rmSync(extractDir, { recursive: true, force: true });
 
@@ -390,7 +517,11 @@ async function downloadAndInstallRuntime(tag) {
 
 async function main() {
   const targetVersion = await getTargetVersion();
-  const existing = validateExistingRuntime(targetVersion);
+  const { sha256: expectedSha256 } = readArtifactPolicy(
+    targetVersion,
+    linuxAssetName
+  );
+  const existing = validateExistingRuntime(targetVersion, expectedSha256);
 
   if (checkOnly) {
     if (!existing.ok) {
@@ -413,8 +544,11 @@ async function main() {
     return;
   }
 
-  const { tag, downloadUrl } = await downloadAndInstallRuntime(targetVersion);
-  const installed = validateExistingRuntime(targetVersion);
+  const { tag, downloadUrl } = await downloadAndInstallRuntime(
+    targetVersion,
+    expectedSha256
+  );
+  const installed = validateExistingRuntime(targetVersion, expectedSha256);
   if (!installed.ok) {
     throw new Error(installed.reason);
   }
@@ -427,7 +561,11 @@ async function main() {
   console.log(`  - ${installed.currentConverterPath}`);
 }
 
-main().catch((err) => {
-  console.error(`[presentation-export] ${err.message}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(`[presentation-export] ${err.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = { readArtifactPolicy, sha256File, verifySha256 };

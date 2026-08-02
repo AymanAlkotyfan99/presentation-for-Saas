@@ -511,6 +511,14 @@ function formatMegabytes(bytes: number): string {
 export async function installExportChromium(
   onProgress?: (progress: ChromiumInstallProgress) => void
 ): Promise<void> {
+  if (
+    process.env.ENABLE_UNVERIFIED_PRESENTATION_EXPORT !== "true" ||
+    process.env.ALLOW_UNVERIFIED_ELECTRON_CHROMIUM_DOWNLOAD !== "true"
+  ) {
+    throw new Error(
+      "Chromium download is disabled until both the experimental export feature and explicit unverified-download risk acceptance are enabled."
+    );
+  }
   const removed = await removeBrokenExportChromiumCaches();
   if (removed > 0) {
     onProgress?.({

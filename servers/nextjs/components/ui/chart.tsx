@@ -8,6 +8,27 @@ import { cn } from "@/lib/utils"
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const
 
+function safeCssIdentifier(value: string): string {
+  const normalized = value.replace(/[^a-zA-Z0-9_-]/g, "-")
+  return normalized || "chart"
+}
+
+function safeCssColor(value: string | undefined): string | null {
+  if (!value) return null
+  const normalized = value.trim()
+  if (
+    /^(?:transparent|currentColor|inherit)$/i.test(normalized) ||
+    /^#[0-9a-f]{3,8}$/i.test(normalized) ||
+    /^(?:rgb|hsl)a?\([0-9.,%\s/+\-]+\)$/i.test(normalized) ||
+    /^(?:oklch|oklab|lab|lch)\([0-9.%\s/+\-]+\)$/i.test(normalized) ||
+    /^var\(--[a-z0-9_-]+\)$/i.test(normalized) ||
+    /^hsl\(var\(--[a-z0-9_-]+\)\)$/i.test(normalized)
+  ) {
+    return normalized
+  }
+  return null
+}
+
 export type ChartConfig = {
   [k in string]: {
     label?: React.ReactNode
@@ -44,7 +65,7 @@ const ChartContainer = React.forwardRef<
   }
 >(({ id, className, children, config, ...props }, ref) => {
   const uniqueId = React.useId()
-  const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`
+  const chartId = safeCssIdentifier(`chart-${id || uniqueId.replace(/:/g, "")}`)
 
   return (
     <ChartContext.Provider value={{ config }}>
@@ -76,28 +97,28 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     return null
   }
 
-  return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
+  const safeId = safeCssIdentifier(id)
+  const css = Object.entries(THEMES)
+    .map(([theme, prefix]) => `
+${prefix} [data-chart=${safeId}] {
 ${colorConfig
   .map(([key, itemConfig]) => {
-    const color =
+    const color = safeCssColor(
       itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
       itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
+    )
+    return color ? `  --color-${safeCssIdentifier(key)}: ${color};` : null
   })
+  .filter(Boolean)
   .join("\n")}
 }
-`
-          )
-          .join("\n"),
-      }}
-    />
-  )
+`)
+    .join("\n")
+
+  // React emits this string as a text node. Combined with strict identifier and
+  // color validation above, chart data cannot terminate the style element or
+  // introduce arbitrary CSS rules.
+  return <style>{css}</style>
 }
 
 const ChartTooltip = RechartsPrimitive.Tooltip

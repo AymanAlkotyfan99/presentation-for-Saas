@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "presentationExport": {
+    "version": "v0.4.2",
+    "source": "https://github.com/presenton/presenton-export/releases/tag/v0.4.2",
+    "trustStatus": "REQUIRES_LEGAL_REVIEW",
+    "licenseStatus": "UNKNOWN",
+    "enabledByDefaultInProduction": false,
+    "assets": {
+      "export-Linux-ARM64.zip": "b9c166115cb182e4627fbbf01db9d03245b361f521ac240b8aa3474256abdc66",
+      "export-Linux-X64.zip": "8abcc9cdd59b071c32e754206dfad6abd3a82d11cfc65f4694d0d730fee9da69",
+      "export-macOS-ARM64.zip": "c37caa4d74526418b4e071d4794158679758ce815f3c8a1809cb21993741784d",
+      "export-macOS-X64.zip": "e260a2b56228921aac3f4a245afad8ec05a3e69890500a4249726bbfd026de05",
+      "export-Windows-X64.zip": "62f143101e88c2e4bd5abff19f78c3010b3d0e7e4fca2aed432889f75c1bc84d"
+    }
+  },
+  "spacyModel": {
+    "name": "en_core_web_sm",
+    "version": "3.8.0",
+    "asset": "en_core_web_sm-3.8.0-py3-none-any.whl",
+    "source": "https://github.com/explosion/spacy-models/releases/tag/en_core_web_sm-3.8.0",
+    "sha256": "1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85",
+    "licenseStatus": "REQUIRES_LEGAL_REVIEW"
+  },
+  "imageMagick": {
+    "version": "7.1.2-18",
+    "source": "https://github.com/ImageMagick/ImageMagick/releases/tag/7.1.2-18",
+    "licenseStatus": "REQUIRES_LEGAL_REVIEW",
+    "assets": {
+      "ImageMagick-7.1.2-18-portable-Q16-arm64.7z": "8bdd2a64da671dbfd5a6c03780a2b62c6bcb69f56fab81eb239a51488bae9fcb",
+      "ImageMagick-7.1.2-18-portable-Q16-x64.7z": "88377fcb78f26763fcffa2aa1959574f32f6de45dbc3b1e662df0bbd5869d301",
+      "ImageMagick-7.1.2-18-portable-Q16-x86.7z": "232beb5be972a9655c16d0a6dbf311f0c9caecf7b16ca49d6d4e3b2ee917f750",
+      "ImageMagick-d4e4b2b-clang-x86_64.AppImage": "dfd7b94fdb3530f90c5836b3eb4bf2602c3f4c3e0702b6cf96f41ca914217401",
+      "ImageMagick-d4e4b2b-gcc-x86_64.AppImage": "9cd43df019ca6ee3361360cd2c2a5c951fe55b9e8c85d76932168e64e871f786"
+    }
+  },
+  "electronChromium": {
+    "chromeBuildId": "149.0.7827.196",
+    "macBuildIds": {
+      "darwin-arm64": "1625085",
+      "darwin-x64": "1625072"
+    },
+    "verificationStatus": "REQUIRES_PLATFORM_ARCHIVE_SHA256",
+    "productionPolicy": "Export packaging must fail unless a platform-specific expected SHA-256 is supplied and verified."
+  }
+}

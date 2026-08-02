@@ -23,7 +23,6 @@ dependencies = [
     "greenlet>=3.0.3",
     "google-genai>=1.28.0",
     "mem0ai[nlp]>=0.1.115",
-    "nltk>=3.9.1",
     "openai>=1.98.0",
     "pathvalidate>=3.3.1",
     "pdfplumber>=0.11.7",
@@ -34,10 +33,13 @@ dependencies = [
     "jsonschema>=4.26.0",
     "python-pptx>=1.0.2",
     "fonttools>=4.55.0",
+    "redis>=5.2.0",
 ]
 
 [tool.uv]
-index-strategy = "unsafe-best-match"
+# Prevent dependency-confusion attacks when an additional private index is used:
+# a package is resolved only from the first index on which its name exists.
+index-strategy = "first-index"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -56,6 +58,8 @@ typeCheckingMode = "off"
 
 [dependency-groups]
 dev = [
+    "cyclonedx-bom==7.3.1",
+    "pip-audit==2.10.1",
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
 ]

@@ -7,9 +7,21 @@ from urllib.parse import urlparse
 import aiohttp
 from fastapi import HTTPException
 
+from api.operation_security import operation_guard
 from constants.supported_ollama_models import SUPPORTED_OLLAMA_MODELS
 from models.ollama_model_status import OllamaModelStatus
 from utils.get_env import get_ollama_url_env
+from utils.outbound_http import (
+    OutboundDNSBlocked,
+    OutboundRedirectBlocked,
+    OutboundRequestTimeout,
+    OutboundSecurityError,
+    OutboundTransportError,
+    OutboundURLBlocked,
+    SecureClientSession,
+    public_outbound_error,
+    secure_stream_request,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -60,15 +72,24 @@ def _get_ollama_url(ollama_url: str | None = None) -> str:
 
 
 def _ollama_unreachable_error(ollama_url: str | None = None) -> HTTPException:
-    resolved_ollama_url = _get_ollama_url(ollama_url)
+    _get_ollama_url(ollama_url)
     return HTTPException(
         status_code=503,
         detail=(
-            f"Could not connect to Ollama at {resolved_ollama_url}. "
-            "Make sure Ollama is running and reachable from Presenton. "
-            "When Presenton runs in Docker, use host.docker.internal instead of localhost."
+            "Could not connect to the configured Ollama endpoint. "
+            "Make sure it is running, reachable, and explicitly approved in "
+            "OUTBOUND_HTTP_ALLOWLIST when it uses a private or loopback address."
         ),
     )
+
+
+def _ollama_outbound_error(error: OutboundSecurityError) -> HTTPException:
+    if isinstance(
+        error,
+        (OutboundURLBlocked, OutboundDNSBlocked, OutboundRedirectBlocked),
+    ):
+        return HTTPException(status_code=400, detail=public_outbound_error(error))
+    return _ollama_unreachable_error()
 
 
 def _extract_ollama_parameter_count(model_name: str, model_details: dict | None = None) -> str:
@@ -92,52 +113,56 @@ async def list_available_ollama_models(
 ) -> list[OllamaModelStatus]:
     base_url = _get_ollama_url(ollama_url)
     try:
-        async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=10)
-        ) as session:
-            async with session.get(
-                f"{base_url}/api/tags",
-            ) as response:
-                if response.status == 200:
-                    pulled_models = await response.json(content_type=None)
-                    models = (
-                        pulled_models.get("models")
-                        if isinstance(pulled_models, dict)
-                        else None
-                    )
-                    if not isinstance(models, list):
-                        raise HTTPException(
-                            status_code=502,
-                            detail="Ollama returned an invalid models response",
+        async with operation_guard("provider_discovery"):
+            async with SecureClientSession(
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as session:
+                async with session.get(
+                    f"{base_url}/api/tags",
+                    max_response_bytes=2 * 1024 * 1024,
+                ) as response:
+                    if response.status == 200:
+                        pulled_models = await response.json(content_type=None)
+                        models = (
+                            pulled_models.get("models")
+                            if isinstance(pulled_models, dict)
+                            else None
                         )
-                    return [
-                        OllamaModelStatus(
-                            name=m.get("model") or m.get("name"),
-                            parameters=_extract_ollama_parameter_count(
-                                m.get("model") or m.get("name") or "",
-                                m.get("details") if isinstance(m, dict) else None,
+                        if not isinstance(models, list):
+                            raise HTTPException(
+                                status_code=502,
+                                detail="Ollama returned an invalid models response",
                             )
-                            or None,
-                            size=m.get("size") or 0,
-                            status="pulled",
-                            downloaded=m.get("size") or 0,
-                            done=True,
+                        return [
+                            OllamaModelStatus(
+                                name=m.get("model") or m.get("name"),
+                                parameters=_extract_ollama_parameter_count(
+                                    m.get("model") or m.get("name") or "",
+                                    m.get("details") if isinstance(m, dict) else None,
+                                )
+                                or None,
+                                size=m.get("size") or 0,
+                                status="pulled",
+                                downloaded=m.get("size") or 0,
+                                done=True,
+                            )
+                            for m in models
+                            if isinstance(m, dict)
+                            and (m.get("model") or m.get("name"))
+                        ]
+                    if response.status == 403:
+                        raise HTTPException(
+                            status_code=403,
+                            detail="Forbidden: Please check your Ollama Configuration",
                         )
-                        for m in models
-                        if isinstance(m, dict) and (m.get("model") or m.get("name"))
-                    ]
-                elif response.status == 403:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Forbidden: Please check your Ollama Configuration",
-                    )
-                else:
                     raise HTTPException(
                         status_code=response.status,
                         detail=f"Failed to list Ollama models: {response.status}",
                     )
     except HTTPException:
         raise
+    except OutboundSecurityError as error:
+        raise _ollama_outbound_error(error) from error
     except (aiohttp.ClientError, TimeoutError, json.JSONDecodeError) as error:
         raise _ollama_unreachable_error(ollama_url) from error
 
@@ -152,50 +177,61 @@ async def pull_ollama_model(
 ) -> AsyncGenerator[str, None]:
     base_url = _get_ollama_url(ollama_url)
     try:
-        async with aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=None)
-        ) as session:
-            async with session.post(
+        async with operation_guard("provider_discovery"):
+            async with secure_stream_request(
+                "POST",
                 f"{base_url}/api/pull",
-                json={"name": model_name, "stream": True, "insecure": False},
-            ) as response:
+                json_body={"name": model_name, "stream": True, "insecure": False},
+                timeout_seconds=1800,
+                max_response_bytes=16 * 1024 * 1024,
+            ) as (response, response_chunks):
                 if response.status != 200:
-                    body = await response.text()
+                    body = b"".join([chunk async for chunk in response_chunks]).decode(
+                        "utf-8", errors="replace"
+                    )
                     yield f"event: error\ndata: {json.dumps({'detail': body or 'Pull failed'})}\n\n"
                     return
 
-                async for line in response.content:
-                    decoded = line.decode("utf-8").strip()
-                    if not decoded:
-                        continue
-                    try:
-                        data = json.loads(decoded)
-                    except json.JSONDecodeError:
-                        continue
+                pending = b""
+                async for chunk in response_chunks:
+                    pending += chunk
+                    lines = pending.split(b"\n")
+                    pending = lines.pop()
+                    for line in lines:
+                        decoded = line.decode("utf-8", errors="replace").strip()
+                        if not decoded:
+                            continue
+                        try:
+                            data = json.loads(decoded)
+                        except json.JSONDecodeError:
+                            continue
 
-                    if data.get("error"):
-                        yield f"event: error\ndata: {json.dumps({'detail': data['error']})}\n\n"
-                        return
+                        if data.get("error"):
+                            yield f"event: error\ndata: {json.dumps({'detail': data['error']})}\n\n"
+                            return
 
-                    if data.get("status") == "success":
-                        yield f"event: response\ndata: {json.dumps({'type': 'complete', 'status': 'success', 'model': model_name})}\n\n"
-                        return
+                        if data.get("status") == "success":
+                            yield f"event: response\ndata: {json.dumps({'type': 'complete', 'status': 'success', 'model': model_name})}\n\n"
+                            return
 
-                    total = data.get("total")
-                    completed = data.get("completed")
-                    status = data.get("status", "")
+                        total = data.get("total")
+                        completed = data.get("completed")
+                        status = data.get("status", "")
 
-                    if total and completed is not None:
-                        progress = round((completed / total) * 100, 1)
-                        yield (
-                            f"event: response\ndata: "
-                            f"{json.dumps({'type': 'progress', 'status': status, 'total': total, 'completed': completed, 'progress': progress})}\n\n"
-                        )
-                    else:
-                        yield (
-                            f"event: response\ndata: "
-                            f"{json.dumps({'type': 'status', 'status': status})}\n\n"
-                        )
+                        if total and completed is not None:
+                            progress = round((completed / total) * 100, 1)
+                            yield (
+                                f"event: response\ndata: "
+                                f"{json.dumps({'type': 'progress', 'status': status, 'total': total, 'completed': completed, 'progress': progress})}\n\n"
+                            )
+                        else:
+                            yield (
+                                f"event: response\ndata: "
+                                f"{json.dumps({'type': 'status', 'status': status})}\n\n"
+                            )
+    except OutboundSecurityError as error:
+        detail = public_outbound_error(error)
+        yield f"event: error\ndata: {json.dumps({'detail': detail})}\n\n"
     except (aiohttp.ClientError, TimeoutError) as error:
         LOGGER.error("Ollama pull error: %s", error)
-        yield f"event: error\ndata: {json.dumps({'detail': f'Could not connect to Ollama at {base_url}'})}\n\n"
+        yield f"event: error\ndata: {json.dumps({'detail': 'Could not connect to the configured Ollama endpoint'})}\n\n"

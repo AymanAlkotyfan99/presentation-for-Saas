@@ -1,7 +1,7 @@
 import asyncio
 import json
 import os
-from fastembed_vectorstore import FastembedEmbeddingModel, FastembedVectorstore
+import re
 from utils.asset_directory_utils import absolute_fastapi_asset_url
 from utils.icon_weights import (
     ALLOWED_ICON_WEIGHTS,
@@ -23,13 +23,36 @@ def _icon_fastembed_cache_directory() -> str:
     return get_writable_path("fastembed_cache")
 
 
+def _enabled(name: str) -> bool:
+    return (os.getenv(name) or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 class IconFinderService:
     def __init__(self):
-        self.model = FastembedEmbeddingModel.AllMiniLML6V2
+        # Semantic search downloads and executes an ONNX model. Until model files
+        # have policy-pinned hashes, keep it behind two explicit deployment flags
+        # and use the repository-owned lexical index by default.
+        self.semantic_enabled = _enabled("ENABLE_SEMANTIC_ICON_SEARCH") and _enabled(
+            "ALLOW_UNVERIFIED_FASTEMBED_MODELS"
+        )
+        self.model = None
         self.cache_directory = _icon_fastembed_cache_directory()
         self.vectorstore = None
+        self._lexical_icons: list[str] | None = None
         self._initialized = False
         self._initialization_failed = False
+
+    def _initialize_lexical_collection(self) -> None:
+        icons_path = get_resource_path("assets/icons.json")
+        with open(icons_path, "r", encoding="utf-8") as file:
+            icons = json.load(file)
+        self._lexical_icons = [
+            f"{item['name']}||{item.get('tags', '')}"
+            for item in icons.get("icons", [])
+            if str(item.get("name", "")).endswith("-bold")
+        ]
+        if not self._lexical_icons:
+            raise RuntimeError("The bundled lexical icon index is empty")
 
     def _initialize_icons_collection(self):
         if self._initialized or self._initialization_failed:
@@ -49,6 +72,14 @@ class IconFinderService:
             return
             
         try:
+            if not self.semantic_enabled:
+                self._initialize_lexical_collection()
+                print("[IconFinder] Loaded bundled lexical icon index")
+                return
+
+            from fastembed_vectorstore import FastembedEmbeddingModel, FastembedVectorstore
+
+            self.model = FastembedEmbeddingModel.AllMiniLML6V2
             # Try bundled vectorstore first (read-only location)
             bundled_vectorstore_path = get_resource_path("assets/icons-vectorstore.json")
             # Writable location for user-created vectorstore (directory + filename)
@@ -132,7 +163,34 @@ class IconFinderService:
     def ensure_initialized(self) -> bool:
         if not self._initialized and not self._initialization_failed:
             self._initialize_icons_collection()
-        return self.vectorstore is not None and not self._initialization_failed
+        return (
+            (self.vectorstore is not None or self._lexical_icons is not None)
+            and not self._initialization_failed
+        )
+
+    def _search_lexical(self, query: str, k: int) -> list[tuple[str, float]]:
+        query_tokens = set(re.findall(r"[a-z0-9]+", query.lower()))
+        if not query_tokens or not self._lexical_icons:
+            return []
+
+        def score(candidate: str) -> tuple[int, str]:
+            name, _, tags = candidate.partition("||")
+            normalized_name = name.removesuffix("-bold").replace("-", " ")
+            candidate_tokens = set(re.findall(r"[a-z0-9]+", f"{normalized_name} {tags}".lower()))
+            overlap = len(query_tokens & candidate_tokens)
+            phrase_bonus = 100 if query.lower().strip() == normalized_name else 0
+            prefix_bonus = sum(2 for token in query_tokens if normalized_name.startswith(token))
+            return phrase_bonus + overlap * 10 + prefix_bonus, name
+
+        ranked = sorted(
+            ((score(candidate), candidate) for candidate in self._lexical_icons),
+            key=lambda item: (-item[0][0], item[0][1]),
+        )
+        return [
+            (candidate, float(candidate_score))
+            for (candidate_score, _), candidate in ranked[: max(k, 0)]
+            if candidate_score > 0
+        ]
 
     @staticmethod
     def _base_icon_name(icon_name: str) -> str:
@@ -169,7 +227,10 @@ class IconFinderService:
             
         try:
             icon_weight = normalize_icon_weight(weight)
-            result = await asyncio.to_thread(self.vectorstore.search, query, k)
+            if self.vectorstore is not None:
+                result = await asyncio.to_thread(self.vectorstore.search, query, k)
+            else:
+                result = await asyncio.to_thread(self._search_lexical, query, k)
             return [self._icon_url_for_weight(each[0], icon_weight) for each in result]
         except Exception as e:
             print(f"Icon search error: {e}")

@@ -13,7 +13,11 @@ import {
 } from "../types";
 import { getApiUrl } from "@/utils/api";
 import { MixpanelEvent, trackEvent } from "@/utils/mixpanel";
-import { bucketFileSize, sanitizeAnalyticsError } from "@/utils/analytics";
+import {
+    bucketFileSize,
+    categorizeFileExtension,
+    sanitizeAnalyticsError,
+} from "@/utils/analytics";
 
 const TEMPLATE_V2_LAYOUT_BATCH_SIZE = 1;
 const MAX_PROCESSING_PROGRESS_PERCENT = 95;
@@ -134,14 +138,12 @@ export const useTemplateCreation = () => {
     // Step 1: Check fonts in PPTX file
     const checkFonts = useCallback(async (pptxFile: File): Promise<FontData | null> => {
         updateState({ isLoading: true, error: null });
+        const fileExtension = categorizeFileExtension(pptxFile.name);
 
         try {
-            const extensionIndex = pptxFile.name.lastIndexOf(".");
-            const fileExtension = extensionIndex >= 0 ? pptxFile.name.slice(extensionIndex).toLowerCase() : "";
             trackEvent(MixpanelEvent.CustomTemplate_Creation_Started, {
                 source: "pptx_upload",
-                file_name: pptxFile.name,
-                file_size_bytes: pptxFile.size,
+                file_size_bucket: bucketFileSize(pptxFile.size),
                 file_extension: fileExtension,
             });
             const formData = new FormData();
@@ -176,10 +178,8 @@ export const useTemplateCreation = () => {
             updateState({ error: errorMessage, isLoading: false });
             trackEvent(MixpanelEvent.CustomTemplate_Font_Check_Failed, {
                 file_size_bucket: bucketFileSize(pptxFile.size),
-                file_extension: pptxFile.name.includes(".")
-                    ? pptxFile.name.slice(pptxFile.name.lastIndexOf(".")).toLowerCase()
-                    : "",
-                error_message: sanitizeAnalyticsError(error, "Font check failed"),
+                file_extension: fileExtension,
+                error_category: sanitizeAnalyticsError(error, "Font check failed"),
             });
             notify.error("Font check failed", errorMessage);
             return null;
@@ -321,7 +321,7 @@ export const useTemplateCreation = () => {
             trackEvent(MixpanelEvent.CustomTemplate_Preview_Failed, {
                 uploaded_font_count: uploadedFonts.length,
                 duration_ms: Date.now() - startedAt,
-                error_message: sanitizeAnalyticsError(
+                error_category: sanitizeAnalyticsError(
                     error,
                     "Document preparation failed"
                 ),
@@ -586,7 +586,7 @@ export const useTemplateCreation = () => {
                         duration_ms:
                             Date.now() -
                             (slideStartedAtByIndex.get(failure.index) ?? Date.now()),
-                        error_message: sanitizeAnalyticsError(
+                        error_category: sanitizeAnalyticsError(
                             failure.error,
                             "Template layout generation failed"
                         ),
@@ -643,7 +643,7 @@ export const useTemplateCreation = () => {
                     trackEvent(MixpanelEvent.CustomTemplate_Blocks_Generation_Failed, {
                         template_id: templateId,
                         template_version: "v2",
-                        error_message: sanitizeAnalyticsError(
+                        error_category: sanitizeAnalyticsError(
                             error,
                             "Failed to generate template blocks"
                         ),
@@ -691,7 +691,7 @@ export const useTemplateCreation = () => {
                 step: "template-creation",
                 slide_index: options.retrySlideIndex ?? null,
                 duration_ms: Date.now() - generationStartedAt,
-                error_message: sanitizeAnalyticsError(
+                error_category: sanitizeAnalyticsError(
                     error,
                     "Template generation failed"
                 ),
@@ -819,7 +819,7 @@ export const useTemplateCreation = () => {
                     template_version: "v2",
                     slide_index: slideIndex,
                     duration_ms: Date.now() - startedAt,
-                    error_message: sanitizeAnalyticsError(
+                    error_category: sanitizeAnalyticsError(
                         error,
                         "Template layout generation failed"
                     ),

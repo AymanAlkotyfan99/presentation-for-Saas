@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from google import genai
 from google.genai import types
 from openai import NOT_GIVEN, AsyncOpenAI
+from api.operation_security import guarded_operation
 from models.image_prompt import ImagePrompt
 from models.sql.image_asset import ImageAsset
 from utils.get_env import (
@@ -40,6 +41,7 @@ from utils.image_provider import (
 )
 from utils.asset_directory_utils import absolute_fastapi_asset_url
 from utils.image_generation_error import normalize_image_generation_error
+from utils.outbound_http import SecureClientSession, validate_outbound_url
 import uuid
 
 
@@ -93,6 +95,7 @@ class ImageGenerationService:
     def is_stock_provider_selected(self):
         return is_pixels_selected() or is_pixabay_selected()
 
+    @guarded_operation("image_generation")
     async def generate_image(self, prompt: ImagePrompt) -> str | ImageAsset:
         """
         Generates an image based on the provided prompt.
@@ -212,7 +215,7 @@ class ImageGenerationService:
             "size": "1024x1024",
         }
 
-        async with aiohttp.ClientSession(trust_env=True) as session:
+        async with SecureClientSession() as session:
             resp = await session.post(
                 f"{base_url}/images/generations",
                 json=payload,
@@ -346,7 +349,7 @@ class ImageGenerationService:
         per_page = max(1, min(limit, 80))
         resolved_api_key = (api_key or get_pexels_api_key_env() or "").strip()
 
-        async with aiohttp.ClientSession(trust_env=True) as session:
+        async with SecureClientSession() as session:
             response = await session.get(
                 "https://api.pexels.com/v1/search",
                 params={"query": prompt, "per_page": per_page},
@@ -381,7 +384,7 @@ class ImageGenerationService:
         per_page = max(3, min(limit, 200))
         resolved_api_key = (api_key or get_pixabay_api_key_env() or "").strip()
 
-        async with aiohttp.ClientSession(trust_env=True) as session:
+        async with SecureClientSession() as session:
             response = await session.get(
                 "https://pixabay.com/api/",
                 params={
@@ -473,7 +476,7 @@ class ImageGenerationService:
                 f"Randomized {randomized_seed_count} ComfyUI seed input(s) before submission"
             )
 
-        async with aiohttp.ClientSession(trust_env=True) as session:
+        async with SecureClientSession() as session:
             # Step 1: Submit workflow
             prompt_id = await self._submit_comfyui_workflow(
                 session, comfyui_url, workflow
@@ -716,7 +719,7 @@ class ImageGenerationService:
         return secrets.randbelow(COMFYUI_MAX_SEED + 1)
 
     async def _submit_comfyui_workflow(
-        self, session: aiohttp.ClientSession, comfyui_url: str, workflow: dict
+        self, session: SecureClientSession, comfyui_url: str, workflow: dict
     ) -> str:
         """Submit workflow to ComfyUI and return the prompt_id."""
         client_id = str(uuid.uuid4())
@@ -743,7 +746,7 @@ class ImageGenerationService:
 
     async def _wait_for_comfyui_completion(
         self,
-        session: aiohttp.ClientSession,
+        session: SecureClientSession,
         comfyui_url: str,
         prompt_id: str,
         timeout: int = 3000,
@@ -793,7 +796,7 @@ class ImageGenerationService:
 
     async def _download_comfyui_image(
         self,
-        session: aiohttp.ClientSession,
+        session: SecureClientSession,
         comfyui_url: str,
         status_data: dict,
         prompt_id: str,
@@ -861,6 +864,12 @@ class ImageGenerationService:
         parsed = urlparse(base_url)
         origin = f"{parsed.scheme}://{parsed.netloc}"
 
+        # The OpenAI SDK owns its HTTP transport. Validate the administrator-
+        # configured origin before constructing it; returned asset downloads
+        # below use the fully DNS-pinned client. A future provider adapter should
+        # replace this SDK call so the generation request itself is pinned too.
+        await validate_outbound_url(f"{base_url.rstrip('/')}/images/generations")
+
         client = AsyncOpenAI(base_url=base_url, api_key=api_key)
 
         response = await client.images.generate(
@@ -891,7 +900,7 @@ class ImageGenerationService:
                 )
             ):
                 headers["Authorization"] = f"Bearer {api_key}"
-            async with aiohttp.ClientSession(trust_env=True) as session:
+            async with SecureClientSession() as session:
                 dl_resp = await session.get(
                     image_url,
                     headers=headers,

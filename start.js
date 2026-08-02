@@ -118,7 +118,7 @@ const copyUserConfigBackup = () => {
   try {
     if (readJsonConfig(userConfigPath)) {
       copyFileSync(userConfigPath, userConfigBackupPath);
-      chmodSync(userConfigBackupPath, 0o644);
+      chmodSync(userConfigBackupPath, 0o600);
     }
   } catch (error) {
     console.warn("Failed to update user config backup:", error);
@@ -130,7 +130,7 @@ const writeUserConfig = (config) => {
   copyUserConfigBackup();
 
   const tempPath = `${userConfigPath}.${process.pid}.${Date.now()}.${randomUUID()}.tmp`;
-  const fd = openSync(tempPath, "w");
+  const fd = openSync(tempPath, "wx", 0o600);
   try {
     writeFileSync(fd, JSON.stringify(config), "utf8");
     fsyncSync(fd);
@@ -140,7 +140,7 @@ const writeUserConfig = (config) => {
 
   try {
     renameSync(tempPath, userConfigPath);
-    chmodSync(userConfigPath, 0o644);
+    chmodSync(userConfigPath, 0o600);
     if (!existsSync(userConfigBackupPath)) {
       copyUserConfigBackup();
     }
@@ -158,24 +158,24 @@ const writeUserConfig = (config) => {
 const setupNodeModules = () => {
   return new Promise((resolve, reject) => {
     console.log("Setting up node_modules for Next.js...");
-    const npmProcess = spawn("npm", ["install"], {
+    const npmProcess = spawn("npm", ["ci", "--no-audit", "--no-fund"], {
       cwd: nextjsDir,
       stdio: "inherit",
       env: process.env,
     });
 
     npmProcess.on("error", (err) => {
-      console.error("npm install failed:", err);
+      console.error("npm ci failed:", err);
       reject(err);
     });
 
     npmProcess.on("exit", (code) => {
       if (code === 0) {
-        console.log("npm install completed successfully");
+        console.log("npm ci completed successfully");
         resolve();
       } else {
-        console.error(`npm install failed with exit code: ${code}`);
-        reject(new Error(`npm install failed with exit code: ${code}`));
+        console.error(`npm ci failed with exit code: ${code}`);
+        reject(new Error(`npm ci failed with exit code: ${code}`));
       }
     });
   });
@@ -228,7 +228,7 @@ const ensurePresentationExportNodeDependencies = async () => {
   );
   await runCommand(
     "npm",
-    ["install", "--include=optional", "--omit=dev", "--no-fund", "--no-audit"],
+    ["ci", "--include=optional", "--omit=dev", "--no-fund", "--no-audit"],
     { cwd: __dirname }
   );
 
@@ -448,19 +448,35 @@ const ensureOllamaRuntime = async () => {
     return;
   }
 
-  console.log("START_OLLAMA=true; installing Ollama runtime...");
-  await runCommand("sh", ["-c", "curl -fsSL https://ollama.com/install.sh | sh"], {
-    cwd: "/",
-  });
+  throw new Error(
+    "START_OLLAMA=true, but Ollama is not installed. Runtime downloads are disabled; build a verified Ollama binary into the image or configure an approved remote OLLAMA_URL.",
+  );
 };
 
 const ensurePresentationExportRuntime = async () => {
+  if (!isTruthyEnv(process.env.ENABLE_UNVERIFIED_PRESENTATION_EXPORT)) {
+    console.log(
+      "Presentation export disabled pending supply-chain and legal review."
+    );
+    return;
+  }
   if (process.env.ENSURE_PRESENTATION_EXPORT_RUNTIME === "false") {
+    if (!isDev) {
+      throw new Error(
+        "Production export is enabled but ENSURE_PRESENTATION_EXPORT_RUNTIME=false would bypass integrity verification."
+      );
+    }
+    console.warn("Development-only export integrity check bypass is active.");
     return;
   }
 
   if (!existsSync(exportSyncScript)) {
-    console.warn("presentation-export sync script not found; skipping runtime check");
+    if (!isDev) {
+      throw new Error(
+        "Production export is enabled but the presentation-export integrity script is missing."
+      );
+    }
+    console.warn("presentation-export sync script not found; development export remains unavailable");
     return;
   }
 
@@ -683,7 +699,7 @@ const startServers = async (nginxReadyPromise) => {
     watchManagedProcess("Ollama", ollamaProcess);
   } else if (shouldStartOllamaRuntime) {
     console.log(
-      "Ollama requested, but the binary is not installed. Set START_OLLAMA=true to install it at startup, or set OLLAMA_URL to a remote daemon."
+      "Ollama requested, but the immutable image does not contain a verified binary. Configure an approved remote OLLAMA_URL or rebuild the image."
     );
   } else {
     console.log(

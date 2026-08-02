@@ -478,6 +478,7 @@ def test_export_includes_optional_fastapi_param():
             {
                 "NEXT_PUBLIC_URL": "https://next.example",
                 "NEXT_PUBLIC_FAST_API": "https://fast.example",
+                "ENABLE_UNVERIFIED_PRESENTATION_EXPORT": "true",
             },
             clear=False,
         ), patch.object(EXPORT_TASK_SERVICE, "export_from_url", mock_pdf):
@@ -499,7 +500,12 @@ def test_export_includes_optional_fastapi_param():
 
         mock_pptx = AsyncMock(return_value=fake_result)
         with patch.dict(
-            os.environ, {"NEXT_PUBLIC_FAST_API": ""}, clear=False
+            os.environ,
+            {
+                "NEXT_PUBLIC_FAST_API": "",
+                "ENABLE_UNVERIFIED_PRESENTATION_EXPORT": "true",
+            },
+            clear=False,
         ), patch.object(EXPORT_TASK_SERVICE, "export_from_url", mock_pptx):
             await export_presentation(dummy, title="two", export_as="pptx")
         pptx_call = mock_pptx.await_args.kwargs
@@ -519,8 +525,11 @@ def test_export_task_output_permissions_are_readable(tmp_path):
 
     EXPORT_TASK_SERVICE._ensure_output_readable(str(output_path))
 
-    assert stat.S_IMODE(export_dir.stat().st_mode) == 0o755
-    assert stat.S_IMODE(output_path.stat().st_mode) == 0o644
+    if os.name != "nt":
+        assert stat.S_IMODE(export_dir.stat().st_mode) == 0o755
+        assert stat.S_IMODE(output_path.stat().st_mode) == 0o644
+    assert os.access(export_dir, os.R_OK | os.X_OK)
+    assert os.access(output_path, os.R_OK)
 
 
 def test_replace_and_extension_helpers():

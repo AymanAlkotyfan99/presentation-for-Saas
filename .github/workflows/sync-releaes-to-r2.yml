@@ -4,6 +4,9 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+
 jobs:
   upload:
     runs-on: ubuntu-latest
@@ -11,43 +14,58 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Download release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
+          set -euo pipefail
           mkdir assets
-          gh release download "${{ github.event.release.tag_name }}" --dir assets --pattern '*.deb' --pattern '*.dmg' --pattern '*.exe'
-          echo "Downloaded files:"
-          ls -lh assets/
+          if [[ ! "$RELEASE_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release tag has an unsupported version format: $RELEASE_TAG" >&2
+            exit 1
+          fi
+          VERSION="${RELEASE_TAG#v}"
+          gh release download "$RELEASE_TAG" --dir assets \
+            --pattern '*.deb' --pattern '*.dmg' --pattern '*.exe' --pattern 'SHA256SUMS'
 
-      - name: Extract version from filename
-        run: |
-          FILE=$(ls assets/ | head -n 1)
-          VERSION=$(echo "$FILE" | sed -E 's/^Presenton-(.+)\.(deb|dmg|exe)$/\1/')
-          echo "Extracted version: $VERSION"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          mapfile -t RELEASE_ASSETS < <(find assets -maxdepth 1 -type f \
+            \( -name '*.deb' -o -name '*.dmg' -o -name '*.exe' \) -printf '%f\n' | sort)
+          if (( ${#RELEASE_ASSETS[@]} == 0 )); then
+            echo "The release contains no supported desktop assets." >&2
+            exit 1
+          fi
+          test -s assets/SHA256SUMS
 
-      # 4. Install rclone
-      - name: Install rclone
-        run: |
-          curl https://rclone.org/install.sh | sudo bash
+          for asset in "${RELEASE_ASSETS[@]}"; do
+            if [[ ! "$asset" =~ ^Presenton-${VERSION}([._-][0-9A-Za-z._-]+)?\.(deb|dmg|exe)$ ]]; then
+              echo "Malformed or version-mismatched release asset: $asset" >&2
+              exit 1
+            fi
+            if ! grep -Eq "^[[:xdigit:]]{64}[[:space:]]+[*]?${asset}$" assets/SHA256SUMS; then
+              echo "SHA256SUMS does not cover release asset: $asset" >&2
+              exit 1
+            fi
+          done
 
-      # 5. Configure R2
-      - name: Configure R2
-        run: |
-          mkdir -p ~/.config/rclone
-          cat <<EOF > ~/.config/rclone/rclone.conf
-          [r2]
-          type = s3
-          provider = Cloudflare
-          access_key_id = ${{ secrets.R2_ACCESS_KEY }}
-          secret_access_key = ${{ secrets.R2_SECRET_KEY }}
-          endpoint = https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
-          EOF
+          (cd assets && sha256sum --check --strict SHA256SUMS)
+          printf 'VERSION=%s\n' "$VERSION" >> "$GITHUB_ENV"
 
-      # 6. Upload to R2 (FINAL STEP)
+      # GitHub-hosted runners include the AWS CLI. Avoid executing an unverified
+      # remote installer and avoid persisting R2 credentials in a config file.
       - name: Upload files to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         run: |
-          rclone copy assets r2:presenton-desktop/${{ env.VERSION }} --progress --transfers=8
+          set -euo pipefail
+          aws --version
+          aws s3 cp assets "s3://presenton-desktop/${VERSION}/" \
+            --recursive \
+            --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"

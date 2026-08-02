@@ -6,6 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from enums.webhook_event import WebhookEvent
 from models.sql.webhook_subscription import WebhookSubscription
 from services.database import get_async_session
+from utils.outbound_http import (
+    OutboundSecurityError,
+    public_outbound_error,
+    validate_outbound_url,
+)
 
 API_V1_WEBHOOK_ROUTER = APIRouter(prefix="/api/v1/webhook", tags=["Webhook"])
 
@@ -27,6 +32,10 @@ async def subscribe_to_webhook(
     body: SubscribeToWebhookRequest,
     sql_session: AsyncSession = Depends(get_async_session),
 ):
+    try:
+        await validate_outbound_url(body.url)
+    except OutboundSecurityError as error:
+        raise HTTPException(status_code=400, detail=public_outbound_error(error)) from error
     webhook_subscription = WebhookSubscription(
         url=body.url,
         secret=body.secret,

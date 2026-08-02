@@ -8,9 +8,9 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
-import { marked } from "marked";
 
 import { Textarea } from "@/components/ui/textarea";
+import { renderSafeMarkdown } from "@/lib/safe-markdown";
 
 interface OutlineItemProps {
   slideOutline: {
@@ -125,11 +125,7 @@ export function OutlineItem({
       window.clearTimeout(throttleRef.current);
     }
     throttleRef.current = window.setTimeout(() => {
-      try {
-        setRenderedHtml(marked.parse(content) as string);
-      } catch {
-        setRenderedHtml("");
-      }
+      setRenderedHtml(renderSafeMarkdown(content));
     }, 60);
 
     return () => {
@@ -142,23 +138,12 @@ export function OutlineItem({
   const stableHtml = useMemo(() => {
     if (!isStreaming || isActiveStreaming) return null;
     if (!isStableStreaming) return null;
-    try {
-      return marked.parse(slideOutline.content || "") as string;
-    } catch {
-      return null;
-    }
+    return renderSafeMarkdown(slideOutline.content || "");
   }, [isStreaming, isActiveStreaming, isStableStreaming, slideOutline.content]);
 
   const previewHtml = useMemo(() => {
     if (isStreaming) return "";
-    try {
-      return marked.parse(slideOutline.content || "", {
-        breaks: true,
-        gfm: true,
-      }) as string;
-    } catch {
-      return "";
-    }
+    return renderSafeMarkdown(slideOutline.content || "", { breaks: true });
   }, [isStreaming, slideOutline.content]);
 
   return (

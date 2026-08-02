@@ -8,6 +8,10 @@ import {
   runBundledPresentationExport,
 } from "@/lib/run-bundled-presentation-export";
 import { authStatusForRequest } from "@/lib/server-auth-role";
+import {
+  isUnverifiedPresentationExportEnabled,
+  UNVERIFIED_PRESENTATION_EXPORT_ERROR_CODE,
+} from "@/lib/presentation-export-policy";
 
 function isValidFormat(value: unknown): value is BundledPresentationExportFormat {
   return value === "pdf" || value === "pptx";
@@ -84,6 +88,17 @@ async function moveExportIntoOwnerDirectory(
 }
 
 export async function POST(req: NextRequest) {
+  if (!isUnverifiedPresentationExportEnabled()) {
+    return NextResponse.json(
+      {
+        error: "The legacy presentation exporter is disabled pending supply-chain and legal review.",
+        code: UNVERIFIED_PRESENTATION_EXPORT_ERROR_CODE,
+        success: false,
+      },
+      { status: 503 },
+    );
+  }
+
   const auth = await authStatusForRequest(req);
   if (!auth.authenticated) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });

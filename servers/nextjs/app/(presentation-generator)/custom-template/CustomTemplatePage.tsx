@@ -53,7 +53,6 @@ import { MixpanelEvent, trackEvent } from "@/utils/mixpanel";
 
 import { useFontLoader as loadFontAssets } from "../hooks/useFontLoad";
 import TemplateService from "../services/api/template";
-import { TAILWIND_CDN_URL } from "./constants";
 import { TemplateV2LayoutPreview } from "./components/EachSlide/TemplateV2LayoutPreview";
 import { useFileUpload } from "./hooks/useFileUpload";
 import { useTemplateCreation } from "./hooks/useTemplateCreation";
@@ -1512,16 +1511,6 @@ const CustomTemplatePage = () => {
       dismissTemplateV2ModelWarning();
     };
   }, [llmConfig]);
-
-  useEffect(() => {
-    const existingScript = document.querySelector('script[src*="tailwindcss.com"]');
-    if (!existingScript) {
-      const script = document.createElement("script");
-      script.src = TAILWIND_CDN_URL;
-      script.async = true;
-      document.head.appendChild(script);
-    }
-  }, []);
 
   const handleLoadGoogleFontOptions = useCallback(() => {
     if (googleFontLoadStartedRef.current) return;

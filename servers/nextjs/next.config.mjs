@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { securityHeaders } from "./lib/security-headers.mjs";
 
 const nextjsRoot = path.dirname(fileURLToPath(import.meta.url));
 
@@ -9,6 +10,14 @@ const nextConfig = {
   output: "standalone",
   turbopack: {
     root: nextjsRoot,
+  },
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: securityHeaders,
+      },
+    ];
   },
   ...(process.env.NODE_ENV !== "production"
     ? {

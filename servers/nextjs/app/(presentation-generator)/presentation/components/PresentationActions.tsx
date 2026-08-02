@@ -924,7 +924,7 @@ export const BlocksPanel = ({
         });
         trackEvent(MixpanelEvent.Editor_Template_Blocks_Load_Failed, {
           presentation_id: presentationId,
-          error_message: "Could not load template components.",
+          error_category: "unknown",
         });
       });
 
@@ -1492,7 +1492,6 @@ const PresentationActions = (props: PresentationActionsProps) => {
       if (inserted) {
         trackEvent(MixpanelEvent.Editor_Template_Block_Inserted, {
           presentation_id: props.presentationId,
-          block_title: block.title,
           block_index: block.index,
           element_count: readRecordArray(block.raw, "elements").length,
           slide_index: props.currentSlide,
@@ -1513,7 +1512,6 @@ const PresentationActions = (props: PresentationActionsProps) => {
     if (insertEditorElements([element], block.title)) {
       trackEvent(MixpanelEvent.Editor_Template_Block_Inserted, {
         presentation_id: props.presentationId,
-        block_title: block.title,
         block_index: block.index,
         element_count: 1,
         slide_index: props.currentSlide,

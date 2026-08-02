@@ -1,4 +1,5 @@
 import logging
+import os
 import uuid
 from typing import Any
 
@@ -19,6 +20,15 @@ _CUSTOM_COMPILE_URL = "http://localhost/api/template/custom"
 
 async def load_custom_presentation_layout(layout_name: str) -> PresentationLayoutModel:
     """Load a custom template from the DB and compile layouts via Next.js (no Puppeteer)."""
+    if os.getenv("ENABLE_UNSAFE_CUSTOM_LAYOUTS", "false").lower() != "true":
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "UNSAFE_CUSTOM_LAYOUTS_DISABLED",
+                "message": "Executable custom layouts are disabled",
+            },
+        )
+
     if not layout_name.startswith("custom-"):
         raise HTTPException(
             status_code=400,
