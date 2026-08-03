@@ -2,6 +2,7 @@ import { net } from "electron";
 import { app, BrowserWindow } from "electron";
 import { isDev } from "./constants";
 import { safeStderrWrite } from "./safe-console";
+import { PRODUCT_IDENTITY } from "../generated/product-identity";
 
 /**
  * Version check URL — GitHub raw version.json (no API required).
@@ -9,10 +10,10 @@ import { safeStderrWrite } from "./safe-console";
  */
 const VERSION_JSON_URL =
   process.env.UPDATE_SERVER_URL ||
-  "https://raw.githubusercontent.com/presenton/presenton/refs/heads/main/electron/version.json";
+  PRODUCT_IDENTITY.desktop.compatibilityUpdateUrl;
 
 const CURRENT_VERSION = app.getVersion();
-const WEBSITE_DOWNLOAD_URL = "https://presenton.ai/download";
+const WEBSITE_DOWNLOAD_URL = PRODUCT_IDENTITY.desktop.compatibilityDownloadUrl;
 
 /** Maximum number of fetch attempts (polls). */
 const MAX_ATTEMPTS = 3;
@@ -70,7 +71,7 @@ async function fetchVersionInfo(): Promise<VersionResponse | null> {
     log(`Fetching ${VERSION_JSON_URL}...`);
     const response = await net.fetch(VERSION_JSON_URL, {
       method: "GET",
-      headers: { "User-Agent": `Presenton/${CURRENT_VERSION}` },
+      headers: { "User-Agent": `${PRODUCT_IDENTITY.product.shortName}/${CURRENT_VERSION}` },
     });
     if (!response.ok) {
       log(`Fetch failed: HTTP ${response.status}`);
@@ -190,6 +191,8 @@ function injectUpdateBanner(
     current: CURRENT_VERSION,
     downloadUrl,
     message: message?.trim() ?? "",
+    productName: PRODUCT_IDENTITY.product.shortName,
+    primaryColor: PRODUCT_IDENTITY.colors.primary,
   })
     .split("<")
     .join("\\u003c")
@@ -239,8 +242,8 @@ function injectUpdateBanner(
       const summary = make('span', 'display:flex;align-items:center;gap:8px;flex:1;min-width:0;');
       summary.appendChild(make('span', 'font-size:18px;', '✨'));
       const versionText = make('span');
-      versionText.appendChild(document.createTextNode('Presenton '));
-      versionText.appendChild(make('strong', 'color:#5141e5;', payload.latest));
+      versionText.appendChild(document.createTextNode(payload.productName + ' '));
+      versionText.appendChild(make('strong', 'color:' + payload.primaryColor + ';', payload.latest));
       versionText.appendChild(document.createTextNode(' is available — you have '));
       versionText.appendChild(make('strong', '', payload.current));
       summary.appendChild(versionText);
@@ -272,7 +275,7 @@ function injectUpdateBanner(
         detailsButton.addEventListener('click', function() { overlay.style.display = 'flex'; });
       }
 
-      const download = make('a', 'color:#fff;text-decoration:none;background:#5141e5;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:500;white-space:nowrap;', 'Download update');
+      const download = make('a', 'color:#fff;text-decoration:none;background:' + payload.primaryColor + ';padding:6px 14px;border-radius:8px;font-size:12px;font-weight:500;white-space:nowrap;', 'Download update');
       download.target = '_blank';
       download.rel = 'noopener noreferrer';
       try {

@@ -1,13 +1,11 @@
 <p align="center">
-  <img src="./readme_assets/images/logo.png" alt="Presenton" />
+  <img src="./assets/branding/DARK_LOGO.png" alt="Bayanly AI" width="520" />
 </p>
 
 <p align="center">
-  <a href="https://presenton.ai/download"><strong>Quickstart</strong></a> &middot;
-  <a href="https://presenton.ai/explore"><strong>Templates</strong></a> &middot;
-  <a href="https://docs.presenton.ai/"><strong>Docs</strong></a> &middot;
-  <a href="https://www.youtube.com/@presentonai"><strong>Youtube</strong></a> &middot;
-  <a href="https://discord.gg/9ZsKKxudNE"><strong>Discord</strong></a>
+  <strong>Bayanly AI</strong> &middot;
+  Arabic and English professional presentations &middot;
+  Support: <a href="mailto:Ayman.Naeem@gmail.com">Ayman.Naeem@gmail.com</a>
 </p>
 
 <p align="center">
@@ -20,17 +18,25 @@
   <a href="https://trendshift.io/repositories/18582?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-18582" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/18582" alt="presenton%2Fpresenton | Trendshift" width="250" height="55" /></a>
 </p>
 
-# Open-Source AI Presentation Generator and API (Gamma, Canva, Beautiful AI, Decktopus, Presentations AI Alternative)
+# Bayanly AI — professional presentations in Arabic and English
 
-Discover what Presenton can do from AI-powered presentation generation to editing, exporting, and flexible model providers.
+An AI-powered platform for creating professional presentations in Arabic and English.
+
+> [!IMPORTANT]
+> Bayanly is a derived work based on the Apache-2.0-licensed
+> [Presenton upstream project](https://github.com/presenton/presenton). Existing
+> `PRESENTON_*` environment variables, `sk-presenton-...` token prefixes,
+> container names, storage paths, update URLs, and desktop app IDs are retained
+> where changing them would break compatibility. The approved `example.ai`
+> domain is a placeholder and is not used as a live production endpoint.
 
 [▶ Watch Presenton in Action](https://github.com/user-attachments/assets/93e541dc-8487-4dcf-a9a0-95ad5ca94453)
 
-### ✨ Why Presenton
+### ✨ Why Bayanly
 
 No SaaS lock-in · No forced subscriptions · Full control over models and data
 
-What makes Presenton different?
+What makes Bayanly different?
 
 - Use Fully **self-hosted** in Web through [Docker Package](https://docs.presenton.ai/v3/get-started/quickstart)
 - Or Download [Desktop App](https://presenton.ai/download) (Mac, Windows & Linux)

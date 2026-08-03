@@ -51,8 +51,16 @@ import {
   resolveLaunchableExportChromiumPath,
 } from "./utils/export-chromium";
 import { syncUserConfigFromEnv } from "./utils/user-config-env";
+import { PRODUCT_IDENTITY } from "./generated/product-identity";
+
+const BRAND_LOG_PREFIX = `[${PRODUCT_IDENTITY.product.shortName}]`;
+const BRAND_SHELL_ENABLED = process.env.NEW_BRAND_SHELL_ENABLED !== "false";
+const ACTIVE_DESKTOP_NAME = BRAND_SHELL_ENABLED
+  ? PRODUCT_IDENTITY.desktop.requestedName
+  : PRODUCT_IDENTITY.upstream.name;
 
 installSafeConsole();
+app.setName(ACTIVE_DESKTOP_NAME);
 
 // Local and ad-hoc signed macOS builds otherwise prompt for Keychain access when
 // Chromium initializes encrypted session storage.
@@ -187,7 +195,7 @@ const chromiumCacheRecovery = prepareChromiumCacheRecovery(
   electronAppPaths.cacheDir,
   electronAppPaths.userDataDir,
 );
-safeLog("[Presenton] Electron paths initialized:", electronAppPaths);
+safeLog(`${BRAND_LOG_PREFIX} Electron paths initialized:`, electronAppPaths);
 
 initMainSentry();
 updateSentryRuntimeContext(chromiumCacheRecovery);
@@ -197,7 +205,7 @@ app.on("child-process-gone", (_event, details) => {
 });
 
 addMainBreadcrumb("memory", "electron.main.startup", memorySnapshotMb());
-safeLog("[Presenton] Startup memory:", {
+safeLog(`${BRAND_LOG_PREFIX} Startup memory:`, {
   memory: memorySnapshotMb(),
 });
 
@@ -212,7 +220,7 @@ function isAllowedMainWindowUrl(url: string, appOrigin: string): boolean {
 
 function openUrlOutsideApp(mainWindow: BrowserWindow, url: string): void {
   if (!isSupportedExternalUrl(url)) {
-    safeWarn("[Presenton] Blocked unsupported external URL.");
+    safeWarn(`${BRAND_LOG_PREFIX} Blocked unsupported external URL.`);
     return;
   }
 
@@ -222,16 +230,16 @@ function openUrlOutsideApp(mainWindow: BrowserWindow, url: string): void {
         return;
       }
 
-      safeWarn(`[Presenton] Failed to open external URL: ${result.message || "Unknown error"}`);
+      safeWarn(`${BRAND_LOG_PREFIX} Failed to open external URL: ${result.message || "Unknown error"}`);
       await showOpenTargetErrorDialog({
         parent: mainWindow,
         title: "Could Not Open Link",
-        message: "Presenton could not open this link in your browser.",
+        message: `${PRODUCT_IDENTITY.product.shortName} could not open this link in your browser.`,
         detail: `${result.message || "No application is registered to open this link."}\n\n${url}`,
       });
     })
     .catch((error) => {
-      safeWarn("[Presenton] Failed to handle external URL open:", error);
+      safeWarn(`${BRAND_LOG_PREFIX} Failed to handle external URL open:`, error);
     });
 }
 
@@ -240,8 +248,14 @@ const createWindow = (appOrigin: string) => {
     width: 1280,
     height: 720,
     show: false, // Reveal once the app URL is ready to avoid a blank flash.
-    backgroundColor: "#f3f5ff",
-    icon: path.join(resourceBaseDir, "resources/ui/assets/images/presenton_short_filled.png"),
+    backgroundColor: PRODUCT_IDENTITY.colors.background,
+    title: ACTIVE_DESKTOP_NAME,
+    icon: path.join(
+      resourceBaseDir,
+      BRAND_SHELL_ENABLED
+        ? "resources/ui/assets/images/brand/v1/desktop-icon.png"
+        : "resources/ui/assets/images/presenton_short_filled.png",
+    ),
     webPreferences: {
         // Ensure a known preload path and explicit isolation settings so
         // the `contextBridge` API is exposed reliably to renderer pages.
@@ -252,10 +266,10 @@ const createWindow = (appOrigin: string) => {
           const p = path.join(__dirname, 'preloads/index.js');
           try {
             if (!fs.existsSync(p)) {
-              safeWarn(`[Presenton] Preload not found at ${p}`);
+              safeWarn(`${BRAND_LOG_PREFIX} Preload not found at ${p}`);
             }
           } catch (e) {
-            safeWarn('[Presenton] Failed to stat preload path', e);
+            safeWarn(`${BRAND_LOG_PREFIX} Failed to stat preload path`, e);
           }
           return p;
         })(),
@@ -336,20 +350,20 @@ async function startServers(fastApiPort: number, nextjsPort: number) {
       fs.promises.mkdir(puppeteerTempDir, { recursive: true }),
     ]);
     if (exportChromiumPath) {
-      safeLog("[Presenton] Export Chromium runtime resolved:", exportChromiumPath);
+      safeLog(`${BRAND_LOG_PREFIX} Export Chromium runtime resolved:`, exportChromiumPath);
     } else {
       safeWarn(
-        "[Presenton] Export Chromium runtime was not found; Template Studio slide previews will fail until Chromium is installed."
+        `${BRAND_LOG_PREFIX} Export Chromium runtime was not found; Template Studio slide previews will fail until Chromium is installed.`
       );
     }
     if (imageMagickRuntime) {
-      safeLog("[Presenton] ImageMagick runtime resolved:", {
+      safeLog(`${BRAND_LOG_PREFIX} ImageMagick runtime resolved:`, {
         source: imageMagickRuntime.source,
         binaryPath: imageMagickRuntime.binaryPath,
         homeDir: imageMagickRuntime.homeDir,
       });
     } else {
-      safeWarn("[Presenton] ImageMagick runtime was not found; LiteParse image conversion will fail until it is bundled or installed.");
+      safeWarn(`${BRAND_LOG_PREFIX} ImageMagick runtime was not found; LiteParse image conversion will fail until it is bundled or installed.`);
     }
     const fastApi = await startFastApiServer(
       fastapiDir,
@@ -482,7 +496,7 @@ app.whenReady().then(async () => {
       syncUserConfigFromEnv();
     }
   } catch (error) {
-    safeWarn("[Presenton] Failed to persist startup user config", error);
+    safeWarn(`${BRAND_LOG_PREFIX} Failed to persist startup user config`, error);
   }
 
   try {
@@ -490,7 +504,7 @@ app.whenReady().then(async () => {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     dialog.showErrorBox(
-      "Presenton Could Not Start",
+      `${PRODUCT_IDENTITY.product.shortName} Could Not Start`,
       `The local application servers failed to start.\n\n${detail}`,
     );
     await forceQuitApp(1);
@@ -513,14 +527,14 @@ app.whenReady().then(async () => {
     if (mainWindow.isDestroyed()) {
       return;
     }
-    safeWarn("[Presenton] Failed to load application URL", error);
+    safeWarn(`${BRAND_LOG_PREFIX} Failed to load application URL`, error);
     return;
   }
 
   // Begin polling the version server for available updates
   const updateWindow = getLiveMainWindow();
   if (updateWindow && !updateWindow.webContents.isDestroyed()) {
-    safeStderrWrite("[Presenton] Starting update checker...\n");
+    safeStderrWrite(`${BRAND_LOG_PREFIX} Starting update checker...\n`);
     startUpdateChecker(updateWindow);
   }
 });

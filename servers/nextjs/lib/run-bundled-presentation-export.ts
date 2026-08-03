@@ -7,6 +7,7 @@ import {
   BoundedTextBuffer,
   memorySnapshotMb,
 } from "@/lib/runtime-limits";
+import { DISPLAY_PRODUCT, newExportMetadataEnabled } from "@/lib/product-metadata";
 
 /** Repo `presentation-export/` at app root (`/app/presentation-export` in Docker). */
 export function getExportPackageRoot(): string {
@@ -208,7 +209,12 @@ async function runBundledPresentationExportLocked(params: {
     type: "export",
     url: pptUrl,
     format,
-    title: sanitizeFilename(title ?? "presentation"),
+    title: sanitizeFilename(
+      title ??
+        (newExportMetadataEnabled()
+          ? `${DISPLAY_PRODUCT.shortName}-presentation`
+          : "presentation"),
+    ),
     fastapiUrl: fastapiUrl || undefined,
     cookieHeader: cookieHeader || undefined,
   };

@@ -28,6 +28,7 @@ import {
 } from "./ui/dialog";
 import { cn } from "@/lib/utils";
 import { notify } from "@/components/ui/sonner";
+import { DISPLAY_PRODUCT } from "@/lib/product-metadata";
 import {
   getDefaultOllamaUrl,
   getReachableOllamaModels,
@@ -148,7 +149,7 @@ export default function OllamaConfig({
         notify.success(
           "Using in-container Ollama",
           requestedUrl
-            ? "host.docker.internal did not respond, so Presenton switched Ollama URL to localhost."
+            ? `host.docker.internal did not respond, so ${DISPLAY_PRODUCT.shortName} switched the Ollama URL to localhost.`
             : "host.docker.internal did not respond, so this check used localhost."
         );
       }

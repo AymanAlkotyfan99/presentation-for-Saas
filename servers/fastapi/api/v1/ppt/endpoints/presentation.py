@@ -91,8 +91,21 @@ from utils.llm_utils import message_content_to_text
 from utils.sse import safe_sse_stream
 from api.v1.auth.config import SESSION_COOKIE_NAME
 from utils.web_search import get_selected_web_search_provider, get_web_search_route
+from utils.architecture_flags import (
+    architecture_facades_enabled,
+    legacy_v1_reads_enabled,
+    legacy_v1_writes_enabled,
+    require_legacy_v1_read,
+    require_legacy_v1_write,
+)
 from api.v1.auth.context import get_current_owner_id
 from models.presentation_layout import PresentationLayoutModel, SlideLayoutModel
+from modules.presentations import (
+    delete_presentation_record,
+    duplicate_presentation_record,
+    load_presentation_with_slides,
+    list_presentation_rows,
+)
 from templates.v2.schema import get_template_schema
 from templates.default_templates import resolve_default_template_id
 import uuid
@@ -1270,31 +1283,44 @@ async def get_all_presentations(
     ] = True,
     sql_session: AsyncSession = Depends(get_async_session),
 ):
-    if include_slides:
-        query = select(PresentationModel, SlideModel).join(
-            SlideModel,
-            (SlideModel.presentation == PresentationModel.id) & (SlideModel.index == 0),
+    if architecture_facades_enabled():
+        results = await list_presentation_rows(
+            sql_session,
+            version=version,
+            include_slides=include_slides,
         )
     else:
-        query = select(PresentationModel)
-
-    if version is not None:
-        query = query.where(PresentationModel.version == version)
-    query = query.order_by(PresentationModel.created_at.desc())
-
-    results = await sql_session.execute(query)
+        query = (
+            select(PresentationModel, SlideModel).join(
+                SlideModel,
+                (SlideModel.presentation == PresentationModel.id)
+                & (SlideModel.index == 0),
+            )
+            if include_slides
+            else select(PresentationModel)
+        )
+        if version is not None:
+            require_legacy_v1_read(version)
+            query = query.where(PresentationModel.version == version)
+        elif not legacy_v1_reads_enabled():
+            query = query.where(
+                PresentationModel.version != PresentationVersion.V1_STANDARD
+            )
+        result = await sql_session.execute(
+            query.order_by(PresentationModel.created_at.desc())
+        )
+        results = list(result.all() if include_slides else result.scalars().all())
     if not include_slides:
         return [
             PresentationWithSlides(
                 **_presentation_response_data(presentation),
                 slides=[],
             )
-            for presentation in results.scalars().all()
+            for presentation in results
         ]
 
-    rows = results.all()
     presentations_with_slides = []
-    for presentation, first_slide in rows:
+    for presentation, first_slide in results:
         slides = [first_slide]
         presentations_with_slides.append(
             PresentationWithSlides(
@@ -1311,15 +1337,21 @@ async def get_presentation(
     request: Request,
     sql_session: AsyncSession = Depends(get_async_session),
 ):
-    presentation = await sql_session.get(PresentationModel, id)
+    if architecture_facades_enabled():
+        presentation, slides = await load_presentation_with_slides(sql_session, id)
+    else:
+        presentation = await sql_session.get(PresentationModel, id)
+        if presentation:
+            require_legacy_v1_read(presentation.version)
+        slides = list(
+            await sql_session.scalars(
+                select(SlideModel)
+                .where(SlideModel.presentation == id)
+                .order_by(SlideModel.index)
+            )
+        ) if presentation else []
     if not presentation:
         raise HTTPException(404, "Presentation not found")
-    slides_result = await sql_session.scalars(
-        select(SlideModel)
-        .where(SlideModel.presentation == id)
-        .order_by(SlideModel.index)
-    )
-    slides = list(slides_result)
     return PresentationWithSlides(
         **_presentation_response_data(presentation),
         slides=slides,
@@ -1334,8 +1366,12 @@ async def delete_presentation(
     if not presentation:
         raise HTTPException(404, "Presentation not found")
 
-    await sql_session.delete(presentation)
-    await sql_session.commit()
+    if architecture_facades_enabled():
+        await delete_presentation_record(sql_session, presentation)
+    else:
+        require_legacy_v1_write(presentation.version)
+        await sql_session.delete(presentation)
+        await sql_session.commit()
 
 
 @PRESENTATION_ROUTER.post("/{id}/duplicate", response_model=PresentationWithSlides)
@@ -1346,22 +1382,29 @@ async def duplicate_presentation(
     if not presentation:
         raise HTTPException(404, "Presentation not found")
 
-    slides = list(
-        await sql_session.scalars(
-            select(SlideModel)
-            .where(SlideModel.presentation == id)
-            .order_by(SlideModel.index)
+    if architecture_facades_enabled():
+        _, slides = await load_presentation_with_slides(sql_session, id)
+        new_presentation, new_slides = await duplicate_presentation_record(
+            sql_session, presentation, slides
         )
-    )
-    new_presentation = presentation.get_new_presentation()
-    if new_presentation.title:
-        new_presentation.title = f"{new_presentation.title} (Copy)"
-    new_slides = [slide.get_new_slide(new_presentation.id) for slide in slides]
-
-    sql_session.add(new_presentation)
-    sql_session.add_all(new_slides)
-    await sql_session.commit()
-    await sql_session.refresh(new_presentation)
+    else:
+        require_legacy_v1_read(presentation.version)
+        require_legacy_v1_write(presentation.version)
+        slides = list(
+            await sql_session.scalars(
+                select(SlideModel)
+                .where(SlideModel.presentation == id)
+                .order_by(SlideModel.index)
+            )
+        )
+        new_presentation = presentation.get_new_presentation()
+        if new_presentation.title:
+            new_presentation.title = f"{new_presentation.title} (Copy)"
+        new_slides = [slide.get_new_slide(new_presentation.id) for slide in slides]
+        sql_session.add(new_presentation)
+        sql_session.add_all(new_slides)
+        await sql_session.commit()
+        await sql_session.refresh(new_presentation)
 
     return PresentationWithSlides(
         **_presentation_response_data(new_presentation),
@@ -1514,6 +1557,7 @@ async def prepare_presentation(
     presentation = await sql_session.get(PresentationModel, presentation_id)
     if not presentation:
         raise HTTPException(status_code=404, detail="Presentation not found")
+    require_legacy_v1_write(presentation.version)
 
     presentation_outline_model = PresentationOutlineModel(slides=outlines)
 
@@ -1596,6 +1640,7 @@ async def stream_presentation(
     presentation = await sql_session.get(PresentationModel, id)
     if not presentation:
         raise HTTPException(status_code=404, detail="Presentation not found")
+    require_legacy_v1_write(presentation.version)
     if not presentation.structure:
         raise HTTPException(
             status_code=400,
@@ -1842,6 +1887,7 @@ async def update_presentation(
     presentation = await sql_session.get(PresentationModel, id)
     if not presentation:
         raise HTTPException(status_code=404, detail="Presentation not found")
+    require_legacy_v1_write(presentation.version)
 
     presentation_update_dict = {}
     if n_slides is not None:
@@ -1914,6 +1960,14 @@ async def update_presentation_slide(
             status_code=400,
             detail="Slide does not belong to the supplied presentation",
         )
+
+    # Preserve the established one-record update transaction by default. Only
+    # load the parent when the compatibility write gate must inspect its version.
+    if not legacy_v1_writes_enabled():
+        presentation = await sql_session.get(PresentationModel, presentation_id)
+        if not presentation:
+            raise HTTPException(status_code=404, detail="Presentation not found")
+        require_legacy_v1_write(presentation.version)
 
     stored_slide.sqlmodel_update(
         slide.model_dump(
@@ -2571,6 +2625,7 @@ async def edit_presentation_with_new_content(
     presentation = await sql_session.get(PresentationModel, data.presentation_id)
     if not presentation:
         raise HTTPException(status_code=404, detail="Presentation not found")
+    require_legacy_v1_write(presentation.version)
 
     slides = await sql_session.scalars(
         select(SlideModel).where(SlideModel.presentation == data.presentation_id)
@@ -2622,6 +2677,8 @@ async def derive_presentation_from_existing_one(
     presentation = await sql_session.get(PresentationModel, data.presentation_id)
     if not presentation:
         raise HTTPException(status_code=404, detail="Presentation not found")
+    require_legacy_v1_read(presentation.version)
+    require_legacy_v1_write(presentation.version)
 
     slides = await sql_session.scalars(
         select(SlideModel).where(SlideModel.presentation == data.presentation_id)

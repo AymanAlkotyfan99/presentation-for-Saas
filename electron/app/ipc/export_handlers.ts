@@ -23,6 +23,7 @@ import {
   resolveLaunchableExportChromiumPath,
 } from "../utils/export-chromium";
 import { resolveExportSpawnTarget } from "../utils/export-msix-runtime";
+import { PRODUCT_IDENTITY } from "../generated/product-identity";
 import { assertTrustedIpcSender } from "./security";
 
 type BinaryFormat = "elf" | "mach-o" | "pe" | "unknown";
@@ -101,7 +102,7 @@ export function setupExportHandlers(trustedOrigin: string) {
         return {
           success: false,
           message:
-            "Export requires Chromium. Restart Presenton and complete the Chromium setup step when prompted.",
+            `Export requires Chromium. Restart ${PRODUCT_IDENTITY.product.shortName} and complete the Chromium setup step when prompted.`,
         };
       }
 
@@ -158,7 +159,7 @@ export function setupExportHandlers(trustedOrigin: string) {
         return {
           success: false,
           message:
-            "Export could not prepare Chromium for this Microsoft Store install. Restart Presenton and try again.",
+            `Export could not prepare Chromium for this Microsoft Store install. Restart ${PRODUCT_IDENTITY.product.shortName} and try again.`,
         };
       }
       const puppeteerTempDir = path.join(tempDir, "puppeteer");

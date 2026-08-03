@@ -36,6 +36,7 @@ from utils.llm_calls.generate_presentation_outlines import (
 )
 from utils.sse import safe_sse_stream
 from utils.web_search import get_selected_web_search_provider, get_web_search_route
+from utils.architecture_flags import require_legacy_v1_read, require_legacy_v1_write
 
 OUTLINES_ROUTER = APIRouter(prefix="/outlines", tags=["Outlines"])
 LOGGER = logging.getLogger(__name__)
@@ -49,6 +50,7 @@ async def get_outline(
     presentation = await sql_session.get(PresentationModel, id)
     if not presentation:
         raise HTTPException(status_code=404, detail="Presentation not found")
+    require_legacy_v1_read(presentation.version)
 
     if not presentation.outlines:
         return PresentationOutlineModel(slides=[])
@@ -65,6 +67,7 @@ async def update_outline(
     presentation = await sql_session.get(PresentationModel, id)
     if not presentation:
         raise HTTPException(status_code=404, detail="Presentation not found")
+    require_legacy_v1_write(presentation.version)
 
     presentation.outlines = outline.model_dump(mode="json")
     presentation.n_slides = len(outline.slides)
@@ -91,6 +94,7 @@ async def stream_outlines(
 
     if not presentation:
         raise HTTPException(status_code=404, detail="Presentation not found")
+    require_legacy_v1_write(presentation.version)
 
     search_route, actual_search_provider = get_web_search_route()
     LOGGER.info(

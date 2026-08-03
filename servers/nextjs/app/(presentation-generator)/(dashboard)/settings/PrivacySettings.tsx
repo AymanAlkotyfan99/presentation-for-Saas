@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { setTelemetryEnabled } from "@/utils/mixpanel";
 import { Loader2 } from "lucide-react";
+import { DISPLAY_PRODUCT } from "@/lib/product-metadata";
 
 const PrivacySettings = () => {
   const [trackingEnabled, setTrackingEnabled] = useState<boolean | null>(null);
@@ -59,7 +60,7 @@ const PrivacySettings = () => {
           Usage analytics
         </h4>
         <p className="text-xs text-[#6B7280] mb-6 leading-relaxed max-w-lg">
-          Share limited product-usage events to help improve Presenton.
+          Share limited product-usage events to help improve {DISPLAY_PRODUCT.shortName}.
           Presentation content is not intentionally included, but the analytics
           provider may process network/device metadata and a persistent
           pseudonymous identifier.

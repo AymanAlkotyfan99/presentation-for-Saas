@@ -49,6 +49,7 @@ import {
 import MarkdownRenderer from "@/components/MarkDownRender";
 import { cn } from "@/lib/utils";
 import { KeyboardShortcutsDialog } from "./KeyboardShortcutsDialog";
+import { BRAND_ASSETS } from "@/lib/product-metadata";
 
 const MAX_EXPORT_TITLE_LENGTH = 40;
 
@@ -458,7 +459,7 @@ const PresentationHeader = ({
             onClick={() => {
               router.push("/dashboard");
             }}
-            src="/logo-with-bg.png"
+            src={BRAND_ASSETS.compactIcon}
             alt=""
             className="w-10 h-10 cursor-pointer object-contain"
           />

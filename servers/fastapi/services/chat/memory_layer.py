@@ -23,6 +23,15 @@ from services.documents_loader import DocumentsLoader
 from services.image_generation_service import ImageGenerationService
 from services.mem0_presentation_memory_service import MEM0_PRESENTATION_MEMORY_SERVICE
 from services.temp_file_service import TEMP_FILE_SERVICE
+from services.chat.theme_policy import (
+    extract_theme_name,
+    find_theme_by_id,
+    is_dark_hex,
+    is_dark_theme,
+    normalize_hex_color,
+    sanitize_theme_id,
+    select_theme_for_query,
+)
 from templates.presentation_layout import PresentationLayoutModel, SlideLayoutModel
 from templates.v2.schema import get_template_schema
 from utils.asset_directory_utils import (
@@ -4389,153 +4398,10 @@ class PresentationChatMemoryLayer:
 
         return {"name": name.strip(), "url": url.strip()}
 
-    @staticmethod
-    def _sanitize_theme_id(value: str) -> str:
-        slug = re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
-        return slug[:64]
-
-    @staticmethod
-    def _normalize_hex_color(value: str) -> str | None:
-        normalized = value.strip().lower()
-        if not normalized:
-            return None
-        if normalized.startswith("#"):
-            normalized = normalized[1:]
-
-        if len(normalized) == 3:
-            expanded = "".join(ch * 2 for ch in normalized)
-            if re.fullmatch(r"[0-9a-f]{6}", expanded):
-                return f"#{expanded}"
-            return None
-
-        if len(normalized) != 6:
-            return None
-        if not re.fullmatch(r"[0-9a-f]{6}", normalized):
-            return None
-        return f"#{normalized}"
-
-    @staticmethod
-    def _select_theme_for_query(
-        requested_theme: str,
-        available_themes: list[dict[str, Any]],
-        current_theme: dict[str, Any] | None,
-    ) -> dict[str, Any] | None:
-        normalized_query = requested_theme.strip().lower()
-        if not normalized_query:
-            return None
-
-        # Direct exact match by id or name.
-        for theme in available_themes:
-            theme_id = str(theme.get("id") or "").strip().lower()
-            theme_name = str(theme.get("name") or "").strip().lower()
-            if normalized_query in {theme_id, theme_name}:
-                return theme
-
-        current_theme_id = str((current_theme or {}).get("id") or "").strip().lower()
-        query_tokens = [token for token in re.split(r"[\s_-]+", normalized_query) if token]
-
-        if "dark" in query_tokens or any(
-            token in normalized_query for token in ("night", "black")
-        ):
-            for preferred in ("professional-dark", "edge-yellow"):
-                theme = PresentationChatMemoryLayer._find_theme_by_id(
-                    available_themes, preferred
-                )
-                if theme:
-                    return theme
-
-        if "light" in query_tokens or any(
-            token in normalized_query for token in ("bright", "white")
-        ):
-            for preferred in ("professional-blue", "mint-blue", "light-rose"):
-                theme = PresentationChatMemoryLayer._find_theme_by_id(
-                    available_themes, preferred
-                )
-                if theme:
-                    return theme
-
-        if any(token in normalized_query for token in ("another", "different", "change")):
-            opposite = (
-                not PresentationChatMemoryLayer._is_dark_theme(current_theme)
-                if current_theme
-                else True
-            )
-            candidates = [
-                theme
-                for theme in available_themes
-                if str(theme.get("id") or "").strip().lower() != current_theme_id
-            ]
-            for theme in candidates:
-                if PresentationChatMemoryLayer._is_dark_theme(theme) == opposite:
-                    return theme
-            if candidates:
-                return candidates[0]
-
-        # Fuzzy contains match over id/name/description.
-        for theme in available_themes:
-            haystack = " ".join(
-                [
-                    str(theme.get("id") or "").strip().lower(),
-                    str(theme.get("name") or "").strip().lower(),
-                    str(theme.get("description") or "").strip().lower(),
-                ]
-            )
-            if normalized_query in haystack:
-                return theme
-            if query_tokens and all(token in haystack for token in query_tokens):
-                return theme
-
-        return None
-
-    @staticmethod
-    def _find_theme_by_id(
-        themes: list[dict[str, Any]], theme_id: str
-    ) -> dict[str, Any] | None:
-        normalized_theme_id = theme_id.strip().lower()
-        for theme in themes:
-            current_id = str(theme.get("id") or "").strip().lower()
-            if current_id == normalized_theme_id:
-                return theme
-        return None
-
-    @staticmethod
-    def _extract_theme_name(theme: dict[str, Any] | None) -> str | None:
-        if not isinstance(theme, dict):
-            return None
-        name = theme.get("name")
-        if isinstance(name, str) and name.strip():
-            return name.strip()
-        theme_id = theme.get("id")
-        if isinstance(theme_id, str) and theme_id.strip():
-            return theme_id.strip()
-        return None
-
-    @staticmethod
-    def _is_dark_theme(theme: dict[str, Any] | None) -> bool:
-        if not isinstance(theme, dict):
-            return False
-        data = theme.get("data")
-        if not isinstance(data, dict):
-            return False
-        colors = data.get("colors")
-        if not isinstance(colors, dict):
-            return False
-        background = colors.get("background")
-        if not isinstance(background, str):
-            return False
-        return PresentationChatMemoryLayer._is_dark_hex(background)
-
-    @staticmethod
-    def _is_dark_hex(hex_color: str) -> bool:
-        normalized = hex_color.strip().lstrip("#")
-        if len(normalized) != 6:
-            return False
-        try:
-            red = int(normalized[0:2], 16)
-            green = int(normalized[2:4], 16)
-            blue = int(normalized[4:6], 16)
-        except ValueError:
-            return False
-        # Relative luminance approximation.
-        luma = (0.299 * red + 0.587 * green + 0.114 * blue) / 255
-        return luma < 0.5
+    _sanitize_theme_id = staticmethod(sanitize_theme_id)
+    _normalize_hex_color = staticmethod(normalize_hex_color)
+    _select_theme_for_query = staticmethod(select_theme_for_query)
+    _find_theme_by_id = staticmethod(find_theme_by_id)
+    _extract_theme_name = staticmethod(extract_theme_name)
+    _is_dark_theme = staticmethod(is_dark_theme)
+    _is_dark_hex = staticmethod(is_dark_hex)

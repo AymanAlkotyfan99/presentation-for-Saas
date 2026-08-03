@@ -16,6 +16,7 @@ from utils.llm_calls.edit_slide import get_edited_slide_content
 from utils.llm_calls.edit_slide_html import get_edited_slide_html
 from utils.llm_calls.select_slide_type_on_edit import get_slide_layout_from_prompt
 from utils.process_slides import process_old_and_new_slides_and_fetch_assets
+from utils.architecture_flags import require_legacy_v1_write
 
 
 SLIDE_ROUTER = APIRouter(prefix="/slide", tags=["Slide"])
@@ -38,6 +39,7 @@ async def edit_slide(
     presentation = await sql_session.get(PresentationModel, slide.presentation)
     if not presentation:
         raise HTTPException(status_code=404, detail="Presentation not found")
+    require_legacy_v1_write(presentation.version)
 
     memory_context = await MEM0_PRESENTATION_MEMORY_SERVICE.retrieve_context(
         presentation.id,
@@ -121,6 +123,7 @@ async def edit_slide_html(
     presentation = await sql_session.get(PresentationModel, slide.presentation)
     if not presentation:
         raise HTTPException(status_code=404, detail="Presentation not found")
+    require_legacy_v1_write(presentation.version)
 
     html_to_edit = html or slide.html_content
     if not html_to_edit:

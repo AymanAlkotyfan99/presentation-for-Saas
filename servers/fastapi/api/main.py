@@ -32,6 +32,10 @@ from utils.sentry_config import (
     parse_sentry_send_default_pii,
 )
 from services.database import async_session_maker
+from utils.architecture_flags import (
+    LegacyV1ReadDisabledError,
+    LegacyV1WriteDisabledError,
+)
 
 
 init_sandbox_safe_mimetypes()
@@ -63,6 +67,16 @@ def _maybe_init_sentry() -> None:
 _maybe_init_sentry()
 
 app = FastAPI(lifespan=app_lifespan)
+
+
+@app.exception_handler(LegacyV1ReadDisabledError)
+async def legacy_v1_read_disabled(_request: Request, exc: LegacyV1ReadDisabledError):
+    return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+
+@app.exception_handler(LegacyV1WriteDisabledError)
+async def legacy_v1_write_disabled(_request: Request, exc: LegacyV1WriteDisabledError):
+    return JSONResponse(status_code=409, content={"detail": str(exc)})
 
 # Routers
 app.include_router(API_V1_PPT_ROUTER)

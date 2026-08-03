@@ -2,6 +2,8 @@
 
 import { useLayoutEffect, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
+import { BRAND_ASSETS } from "@/lib/product-metadata";
+import { PRODUCT_IDENTITY } from "@/lib/product-identity";
 
 interface PresentonSplashLoaderProps {
   message?: string;
@@ -11,7 +13,7 @@ interface PresentonSplashLoaderProps {
 export const PRESENTON_SPLASH_MIN_DURATION_MS = 3000;
 
 const SPLASH_ANIMATION_MS = 2600;
-const SPLASH_MASK_SRC = "/Presenton_Splash.png";
+const SPLASH_MASK_SRC = BRAND_ASSETS.splash;
 
 let splashSessionStartedAt: number | null = null;
 let splashMaskReadyPromise: Promise<void> | null = null;
@@ -91,7 +93,7 @@ export function PresentonSplashLoader({
     width: "142vmax",
     height: "142vmax",
     borderRadius: "50%",
-    background: "#7a5af8",
+    background: PRODUCT_IDENTITY.colors.primary,
     transform: "translate3d(-50%, -50%, 0) scale(0.001)",
     animation: `presenton-splash-surface-grow ${SPLASH_ANIMATION_MS}ms linear ${animationDelayMs}ms both`,
     willChange: "transform",
@@ -142,7 +144,7 @@ export function PresentonSplashLoader({
           className="presenton-splash-wordmark-layer presenton-splash-wordmark-base"
           style={{
             ...wordmarkLayerStyle,
-            background: "#7a5af8",
+            background: PRODUCT_IDENTITY.colors.primary,
           }}
         />
         <span

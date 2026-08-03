@@ -3,9 +3,10 @@ import SettingPage from './SettingPage'
 import UserAccountSettings from './UserAccountSettings'
 import { getServerAuthStatus } from '@/utils/serverAuth'
 import { getSettingsView } from '@/utils/settingsAccess'
+import { DISPLAY_PRODUCT } from '@/lib/product-metadata'
 
 export const metadata = {
-  title: 'Settings | Presenton',
+  title: `Settings | ${DISPLAY_PRODUCT.shortName}`,
   description: 'Settings page',
 }
 const page = async () => {

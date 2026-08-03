@@ -9,6 +9,7 @@ import {
   PRESENTON_SPLASH_MIN_DURATION_MS,
   PresentonSplashLoader,
 } from "@/components/ui/presenton-splash-loader";
+import { BRAND_ASSETS } from "@/lib/product-metadata";
 import { notify } from "@/components/ui/sonner";
 import { sanitizeAnalyticsError } from "@/utils/analytics";
 import { MixpanelEvent, trackEvent } from "@/utils/mixpanel";
@@ -285,7 +286,7 @@ export default function AuthGate() {
           <div className="flex items-center gap-4">
             <div className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-[4px] bg-[#F4F3FF] p-3">
               <Image
-                src="/logo-with-bg.png"
+                src={BRAND_ASSETS.compactIcon}
                 alt=""
                 width={161}
                 height={166}

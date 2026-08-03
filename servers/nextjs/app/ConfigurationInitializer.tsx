@@ -11,6 +11,7 @@ import { LLMConfig } from '@/types/llm_config';
 import { getApiUrl } from '@/utils/api';
 import { notify } from '@/components/ui/sonner';
 import { PRESENTON_SPLASH_MIN_DURATION_MS } from '@/components/ui/presenton-splash-loader';
+import { DISPLAY_PRODUCT } from '@/lib/product-metadata';
 
 function ConfigurationLoadingScreen() {
   return (
@@ -22,7 +23,7 @@ function ConfigurationLoadingScreen() {
       <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-7 whitespace-nowrap">
         <div aria-hidden="true" className="configuration-loader" />
         <p className="font-syne text-[18px] font-normal leading-normal tracking-[-0.54px] text-[#191919]">
-          Loading Presenton...
+          Loading {DISPLAY_PRODUCT.shortName}...
         </p>
       </div>
 

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { DISPLAY_PRODUCT } from "@/lib/product-metadata";
 
 export const metadata: Metadata = {
-  title: "Page not found | Presenton",
+  title: `Page not found | ${DISPLAY_PRODUCT.shortName}`,
 };
 
 export default function NotFound() {

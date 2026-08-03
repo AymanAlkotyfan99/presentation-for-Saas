@@ -37,6 +37,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { notify } from "@/components/ui/sonner";
+import { BRAND_ASSETS, DISPLAY_PRODUCT } from "@/lib/product-metadata";
 import {
   EDITOR_STAGE_HEIGHT,
   EDITOR_STAGE_WIDTH,
@@ -115,8 +116,8 @@ function StudioTopBar({ activeStep }: { activeStep: StudioStep }) {
           aria-label="Dashboard"
         >
           <img
-            src="/logo-with-bg.png"
-            alt="Presenton"
+            src={BRAND_ASSETS.compactIcon}
+            alt={DISPLAY_PRODUCT.shortName}
             className="h-full w-full"
             draggable={false}
           />
@@ -377,7 +378,7 @@ function UploadPanel({
             i
           </span>
           <p>
-            Presenton sends each slide as a screenshot and HTML reference. Use a
+            {DISPLAY_PRODUCT.shortName} sends each slide as a screenshot and HTML reference. Use a
             vision-enabled model for accurate layouts. Text-only models may produce
             poor results or fail.
           </p>
