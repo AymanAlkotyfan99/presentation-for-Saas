@@ -2,6 +2,7 @@ import { dialog } from "electron";
 import path from "path";
 import { openLocalPath, showOpenTargetErrorDialog } from "./open-target";
 import { safeError } from "./safe-console";
+import { PRODUCT_IDENTITY } from "../generated/product-identity";
 
 export async function showFileDownloadedDialog(filePath: string): Promise<boolean> {
   try {
@@ -29,7 +30,7 @@ export async function showFileDownloadedDialog(filePath: string): Promise<boolea
       if (!result.success) {
         await showOpenTargetErrorDialog({
           title: `Could Not Open ${targetLabel === "file" ? "File" : "Folder"}`,
-          message: `The exported file was saved, but Presenton could not open the ${targetLabel}.`,
+          message: `The exported file was saved, but ${PRODUCT_IDENTITY.product.shortName} could not open the ${targetLabel}.`,
           detail: `${result.message || "No application is registered to open this item."}\n\nSaved location:\n${filePath}`,
         });
       }

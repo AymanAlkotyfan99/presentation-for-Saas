@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { BRAND_ASSETS } from "@/lib/product-metadata";
 
 interface OutlineStandardHeaderProps {
   title: string;
@@ -22,7 +23,7 @@ const OutlineStandardHeader = ({
           className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/30"
         >
           <Image
-            src="/logo-with-bg.png"
+            src={BRAND_ASSETS.compactIcon}
             alt=""
             width={32}
             height={33}

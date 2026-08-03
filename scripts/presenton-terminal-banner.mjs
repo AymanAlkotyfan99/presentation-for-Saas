@@ -1,5 +1,6 @@
 /**
- * Docker / startup terminal banner for Presenton.
+ * Docker / startup terminal banner. The exported function name is retained as
+ * a compatibility API for start.js; display identity comes from the registry.
  * Renders a compact brand logo + startup status.
  */
 
@@ -10,32 +11,38 @@ import { fileURLToPath } from "node:url";
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
 const DIM = "\x1b[2m";
+const thisDir = path.dirname(fileURLToPath(import.meta.url));
+const PRODUCT_IDENTITY = JSON.parse(
+  fs.readFileSync(path.join(thisDir, "..", "config", "product-identity.json"), "utf8"),
+);
+
+function hexRgb(value) {
+  const hex = value.slice(1);
+  return [0, 2, 4].map((index) => Number.parseInt(hex.slice(index, index + 2), 16));
+}
+
+const PRIMARY_RGB = hexRgb(PRODUCT_IDENTITY.colors.primary);
+const SECONDARY_RGB = hexRgb(PRODUCT_IDENTITY.colors.secondary);
 
 function fgRgb(r, g, b, text) {
   return `\x1b[38;2;${r};${g};${b}m${text}${RESET}`;
 }
 
 function brand(text) {
-  return BOLD + fgRgb(138, 99, 255, text);
+  return BOLD + fgRgb(...PRIMARY_RGB, text);
 }
 
 function accent(text) {
-  return fgRgb(184, 176, 255, text);
+  return fgRgb(...SECONDARY_RGB, text);
 }
 
 function muted(text) {
-  return DIM + fgRgb(160, 150, 210, text);
+  return DIM + fgRgb(148, 163, 184, text);
 }
 
 function styleAsciiArt(rawAscii) {
   const lines = rawAscii.replace(/\r/g, "").split("\n");
-  const palette = [
-    [153, 108, 255],
-    [145, 103, 250],
-    [136, 98, 245],
-    [127, 92, 239],
-    [118, 86, 233],
-  ];
+  const palette = [PRIMARY_RGB, SECONDARY_RGB];
 
   return lines
     .map((line, lineIdx) => {
@@ -46,20 +53,10 @@ function styleAsciiArt(rawAscii) {
 }
 
 function loadAsciiBanner() {
-  const thisDir = path.dirname(fileURLToPath(import.meta.url));
-  const asciiPath = path.join(thisDir, "presenton-ascii.txt");
-
-  try {
-    const raw = fs.readFileSync(asciiPath, "utf8").trimEnd();
-    if (!raw) return "";
-    return styleAsciiArt(raw);
-  } catch {
-    return "";
-  }
+  return styleAsciiArt(`  ${PRODUCT_IDENTITY.product.name}`);
 }
 
 function loadPackageVersion() {
-  const thisDir = path.dirname(fileURLToPath(import.meta.url));
   const packageJsonPath = path.join(thisDir, "..", "package.json");
 
   try {
@@ -110,12 +107,12 @@ export function printPresentonStartupBanner(opts = {}) {
 
   const title = [
     "",
-    BOLD + fgRgb(138, 99, 255, "   Open Source AI Presentation Generator"),
+    BOLD + fgRgb(...PRIMARY_RGB, `   ${PRODUCT_IDENTITY.product.description}`),
     ...(mode === "development"
       ? [
           "   " +
             accent("Love the Project?  ") +
-            brand("Star us on github: ") +
+            brand("Upstream repository: ") +
             BOLD +
             fgRgb(224, 218, 255, "https://github.com/presenton/presenton"),
         ]
@@ -170,7 +167,7 @@ export function printPresentonStartupBanner(opts = {}) {
           pipe(
             padVis(
               "  " +
-                muted("Open Presenton:     ") +
+                muted(`Open ${PRODUCT_IDENTITY.product.shortName}:     `) +
                 BOLD +
                 fgRgb(255, 255, 255, publicUrl),
               W,
@@ -183,7 +180,7 @@ export function printPresentonStartupBanner(opts = {}) {
     ...summaryLines,
     boxBottom,
     "",
-    "   " + muted("Made with ❤️  by the Presenton team"),
+    "   " + muted(`Support: ${PRODUCT_IDENTITY.product.supportEmail}`),
   ].join("\n");
 
   const bannerHeader = iconBlock ? `${iconBlock}\n` : "";

@@ -35,6 +35,9 @@ test_repository_tools() {
         npm ci &&
         npm audit --audit-level=high &&
         npm test &&
+        npm run check:architecture &&
+        npm run product:metadata:check &&
+        npm run brand:scan &&
         npm run sync:presentation-export &&
         npm run check:presentation-export &&
         npm run sbom:node &&
@@ -66,6 +69,7 @@ test_fastapi() (
     uv run --locked python -m pytest --verbose --tb=short &&
         uv run --locked python -m compileall -q api models services utils &&
         uv run --locked python scripts/generate_openapi_spec.py --check &&
+        uv run --locked python scripts/check_migrations.py &&
         mkdir -p "$SCRIPT_DIR/artifacts/sbom" &&
         uv run --locked cyclonedx-py environment \
             --pyproject pyproject.toml \

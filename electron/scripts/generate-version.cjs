@@ -2,6 +2,9 @@ const fs = require("fs");
 const path = require("path");
 
 const electronRoot = path.join(__dirname, "..");
+const identity = JSON.parse(
+  fs.readFileSync(path.join(electronRoot, "..", "config", "product-identity.json"), "utf8"),
+);
 const pkg = JSON.parse(
   fs.readFileSync(path.join(electronRoot, "package.json"), "utf8"),
 );
@@ -18,9 +21,9 @@ const update = {
   version,
   message: process.env.UPDATE_MESSAGE || existing.message || "",
   downloads: {
-    linux: `https://github.com/presenton/presenton/releases/download/electron-v${version}/Presenton-${version}.deb`,
-    mac: `https://github.com/presenton/presenton/releases/download/electron-v${version}/Presenton-${version}.dmg`,
-    windows: `https://github.com/presenton/presenton/releases/download/electron-v${version}/Presenton-${version}.exe`,
+    linux: existing.downloads?.linux || identity.desktop.compatibilityDownloadUrl,
+    mac: existing.downloads?.mac || identity.desktop.compatibilityDownloadUrl,
+    windows: existing.downloads?.windows || identity.desktop.compatibilityDownloadUrl,
   },
 };
 

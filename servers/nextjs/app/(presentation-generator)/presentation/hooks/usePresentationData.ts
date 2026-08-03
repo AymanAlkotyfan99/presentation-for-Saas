@@ -8,6 +8,7 @@ import { applyPresentationThemeToElement } from "../utils/applyPresentationTheme
 import { normalizeBackendAssetUrls } from "@/utils/api";
 import { useFontLoader } from "../../hooks/useFontLoad";
 import { DashboardApi } from "../../services/api/dashboard";
+import { DISPLAY_PRODUCT } from "@/lib/product-metadata";
 
 
 export const usePresentationData = (
@@ -25,7 +26,7 @@ export const usePresentationData = (
       if (data?.version === "v1-standard") {
         notify.warning(
           "Unsupported presentation",
-          "This deck was created in an older Presenton version. Downgrade to a compatible version to open it."
+          `This deck was created in an older ${DISPLAY_PRODUCT.shortName}-compatible format. Open it with a compatible legacy release.`
         );
         setLoading(false);
         router.replace("/dashboard");

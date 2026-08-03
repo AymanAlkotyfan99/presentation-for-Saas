@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bayanly.invalid/schemas/product-identity-v1.json",
+  "title": "Bayanly product identity registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "brandVersion", "product", "publisher", "web", "desktop", "colors", "assets", "featureFlags", "upstream"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "brandVersion": { "type": "string", "minLength": 1 },
+    "product": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "shortName", "description", "supportEmail"],
+      "properties": {
+        "name": { "const": "Bayanly AI" },
+        "shortName": { "const": "Bayanly" },
+        "description": { "type": "string", "minLength": 1 },
+        "supportEmail": { "type": "string", "format": "email" }
+      }
+    },
+    "publisher": {
+      "type": "object", "additionalProperties": false,
+      "required": ["displayName", "legalStatus"],
+      "properties": {
+        "displayName": { "const": "Bayanly Technologies" },
+        "legalStatus": { "const": "REQUIRES_LEGAL_REVIEW" }
+      }
+    },
+    "web": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requestedDomain", "canonicalUrl", "isPlaceholder", "operationalStatus"],
+      "properties": {
+        "requestedDomain": { "const": "example.ai" },
+        "canonicalUrl": { "const": "https://example.ai" },
+        "isPlaceholder": { "const": true },
+        "operationalStatus": { "const": "REQUIRES_DOMAIN_CONFIGURATION" }
+      }
+    },
+    "desktop": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requestedName", "requestedAppId", "activeAppId", "appIdStatus", "requestedProtocol", "requestedProtocolExample", "protocolStatus", "requestedUpdateDomain", "updateStatus", "compatibilityUpdateUrl", "compatibilityDownloadUrl"],
+      "properties": {
+        "requestedName": { "const": "Bayanly" },
+        "requestedAppId": { "const": "ai.bayanly.desktop" },
+        "activeAppId": { "const": "com.presenton.presenton" },
+        "appIdStatus": { "const": "COMPATIBILITY_RETAINED" },
+        "requestedProtocol": { "const": "bayanly" },
+        "requestedProtocolExample": { "const": "bayanly://open" },
+        "protocolStatus": { "const": "REQUIRES_INSTALLER_AND_SECURITY_REVIEW" },
+        "requestedUpdateDomain": { "const": "updates.bayanly.ai" },
+        "updateStatus": { "const": "REQUIRES_UPDATE_CHANNEL_CONFIGURATION" },
+        "compatibilityUpdateUrl": { "type": "string", "minLength": 1 },
+        "compatibilityDownloadUrl": { "type": "string", "minLength": 1 }
+      }
+    },
+    "colors": {
+      "type": "object", "additionalProperties": false,
+      "required": ["primary", "secondary", "accent", "background", "text"],
+      "properties": {
+        "primary": { "const": "#1677FF" },
+        "secondary": { "const": "#22D3EE" },
+        "accent": { "const": "#00F0FF" },
+        "background": { "const": "#061538" },
+        "text": { "const": "#F8FAFC" }
+      }
+    },
+    "assets": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sourceDirectory", "webBasePath", "electronBuildDirectory", "primaryLogo", "lightLogo", "darkLogo", "compactIcon", "favicon", "desktopIcon", "splash"],
+      "properties": {
+        "sourceDirectory": { "const": "assets/branding" },
+        "webBasePath": { "const": "/brand/v1" },
+        "electronBuildDirectory": { "const": "build/brand/v1" },
+        "primaryLogo": { "const": "primary-logo.png" },
+        "lightLogo": { "const": "light-logo.png" },
+        "darkLogo": { "const": "dark-logo.png" },
+        "compactIcon": { "const": "compact-icon.png" },
+        "favicon": { "const": "favicon.png" },
+        "desktopIcon": { "const": "desktop-icon.png" },
+        "splash": { "const": "splash.png" }
+      }
+    },
+    "featureFlags": {
+      "type": "object", "additionalProperties": false,
+      "required": ["newBrandShell", "newExportMetadata"],
+      "properties": {
+        "newBrandShell": {
+          "type": "object", "additionalProperties": false,
+          "required": ["environment", "default"],
+          "properties": { "environment": { "const": "NEW_BRAND_SHELL_ENABLED" }, "default": { "const": true } }
+        },
+        "newExportMetadata": {
+          "type": "object", "additionalProperties": false,
+          "required": ["environment", "default"],
+          "properties": { "environment": { "const": "NEW_EXPORT_METADATA_ENABLED" }, "default": { "const": false } }
+        }
+      }
+    },
+    "upstream": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "repository", "license", "relationship"],
+      "properties": {
+        "name": { "const": "Presenton" },
+        "repository": { "const": "https://github.com/presenton/presenton" },
+        "license": { "const": "Apache-2.0" },
+        "relationship": { "const": "derived-work" }
+      }
+    }
+  }
+}

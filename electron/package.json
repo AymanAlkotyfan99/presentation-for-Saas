@@ -1,6 +1,6 @@
 {
-  "name": "presenton",
-  "productName": "Presenton Open Source",
+  "name": "bayanly-desktop",
+  "productName": "Bayanly",
   "version": "0.9.3-beta",
   "exportVersion": "v0.4.2",
   "exportChromiumBuildId": "149.0.7827.196",
@@ -9,8 +9,8 @@
     "darwin-x64": "1625072"
   },
   "main": "app_dist/main.js",
-  "description": "Open-Source AI Presentation Generator",
-  "homepage": "https://presenton.ai",
+  "description": "An AI-powered platform for creating professional presentations in Arabic and English.",
+  "homepage": "https://github.com/presenton/presenton",
   "repository": "https://github.com/presenton/presenton",
   "keywords": [
     "electron",
@@ -69,8 +69,8 @@
     "cleanup:installed-app-cache": "node scripts/cleanup-installed-app-cache.cjs"
   },
   "author": {
-    "name": "Presenton",
-    "email": "suraj@presenton.ai"
+    "name": "Bayanly Technologies",
+    "email": "Ayman.Naeem@gmail.com"
   },
   "dependencies": {
     "@llamaindex/liteparse": "2.10.1",

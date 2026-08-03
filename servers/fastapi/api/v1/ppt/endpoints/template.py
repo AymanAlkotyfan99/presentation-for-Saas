@@ -38,6 +38,7 @@ from enums.async_task_status import AsyncTaskStatus
 from models.api_error_model import APIErrorModel
 from models.sql.async_task import AsyncTaskModel
 from models.sql.template_v2 import TemplateV2
+from modules.templates import list_template_rows
 from services.database import async_session_maker, get_async_session
 from services.export_task_service import EXPORT_TASK_SERVICE
 from templates.preview import (
@@ -901,23 +902,7 @@ async def list_templates(
     sql_session: AsyncSession = Depends(get_async_session),
 ):
     offset = (page - 1) * page_size
-    query = (
-        select(
-            TemplateV2.id,
-            TemplateV2.name,
-            TemplateV2.description,
-            TemplateV2.layouts,
-            TemplateV2.assets,
-            TemplateV2.is_default,
-            TemplateV2.created_at,
-            TemplateV2.updated_at,
-        )
-        .order_by(TemplateV2.created_at.desc())
-    )
-    if default is not None:
-        query = query.where(TemplateV2.is_default == default)
-
-    result = await sql_session.execute(query)
+    rows = await list_template_rows(sql_session, default=default)
 
     items: list[TemplateListItem] = []
     for (
@@ -929,7 +914,7 @@ async def list_templates(
         is_default,
         created_at,
         updated_at,
-    ) in result.all():
+    ) in rows:
         if default is not None and bool(is_default) != default:
             continue
 

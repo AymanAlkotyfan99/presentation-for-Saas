@@ -28,6 +28,7 @@ import {
   IMAGE_PROVIDERS,
   LLM_PROVIDERS,
 } from "@/utils/providerConstants";
+import { DISPLAY_PRODUCT } from "@/lib/product-metadata";
 
 const GITHUB_REPOSITORY_URL = "https://github.com/presenton/presenton";
 const DISCORD_INVITE_URL = "https://discord.com/invite/9ZsKKxudNE";
@@ -261,8 +262,8 @@ function DashboardHeader() {
               href={APP_UPDATE_URL}
               target="_blank"
               rel="noreferrer"
-              aria-label="Update Presenton"
-              title="Update Presenton"
+              aria-label={`Update ${DISPLAY_PRODUCT.shortName}`}
+              title={`Update ${DISPLAY_PRODUCT.shortName}`}
               className="relative flex h-[42.24px] w-[42.24px] shrink-0 items-center justify-center rounded-full border-[1.32px] border-[#D9D6FE] bg-[#FAFAFF] transition-colors hover:bg-[#F3F0FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8] focus-visible:ring-offset-2"
               onClick={() =>
                 trackEvent(MixpanelEvent.Navigation, {

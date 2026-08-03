@@ -3,11 +3,15 @@ const { execFileSync } = require("child_process")
 const fs = require("fs")
 const path = require("path")
 const packageMetadata = require("./package.json")
+const identity = require("../config/product-identity.json")
 const {
   normalizeBundledMacChromiumForPackaging,
 } = require("./scripts/prepare-export-chromium.cjs")
 
-const APP_ID = "com.presenton.presenton"
+const APP_ID = identity.desktop.activeAppId
+const PRODUCT_NAME = process.env.NEW_BRAND_SHELL_ENABLED === "false"
+  ? identity.upstream.name
+  : identity.desktop.requestedName
 const TEAM_ID = "S6W5C54KL6"
 const macTarget = process.env.PRESENTON_MAC_TARGET
 const isMasBuild = macTarget === "mas" || macTarget === "mas-dev"
@@ -859,14 +863,14 @@ function findDirectoriesNamed(root, name) {
 
 const config = {
   appId: APP_ID,
-  productName: "Presenton",
+  productName: PRODUCT_NAME,
   asar: true,
   asarUnpack: [
     "resources/**",
     // LiteParse runs from FastAPI via Electron-as-Node and needs real package dirs.
     "node_modules/**",
   ],
-  copyright: "Copyright © 2026 Presenton",
+  copyright: `Copyright © 2026 ${identity.product.shortName} contributors`,
   directories: {
     output: "dist",
     buildResources: "build",
@@ -884,7 +888,7 @@ const config = {
   ],
   afterPack,
   mac: {
-    artifactName: "Presenton-${version}.${ext}",
+    artifactName: PRODUCT_NAME + "-${version}.${ext}",
     target: [macTarget || "dmg"],
     category: "public.app-category.productivity",
     hardenedRuntime: !isMasBuild,
@@ -897,7 +901,7 @@ const config = {
         : macDistributionIdentity,
     notarize: isMasBuild || !shouldNotarizeDirectMacBuild ? false : true,
     sign: isMasBuild ? undefined : signDirectMacApp,
-    icon: "build/icon.icns",
+    icon: identity.assets.electronBuildDirectory + "/" + identity.assets.desktopIcon,
     bundleShortVersion: appStoreBundleShortVersion,
     bundleVersion: appStoreBundleVersion,
     extendInfo: {
@@ -923,9 +927,9 @@ const config = {
     additionalArguments: masSigningExtraArgs,
   },
   linux: {
-    artifactName: "Presenton-${version}.${ext}",
+    artifactName: PRODUCT_NAME + "-${version}.${ext}",
     target: ["AppImage", "deb"],
-    icon: "build/icons",
+    icon: identity.assets.electronBuildDirectory + "/" + identity.assets.desktopIcon,
     category: "Office",
   },
   deb: {
@@ -933,9 +937,9 @@ const config = {
   },
   win: {
     target: ["nsis", "appx"],
-    icon: "build/icon.ico",
-    artifactName: "Presenton-${version}.${ext}",
-    executableName: "Presenton",
+    icon: identity.assets.electronBuildDirectory + "/" + identity.assets.desktopIcon,
+    artifactName: PRODUCT_NAME + "-${version}.${ext}",
+    executableName: PRODUCT_NAME,
   },
   nsis: {
     oneClick: false,
@@ -947,7 +951,7 @@ const config = {
     installerHeaderIcon: "build/icon.ico",
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
-    shortcutName: "Presenton",
+    shortcutName: PRODUCT_NAME,
     uninstallDisplayName: "Presenton",
   },
   dmg: {

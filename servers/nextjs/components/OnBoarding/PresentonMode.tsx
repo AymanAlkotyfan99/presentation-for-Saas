@@ -26,6 +26,8 @@ import OpenAICompatibleImageFields from '@/components/OpenAICompatibleImageField
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import Image from 'next/image';
 import OllamaConfig from '../OllamaConfig';
+import { PRODUCT_IDENTITY } from '@/lib/product-identity';
+import { DISPLAY_PRODUCT } from '@/lib/product-metadata';
 
 const MANUAL_MODEL_PROVIDERS = new Set(["vertex", "azure", "bedrock"]);
 const LOCAL_PROVIDERS = ["ollama", "lmstudio"];
@@ -876,7 +878,7 @@ const PresentonMode = ({
                 <div className="space-y-4">
                     {selectedWebProvider.value === "auto" && (
                         <div className="rounded-lg border border-[#D9D6FE] bg-[#F4F3FF] p-3 text-xs leading-5 text-[#5146E5]">
-                            Presenton will use model-native web grounding when available. If the selected text model does not support it, web search stays off until you choose an external provider.
+                            {DISPLAY_PRODUCT.shortName} will use model-native web grounding when available. If the selected text model does not support it, web search stays off until you choose an external provider.
                         </div>
                     )}
 
@@ -1019,7 +1021,7 @@ const PresentonMode = ({
 
     return (
         <div className='w-full max-w-[660px] font-syne pb-10'>
-            <p className='px-2.5 py-0.5 w-fit text-[#7A5AF8] rounded-[50px]  border border-[#EDEEEF] text-[10px] font-medium mb-5 font-syne'>PRESENTON</p>
+            <p className='px-2.5 py-0.5 w-fit rounded-[50px] border border-[#EDEEEF] text-[10px] font-medium mb-5 font-syne' style={{ color: PRODUCT_IDENTITY.colors.primary }}>{DISPLAY_PRODUCT.shortName.toUpperCase()}</p>
             <div className=''>
 
                 <h2 className='mb-4 text-black text-[26px] font-normal font-unbounded '>
@@ -1029,13 +1031,13 @@ const PresentonMode = ({
                     {providerStep === 1
                         ? "Start with ChatGPT, run a local model, or connect another AI provider."
                         : providerStep === 2
-                            ? "Choose how Presenton creates visuals, or continue without image generation."
+                            ? `Choose how ${DISPLAY_PRODUCT.shortName} creates visuals, or continue without image generation.`
                             : "Add current web context to presentations, or continue with web search disabled."}
                 </p>
             </div>
             <div className='flex items-center gap-2 bg-[#F0F3F9B2] rounded-[8px]  px-6 py-2.5 my-[54px]'>
                 <Info className='w-4 h-4 fill-[#003399] stroke-white' />
-                <p className='text-sm text-[#5F6062] font-medium'>Presenton runs on this deployment. Generation data may be sent to the providers you select, and keys and settings are stored on the deployment host.</p>
+                <p className='text-sm text-[#5F6062] font-medium'>{DISPLAY_PRODUCT.shortName} runs on this deployment. Generation data may be sent to the providers you select, and keys and settings are stored on the deployment host.</p>
             </div>
 
             {providerStep === 1 && <>

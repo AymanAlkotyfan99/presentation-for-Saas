@@ -50,10 +50,16 @@ import { TemplateV2ChartJsElement as RawChartElement } from "@/components/slide-
 import { TemplateV2TableElement as RawTableElement } from "@/components/slide-editor/tables/TemplateV2TableElement";
 import { buildSvgUpdateUrl } from "@/lib/svg-color";
 import {
-  componentSideResizeBox,
-  resizeComponentFromSideTransform,
-  type ComponentSideResizeAnchor,
-} from "@/components/slide-editor/model/component-resize";
+  componentFromNodeTransform,
+  componentFromSideTransformPreview,
+  componentSideTransformTargetFromNode,
+  componentTransformAnchorForNode,
+  hasTransformScale,
+  isComponentSideResizeAnchor,
+  isTopOrLeftSideResizeAnchor,
+  type ComponentSideTransformPreview,
+  type ComponentTransformAnchor,
+} from "@/components/slide-editor/surface/component-transforms";
 import {
   asRecord,
   anchoredFramePositionForResize,
@@ -90,10 +96,6 @@ import {
   readPoint,
   readString,
   ROOT_ELEMENTS_COMPONENT_INDEX,
-  STAGE_BOX,
-  resizeComponent,
-  resizeComponentElementBounds,
-  resizeComponentFrame,
   scaleRawElementTextMetrics,
   selectionTouchesComponent,
   selectionTouchesElement,
@@ -122,49 +124,6 @@ import {
   type Selection,
 } from "@/components/slide-editor/model/model";
 
-type ComponentTransformAnchor =
-  | "top-left"
-  | "top-center"
-  | "top-right"
-  | "middle-left"
-  | "middle-right"
-  | "bottom-left"
-  | "bottom-center"
-  | "bottom-right"
-  | "rotater";
-
-type ComponentResizeMode =
-  | "scale-content"
-  | "resize-element-bounds"
-  | "resize-frame";
-
-type ComponentTransformBox = Box & {
-  scaleX: number;
-  scaleY: number;
-  rawWidth: number;
-  rawHeight: number;
-};
-
-type ComponentSideTransformTarget = {
-  anchor: ComponentSideResizeAnchor;
-  box: Box;
-  rotation: number;
-};
-
-type ComponentSideTransformPreview = {
-  source: RawComponent;
-  sourceBox: Box;
-  target: ComponentSideTransformTarget;
-};
-
-const HORIZONTAL_RESIZE_ANCHORS = new Set<ComponentTransformAnchor>([
-  "middle-left",
-  "middle-right",
-]);
-const VERTICAL_RESIZE_ANCHORS = new Set<ComponentTransformAnchor>([
-  "top-center",
-  "bottom-center",
-]);
 const VECTOR_VERTEX_HANDLE_RADIUS = 5;
 const VECTOR_VERTEX_HANDLE_STROKE_WIDTH = 2;
 const VECTOR_VERTEX_HANDLE_COLOR = "#7A5AF8";
@@ -173,226 +132,6 @@ const VECTOR_ADD_HANDLE_RADIUS = 6;
 const VECTOR_DELETE_HANDLE_RADIUS = 5;
 const VECTOR_DELETE_HANDLE_OFFSET = 11;
 const VECTOR_DELETE_HANDLE_COLOR = "#EF4444";
-
-function isComponentSideResizeAnchor(
-  anchor: ComponentTransformAnchor | null,
-): anchor is ComponentSideResizeAnchor {
-  return Boolean(
-    anchor &&
-      (HORIZONTAL_RESIZE_ANCHORS.has(anchor) ||
-        VERTICAL_RESIZE_ANCHORS.has(anchor)),
-  );
-}
-
-function isTopOrLeftSideResizeAnchor(anchor: ComponentSideResizeAnchor) {
-  return anchor === "top-center" || anchor === "middle-left";
-}
-
-function hasTransformScale(node: Konva.Node) {
-  return (
-    Math.abs(node.scaleX() - 1) >= 0.001 ||
-    Math.abs(node.scaleY() - 1) >= 0.001
-  );
-}
-
-function componentTransformerForNode(node: Konva.Node) {
-  const stage = node.getStage();
-  if (!stage) return null;
-  return stage
-    .find<Konva.Transformer>("Transformer")
-    .find((candidate) => candidate.getNodes().includes(node));
-}
-
-function componentTransformAnchorForNode(
-  node: Konva.Node,
-): ComponentTransformAnchor | null {
-  const transformer = componentTransformerForNode(node);
-  const activeAnchor =
-    transformer?.getActiveAnchor() ??
-    readString(node.getAttr(TRANSFORM_ANCHOR_ATTR));
-  return isComponentTransformAnchor(activeAnchor) ? activeAnchor : null;
-}
-
-function isComponentTransformAnchor(
-  value: string | null | undefined,
-): value is ComponentTransformAnchor {
-  return (
-    value === "top-left" ||
-    value === "top-center" ||
-    value === "top-right" ||
-    value === "middle-left" ||
-    value === "middle-right" ||
-    value === "bottom-left" ||
-    value === "bottom-center" ||
-    value === "bottom-right" ||
-    value === "rotater"
-  );
-}
-
-function componentResizeModeForTransform(
-  anchor: ComponentTransformAnchor | null,
-  scaleX: number,
-  scaleY: number,
-): ComponentResizeMode {
-  if (anchor === "rotater") return "resize-frame";
-  if (
-    anchor &&
-    (HORIZONTAL_RESIZE_ANCHORS.has(anchor) ||
-      VERTICAL_RESIZE_ANCHORS.has(anchor))
-  ) {
-    return "resize-element-bounds";
-  }
-  if (anchor) return "scale-content";
-
-  const changedX = Math.abs(scaleX - 1) > 0.001;
-  const changedY = Math.abs(scaleY - 1) > 0.001;
-  if (changedX && changedY) return "scale-content";
-  if (changedX || changedY) return "resize-element-bounds";
-  return "resize-frame";
-}
-
-function componentBoxFromTransform(
-  box: Box,
-  scaleX: number,
-  scaleY: number,
-  anchor: ComponentTransformAnchor | null,
-): ComponentTransformBox {
-  const isVerticalOnly = anchor ? VERTICAL_RESIZE_ANCHORS.has(anchor) : false;
-  const isHorizontalOnly = anchor ? HORIZONTAL_RESIZE_ANCHORS.has(anchor) : false;
-  const nextScaleX = isVerticalOnly || anchor === "rotater" ? 1 : scaleX;
-  const nextScaleY = isHorizontalOnly || anchor === "rotater" ? 1 : scaleY;
-  const rawWidth = Math.max(1, box.width * nextScaleX);
-  const rawHeight = Math.max(1, box.height * nextScaleY);
-
-  return {
-    ...box,
-    width: rawWidth,
-    height: rawHeight,
-    scaleX: box.width > 0 ? rawWidth / box.width : 1,
-    scaleY: box.height > 0 ? rawHeight / box.height : 1,
-    rawWidth,
-    rawHeight,
-  };
-}
-
-function positionFromComponentTransform(
-  box: Box,
-  node: Konva.Node,
-  nextBox: ComponentTransformBox,
-  anchor: ComponentTransformAnchor | null,
-): Point {
-  if (isComponentSideResizeAnchor(anchor)) {
-    return {
-      x: clamp(box.x, 0, Math.max(0, STAGE_BOX.width - nextBox.width)),
-      y: clamp(box.y, 0, Math.max(0, STAGE_BOX.height - nextBox.height)),
-    };
-  }
-
-  const rawPosition = positionFromNodeInParent(node, STAGE_BOX, {
-    ...nextBox,
-    width: nextBox.rawWidth,
-    height: nextBox.rawHeight,
-  });
-  return {
-    x: clamp(
-      rawPosition.x,
-      0,
-      Math.max(0, STAGE_BOX.width - nextBox.width),
-    ),
-    y: clamp(
-      rawPosition.y,
-      0,
-      Math.max(0, STAGE_BOX.height - nextBox.height),
-    ),
-  };
-}
-
-function componentFromNodeTransform(
-  component: RawComponent,
-  node: Konva.Group,
-  anchor: ComponentTransformAnchor | null,
-) {
-  const box = componentBox(component);
-  const scaleX = node.scaleX();
-  const scaleY = node.scaleY();
-  const nextBox = componentBoxFromTransform(box, scaleX, scaleY, anchor);
-  const resizeMode = componentResizeModeForTransform(anchor, scaleX, scaleY);
-  node.scaleX(1);
-  node.scaleY(1);
-  const position = positionFromComponentTransform(box, node, nextBox, anchor);
-  const nextComponentBox = {
-    ...position,
-    width: nextBox.width,
-    height: nextBox.height,
-    rotation: node.rotation(),
-  };
-
-  if (resizeMode === "resize-frame") {
-    return resizeComponentFrame(component, nextComponentBox);
-  }
-  if (resizeMode === "resize-element-bounds") {
-    return resizeComponentElementBounds(component, {
-      ...nextComponentBox,
-      scaleX: nextBox.scaleX,
-      scaleY: nextBox.scaleY,
-    });
-  }
-  return resizeComponent(component, {
-    ...nextComponentBox,
-    scaleX: nextBox.scaleX,
-    scaleY: nextBox.scaleY,
-  });
-}
-
-function syncComponentNodeBox(node: Konva.Group, box: Box) {
-  node.setAttrs({
-    x: box.x + box.width / 2,
-    y: box.y + box.height / 2,
-    width: box.width,
-    height: box.height,
-    offsetX: box.width / 2,
-    offsetY: box.height / 2,
-    scaleX: 1,
-    scaleY: 1,
-  });
-  componentTransformerForNode(node)?.forceUpdate();
-  node.getLayer()?.batchDraw();
-}
-
-function componentSideTransformTargetFromNode(
-  node: Konva.Group,
-  anchor: ComponentSideResizeAnchor,
-  sourceBox: Box,
-) {
-  const transformedWidth = Math.max(1, node.width() * node.scaleX());
-  const transformedHeight = Math.max(1, node.height() * node.scaleY());
-  const box = componentSideResizeBox(
-    sourceBox,
-    { width: transformedWidth, height: transformedHeight },
-    anchor,
-    STAGE_BOX,
-  );
-
-  // Stop Konva from stretching the rendered group while React rebuilds its
-  // contents at the latest dimensions on the next animation frame.
-  syncComponentNodeBox(node, box);
-  return { anchor, box, rotation: node.rotation() };
-}
-
-function componentFromSideTransformPreview({
-  source,
-  sourceBox,
-  target,
-}: ComponentSideTransformPreview) {
-  return resizeComponentFromSideTransform(
-    source,
-    sourceBox,
-    { width: target.box.width, height: target.box.height },
-    target.anchor,
-    STAGE_BOX,
-    target.rotation,
-  ).component;
-}
 
 function setStageCursor(
   event: Konva.KonvaEventObject<MouseEvent>,

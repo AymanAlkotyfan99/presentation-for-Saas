@@ -1,5 +1,6 @@
 {
-  "name": "presenton",
+  "name": "bayanly-web",
+  "description": "Bayanly AI web application",
   "version": "0.1.0",
   "private": true,
   "type": "module",

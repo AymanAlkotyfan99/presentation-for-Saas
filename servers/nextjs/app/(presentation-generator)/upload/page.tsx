@@ -3,13 +3,15 @@ import React from "react";
 import UploadPage from "./components/UploadPage";
 import Header from "@/app/(presentation-generator)/(dashboard)/dashboard/components/Header";
 import { Metadata } from "next";
+import { DISPLAY_PRODUCT, PRODUCT_DESCRIPTION, publicSiteUrl } from "@/lib/product-metadata";
+
+const createUrl = new URL("/create", publicSiteUrl());
 
 export const metadata: Metadata = {
-  title: "Presenton | Open Source AI presentation generator",
-  description:
-    "Open-source AI presentation generator with custom layouts, multi-model support (OpenAI, Gemini, Ollama), and PDF/PPTX export. A free Gamma alternative.",
+  title: `${DISPLAY_PRODUCT.name} | AI presentation generator`,
+  description: PRODUCT_DESCRIPTION,
   alternates: {
-    canonical: "https://presenton.ai/create",
+    canonical: createUrl,
   },
   keywords: [
     "presentation generator",
@@ -24,20 +26,16 @@ export const metadata: Metadata = {
     "business presentations",
   ],
   openGraph: {
-    title: "Create Data Presentation | PresentOn",
-    description:
-      "Open-source AI presentation generator with custom layouts, multi-model support (OpenAI, Gemini, Ollama), and PDF/PPTX export. A free Gamma alternative.",
+    title: `Create a presentation | ${DISPLAY_PRODUCT.shortName}`,
+    description: PRODUCT_DESCRIPTION,
     type: "website",
-    url: "https://presenton.ai/create",
-    siteName: "PresentOn",
+    url: createUrl,
+    siteName: DISPLAY_PRODUCT.name,
   },
   twitter: {
     card: "summary_large_image",
-    title: "Create Data Presentation | PresentOn",
-    description:
-      "Open-source AI presentation generator with custom layouts, multi-model support (OpenAI, Gemini, Ollama), and PDF/PPTX export. A free Gamma alternative.",
-    site: "@presenton_ai",
-    creator: "@presenton_ai",
+    title: `Create a presentation | ${DISPLAY_PRODUCT.shortName}`,
+    description: PRODUCT_DESCRIPTION,
   },
 };
 
