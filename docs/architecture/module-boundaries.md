@@ -61,12 +61,28 @@ configuration. A new route fails CI until it has an owner.
 
 `PresentationRender` is the active presentation facade. It can dispatch to
 the legacy `V1ContentRender` for persisted V1 decks and to the Template V2
-Konva/HTML render path for V2 decks. `TemplateV2KonvaSlide` and
-`components/slide-editor/surface/nodes.tsx` are active editor/render surfaces.
+Konva/HTML render path for V2 decks. Sprint 5 adds `components/editor` as the
+canonical command/view-model owner and `renderers/shared`, `renderers/konva`,
+and `renderers/browser` as renderer-owned adapters. Renderers may import the
+generated presentation contract and shared adapters; they must not import API
+routes, provider integrations, Redux document snapshots, or executable layout
+compilers. The canonical editor may import renderers, but renderers do not own
+or persist editor state.
+
+The former `TemplateV2KonvaSlide` and `surface/nodes.tsx` implementations live
+under `components/slide-editor/renderers/legacy`; the original paths are
+compatibility facades for existing callers. Canonical cohorts enter through
+the renderer/editor feature-flag boundaries. The browser preview has a direct
+canonical input branch and retains escaped Template V2 conversion as fallback.
 `V1ContentRender` remains reachable from presentation rendering and dashboard
 thumbnails; it is deprecated, not dead. `V1SelectEdit` has no active importer
 and is retained only as a time-boxed deletion candidate pending telemetry and
 manual UI verification.
+
+Asset bytes/URLs remain owned by `asset-storage`. Canonical renderers receive
+only an authorized, scoped URL resolution keyed by `assetId`; URLs and local
+paths never cross back into the document. Sprint 5 adds no route or persistence
+system.
 
 Persisted `PresentationVersion.V1_STANDARD` reads and writes default on for
 compatibility. Operators can separately set `LEGACY_V1_READS_ENABLED=false`

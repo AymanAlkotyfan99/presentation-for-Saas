@@ -1,6 +1,8 @@
 import { createSlice, original, PayloadAction } from '@reduxjs/toolkit';
 import { Slide } from '@/app/(presentation-generator)/types/slide';
 
+// Deprecated for canonical documents; retained only for legacy editor fallback.
+
 interface HistoryState {
   slides: Slide[];
   timestamp: number;

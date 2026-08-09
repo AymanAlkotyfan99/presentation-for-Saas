@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { ProcessedSlide } from "../types";
 
+// Deprecated legacy custom-layout source history. Canonical editing uses commands/history.
+
 interface SlideHistoryState {
     react: string;
     timestamp: number;

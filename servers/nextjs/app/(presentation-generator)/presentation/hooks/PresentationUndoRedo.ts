@@ -5,6 +5,7 @@ import { redo, undo } from "@/store/slices/undoRedoSlice";
 import { useKeyboardShortcut } from "../../hooks/use-keyboard-shortcut";
 import { setPresentationData } from "@/store/slices/presentationGeneration";
 
+/** @deprecated Legacy non-canonical snapshot history. Do not use for canonical documents. */
 export const usePresentationUndoRedo = () => {
   const dispatch = useDispatch();
   const undoRedoState = useSelector((state: RootState) => state.undoRedo);

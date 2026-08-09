@@ -9,6 +9,9 @@ import {
   TEMPLATE_V2_HTML_WIDTH,
   templateV2UiToHtmlFragment,
 } from "@/lib/template-v2-json-to-html";
+import type { PresentationDocument } from "@/generated/presentation-document";
+import { CanonicalBrowserSlide } from "@/renderers/browser";
+import { rendererFeatureFlags } from "@/renderers/shared/feature-flags";
 
 type PresentonDataLabelOptions = {
   enabled?: boolean;
@@ -701,12 +704,18 @@ export function TemplateV2HtmlSlidePreview({
   fixedSize = false,
   className = "",
   contentClassName = "",
+  canonicalDocument,
+  canonicalSlideId,
+  canonicalAssetUrls,
 }: {
   slide: unknown;
   fonts?: unknown;
   fixedSize?: boolean;
   className?: string;
   contentClassName?: string;
+  canonicalDocument?: PresentationDocument;
+  canonicalSlideId?: string;
+  canonicalAssetUrls?: Readonly<Record<string, string | undefined>>;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -826,6 +835,31 @@ export function TemplateV2HtmlSlidePreview({
       ? Math.min((containerWidth / TEMPLATE_V2_HTML_WIDTH) * 0.98, 1)
       : 0;
   const previewHeight = TEMPLATE_V2_HTML_HEIGHT * (scale || 1);
+
+  if (canonicalDocument && canonicalSlideId && rendererFeatureFlags().canonicalBrowserRenderer) {
+    return (
+      <div
+        ref={containerRef}
+        className={`relative w-full overflow-hidden bg-white ${className}`}
+        style={fixedSize
+          ? { width: TEMPLATE_V2_HTML_WIDTH, height: TEMPLATE_V2_HTML_HEIGHT }
+          : { height: scale ? previewHeight : undefined, aspectRatio: scale ? undefined : "16 / 9" }}
+      >
+        <div
+          className={fixedSize ? "absolute left-0 top-0" : "absolute left-1/2 top-0"}
+          style={{
+            width: TEMPLATE_V2_HTML_WIDTH,
+            height: TEMPLATE_V2_HTML_HEIGHT,
+            transform: fixedSize ? undefined : `translateX(-50%) scale(${scale || 1})`,
+            transformOrigin: fixedSize ? undefined : "top center",
+            opacity: scale ? 1 : 0,
+          }}
+        >
+          <CanonicalBrowserSlide document={canonicalDocument} slideId={canonicalSlideId} assetUrls={canonicalAssetUrls} className={contentClassName} />
+        </div>
+      </div>
+    );
+  }
 
   if (!html) {
     return (

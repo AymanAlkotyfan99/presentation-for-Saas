@@ -1,5 +1,12 @@
 # Template V2 Slide Rendering and Editor Documentation
 
+> Compatibility scope (Sprint 5): this document describes the legacy Template
+> V2 editor. Canonical document editing is owned by `components/editor` and
+> canonical rendering by `renderers/{shared,konva,browser}`. The two files under
+> `surface/` named below are now small compatibility facades; their retained
+> implementations live in `renderers/legacy/`. Do not add canonical behavior to
+> the legacy model or history described here.
+
 This document explains the Template V2 slide editor for a developer who is new
 to the project. It covers what features exist, which files own each feature,
 how rendering works, how editing works, and where to make changes safely.
@@ -63,7 +70,8 @@ The editor generally works like this:
 
 | Folder | Purpose |
 | --- | --- |
-| `surface/` | Main editable canvas, Konva nodes, font loading, image loading/export assets. |
+| `surface/` | Legacy import facades plus shared font/image/geometry helpers. |
+| `renderers/legacy/` | Retained Template V2 god stage/nodes for feature-flag fallback only. |
 | `model/` | Geometry, selection, raw UI updates, conversions between raw Template V2 elements and typed toolbar elements. |
 | `types.ts` | Plain TypeScript contract for Template V2 editor data. |
 | `importing/` | Template V2 import/adaptation code. |
@@ -1041,11 +1049,11 @@ SVG icon recoloring uses `buildSvgUpdateUrl()` from `lib/svg-color.ts`.
 
 | Feature | File | Functions/components |
 | --- | --- | --- |
-| Main editor surface | `surface/TemplateV2KonvaSlide.tsx` | `TemplateV2KonvaSlideComponent` |
-| Konva component renderer | `surface/nodes.tsx` | `RawComponentNode` |
-| Konva element renderer | `surface/nodes.tsx` | `RawElementNode`, `RawElementVisual` |
-| Text rendering | `surface/nodes.tsx`, `text/template-v2-text.ts` | `RawRichTextElement`, `layoutRichText`, `rawRenderTextRuns` |
-| Image rendering | `surface/nodes.tsx` | `RawImageElement`, `useLoadedKonvaImage`, `imageCornerRadii` |
+| Main editor surface | `renderers/legacy/TemplateV2KonvaSlide.tsx` (facade at old path) | `TemplateV2KonvaSlideComponent` |
+| Konva component renderer | `renderers/legacy/nodes.tsx` (facade at old path) | `RawComponentNode` |
+| Konva element renderer | `renderers/legacy/nodes.tsx` | `RawElementNode`, `RawElementVisual` |
+| Text rendering | `renderers/legacy/nodes.tsx`, `text/template-v2-text.ts` | `RawRichTextElement`, `layoutRichText`, `rawRenderTextRuns` |
+| Image rendering | `renderers/legacy/nodes.tsx` | `RawImageElement`, `useLoadedKonvaImage`, `imageCornerRadii` |
 | Table rendering | `tables/TemplateV2TableElement.tsx` | `TemplateV2TableElement`, `TableCellText` |
 | Chart rendering | `charts/TemplateV2ChartJsElement.tsx` | `TemplateV2ChartJsElement`, Chart.js canvas renderer |
 | Flex/grid layout | `layout/flowLayout.ts` | `layoutFlowChildren`, `layoutFlexChildren`, `layoutGridChildren` |
@@ -1056,8 +1064,8 @@ SVG icon recoloring uses `buildSvgUpdateUrl()` from `lib/svg-color.ts`.
 
 | Feature | File | Functions/components |
 | --- | --- | --- |
-| Commit state/history | `surface/TemplateV2KonvaSlide.tsx` | `commitUi`, `undo`, `redo` |
-| Selection | `surface/TemplateV2KonvaSlide.tsx`, `model/model.ts` | `select`, `keyForSelection`, `selectionWithComponentToggle` |
+| Commit state/history | `renderers/legacy/TemplateV2KonvaSlide.tsx` | `commitUi`, `undo`, `redo` |
+| Selection | `renderers/legacy/TemplateV2KonvaSlide.tsx`, `model/model.ts` | `select`, `keyForSelection`, `selectionWithComponentToggle` |
 | Resize handles | `selection/SelectionTransformers.tsx` | `TemplateV2SelectionTransformers` |
 | Floating selection toolbar | `selection/SelectionToolbar.tsx` | `TemplateV2SelectionToolbar` |
 | Toolbar routing | `toolbar/ElementToolbar.tsx` | `ElementToolbar`, `TOOLBAR_RENDERERS` |

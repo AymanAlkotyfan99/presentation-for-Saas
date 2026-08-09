@@ -1,7 +1,7 @@
 # Canonical presentation document architecture
 
-Status: Sprint 4 additive internal rollout. The legacy record and renderer
-remain the served authority by default.
+Status: Sprint 5 canonical editor/renderer integration under controlled flags.
+The legacy record and renderer remain the served authority by default.
 
 ## Boundary and ownership
 
@@ -72,7 +72,16 @@ the comparison status to an explicitly enabled cohort. Metrics contain only fini
 names, schema/legacy versions, status/error codes, size/count buckets, and
 element categories—never titles, text, notes, prompts, URLs, or paths.
 
-Sprint 5 should consume the adapter contract while replacing editor/renderer
-internals. Sprint 6 extends revision semantics. Sprint 9 replaces private path
+Sprint 5 consumes this contract through a transient view model, deterministic
+typed commands, and exhaustive Konva/browser registries. The schema remains
+`1.0.0`: its existing optional `locked` and `hidden` fields already express
+stable authoring semantics, so no renderer-specific schema field or migration
+was added. Selection, viewport, guides, URLs, renderer caches, and undo stacks
+remain outside the document. Canonical renderer and unified-command flags
+default off; legacy renderer fallback defaults on.
+
+Sprint 6 can persist the original command/batch contract against this existing
+revision sequence; transient restore snapshots are not a persistence format.
+Sprint 9 replaces private path
 mappings with object-storage identities. Sprint 16 validates export capability
-hints; Sprint 4 does not enable or promise the current exporter.
+hints; Sprint 5 does not enable or promise the current exporter.

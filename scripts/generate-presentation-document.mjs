@@ -380,7 +380,12 @@ const typesOutput = generateTypes();
 async function emit(target, content) {
   if (check) {
     const current = await readFile(target, "utf8").catch(() => "");
-    if (current !== content) throw new Error(`${path.relative(root, target)} is stale; run npm run canonical:generate`);
+    // Git may check text files out with CRLF on Windows. Generated semantics
+    // remain byte-deterministic at write time; check mode compares normalized
+    // text so core.autocrlf does not make a current binding look stale.
+    const normalizedCurrent = current.replace(/\r\n?/g, "\n");
+    const normalizedContent = content.replace(/\r\n?/g, "\n");
+    if (normalizedCurrent !== normalizedContent) throw new Error(`${path.relative(root, target)} is stale; run npm run canonical:generate`);
     return;
   }
   await writeFile(target, content, "utf8");

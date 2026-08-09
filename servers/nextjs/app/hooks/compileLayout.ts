@@ -8,6 +8,8 @@ import * as d3 from "d3";
 import * as LucideReact from "lucide-react";
 import { resolveBackendAssetUrl } from "@/utils/api";
 import { isUnsafeCustomLayoutClientEnabled } from "@/lib/unsafe-custom-layouts";
+
+// Deprecated compatibility compiler. Canonical documents/renderers must never call this module.
 // import * as d3Cloud from "d3-cloud";
 
 /** Names already bound from Recharts (and core helpers) — do not shadow with Lucide. */
