@@ -3,6 +3,8 @@
 import React, { ChangeEvent, useEffect, useMemo, useState } from 'react'
 import { File, Paperclip, Plus, X } from 'lucide-react'
 import { notify } from '@/components/ui/sonner'
+import { useI18n } from '@/i18n/catalog'
+import { formatFileSize } from '@/lib/locale-format'
 
 interface SupportingDocProps {
     files: File[]
@@ -65,6 +67,7 @@ const SupportingDoc = ({
     accept = ACCEPT_DEFAULT,
     multiple = true,
 }: SupportingDocProps) => {
+    const { locale, t } = useI18n()
     const [isDragging, setIsDragging] = useState(false)
     const [previewUrls, setPreviewUrls] = useState<(string | null)[]>([])
 
@@ -88,7 +91,7 @@ const SupportingDoc = ({
     const handleValidate = (filesToReview: File[]) => {
         const disallowed = filesToReview.filter((file) => !isAllowedFile(file))
         if (disallowed.length > 0) {
-            notify.error('Some files are not supported', 'Supported: Word, PowerPoint, spreadsheets, PDF/TXT, and image files.')
+            notify.error(t('generation.unsupportedFilesTitle'), t('generation.supportedFiles'))
         }
     }
 
@@ -97,7 +100,7 @@ const SupportingDoc = ({
             return candidateFiles
         }
 
-        notify.warning('Maximum file limit reached', `You can upload up to ${MAX_SUPPORTED_FILES} documents only.`)
+        notify.warning(t('generation.fileLimitTitle'), t('generation.fileLimitDescription', { count: MAX_SUPPORTED_FILES }))
 
         return candidateFiles.slice(0, MAX_SUPPORTED_FILES)
     }
@@ -112,7 +115,7 @@ const SupportingDoc = ({
         onFilesChange(allowedFiles)
         handleValidate(nextFiles)
         if (allowedFiles.length > files.length) {
-            notify.success('Files selected', `${allowedFiles.length - files.length} file(s) have been added.`)
+            notify.success(t('generation.filesSelected'), t('generation.filesAdded', { count: allowedFiles.length - files.length }))
         }
         e.currentTarget.value = ''
     }
@@ -130,7 +133,7 @@ const SupportingDoc = ({
         onFilesChange(allowedFiles)
         handleValidate(nextFiles)
         if (allowedFiles.length > files.length) {
-            notify.success('Files selected', `${allowedFiles.length - files.length} file(s) have been added.`)
+            notify.success(t('generation.filesSelected'), t('generation.filesAdded', { count: allowedFiles.length - files.length }))
         }
     }
 
@@ -158,7 +161,7 @@ const SupportingDoc = ({
         <div className="space-y-2 min-[1800px]:space-y-3" data-testid="attachments-uploader">
             <div className="flex items-center justify-between">
                 <p className="font-syne text-sm text-gray-600 min-[1800px]:text-base min-[2200px]:text-lg">
-                    {hasFiles ? `${filteredFiles.length} attachment${filteredFiles.length > 1 ? 's' : ''}` : ''}
+                    {hasFiles ? t('generation.attachments', { count: filteredFiles.length }) : ''}
                 </p>
                 {hasFiles && <button
                     type="button"
@@ -168,7 +171,7 @@ const SupportingDoc = ({
                     data-testid="attachments-clear-button"
                     aria-disabled={!hasFiles}
                 >
-                    Clear all
+                    {t('generation.clearAll')}
                 </button>}
             </div>
 
@@ -192,13 +195,13 @@ const SupportingDoc = ({
                             <Plus className='h-3 w-3 min-[1800px]:h-4 min-[1800px]:w-4 min-[2200px]:h-5 min-[2200px]:w-5' />
                         </div>
                     </div>
-                    <p className='text-sm font-normal text-[#808080] min-[1800px]:text-base min-[2200px]:text-lg'>(Office docs, spreadsheets, images, PDF/TXT)</p>
+                    <p className='text-sm font-normal text-[#808080] min-[1800px]:text-base min-[2200px]:text-lg'>({t('generation.supportedFileSummary')})</p>
                 </div>
             </label>
 
             {hasFiles && (
                 <div className="mt-2">
-                    <ul data-testid="file-list" className="grid grid-cols-1 gap-2 sm:grid-cols-2 min-[1800px]:gap-3" aria-label="Attached files">
+                    <ul data-testid="file-list" className="grid grid-cols-1 gap-2 sm:grid-cols-2 min-[1800px]:gap-3" aria-label={t('generation.attachedFiles')}>
                         {filteredFiles.map((file, idx) => (
                             <li
                                 key={`${file.name}-${idx}`}
@@ -206,7 +209,7 @@ const SupportingDoc = ({
                                 data-testid="attached-file-item"
                             >
                                 {previewUrls[idx] ? (
-                                    <img src={previewUrls[idx] as string} alt="Preview" className="h-10 w-10 flex-none rounded object-cover min-[1800px]:h-12 min-[1800px]:w-12 min-[2200px]:h-14 min-[2200px]:w-14" />
+                                    <img src={previewUrls[idx] as string} alt={t('generation.filePreview')} className="h-10 w-10 flex-none rounded object-cover min-[1800px]:h-12 min-[1800px]:w-12 min-[2200px]:h-14 min-[2200px]:w-14" />
                                 ) : (
                                     <div className="flex h-10 w-10 flex-none items-center justify-center rounded bg-gray-100 text-gray-600 min-[1800px]:h-12 min-[1800px]:w-12 min-[2200px]:h-14 min-[2200px]:w-14">
                                         <File className="h-5 w-5 min-[1800px]:h-6 min-[1800px]:w-6" />
@@ -214,17 +217,17 @@ const SupportingDoc = ({
                                 )}
 
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate font-syne text-sm font-medium text-gray-900 min-[1800px]:text-base min-[2200px]:text-lg" title={file.name}>
+                                    <p className="truncate font-syne text-sm font-medium text-gray-900 min-[1800px]:text-base min-[2200px]:text-lg" title={file.name} dir="auto">
                                         {file.name}
                                     </p>
-                                    <p className="font-syne text-xs text-gray-500 min-[1800px]:text-sm min-[2200px]:text-base">{formatFileSize(file.size)}</p>
+                                    <p className="font-syne text-xs text-gray-500 min-[1800px]:text-sm min-[2200px]:text-base">{formatFileSize(file.size, locale)}</p>
                                 </div>
 
                                 <button
                                     type="button"
                                     onClick={() => handleRemoveFileAt(idx)}
-                                    className="ml-2 inline-flex h-8 w-8 items-center justify-center rounded text-red-600 hover:bg-red-50 hover:text-red-700 min-[1800px]:h-10 min-[1800px]:w-10"
-                                    aria-label={`Remove ${file.name}`}
+                                    className="ms-2 inline-flex h-8 w-8 items-center justify-center rounded text-red-600 hover:bg-red-50 hover:text-red-700 min-[1800px]:h-10 min-[1800px]:w-10"
+                                    aria-label={t('generation.removeNamedFile', { name: file.name })}
                                     data-testid="remove-file-button"
                                 >
                                     <X className="h-5 w-5 min-[1800px]:h-6 min-[1800px]:w-6" />
@@ -234,18 +237,13 @@ const SupportingDoc = ({
                     </ul>
                     {filteredFiles.length !== files.length && (
                         <p className="mt-2 font-syne text-xs text-amber-600 min-[1800px]:text-sm">
-                            Some files were skipped. Supported: Word, PowerPoint, spreadsheets, PDF/TXT, and image files.
+                            {t('generation.someFilesSkipped', { supported: t('generation.supportedFiles') })}
                         </p>
                     )}
                 </div>
             )}
         </div>
     )
-}
-
-const formatFileSize = (bytes: number): string => {
-    if (!bytes || bytes <= 0) return '0 KB'
-    return `${(bytes / 1024).toFixed(1)} KB`
 }
 
 function isAllowedFile(file: File): boolean {

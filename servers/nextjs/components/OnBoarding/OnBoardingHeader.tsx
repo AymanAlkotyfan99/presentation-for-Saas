@@ -1,7 +1,8 @@
+"use client";
+
 import React from 'react'
 import { MixpanelEvent, trackEvent } from '@/utils/mixpanel'
-
-const STEPS = ["Text Provider", "Image Provider", "Web Search", "Finish Setup"];
+import { useTranslations } from '@/i18n/catalog'
 
 const OnBoardingHeader = ({
     currentStep,
@@ -14,6 +15,13 @@ const OnBoardingHeader = ({
     setStep: (step: number) => void,
     setProviderStep: (step: number) => void,
 }) => {
+    const t = useTranslations();
+    const steps = [
+        t("onboarding.textProviderStep"),
+        t("onboarding.imageProviderStep"),
+        t("onboarding.webSearchStep"),
+        t("onboarding.finish"),
+    ];
     const activeStep = currentStep === 3 ? 4 : providerStep;
 
     const goToStep = (target: number) => {
@@ -30,7 +38,7 @@ const OnBoardingHeader = ({
     return (
         <div className='sticky top-8 z-20 flex items-center font-syne justify-end mt-7 mb-[52px]'>
             <div className='flex items-center gap-1'>
-                {STEPS.map((label, index) => {
+                {steps.map((label, index) => {
                     const number = index + 1;
                     return (
                         <React.Fragment key={label}>

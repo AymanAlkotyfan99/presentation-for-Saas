@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "1.0.0",
+  "valid": {
+    "minimal-en.json": {
+      "checksum": "ce9c1c2fb9b08b270d30491d79e25aa19f56e33d5a5c0e65b1b7ffe310f312b6"
+    },
+    "minimal-ar.json": {
+      "checksum": "9bb5f66735fe29df3c318082ce71caa1f91b615e4f37a42ae8bb01bb035a5c5a"
+    },
+    "mixed-direction.json": {
+      "checksum": "4e01697b4f1e8730367ce2bd4245841ec70977dd5928bdc90aca8403700b064c"
+    },
+    "text-heavy.json": {
+      "checksum": "b10485bf180b013332cca92788275173b2a6db29e66514573eb136dd3b4ec90d"
+    },
+    "image-slide.json": {
+      "checksum": "0c782ac09a88b93a20bbb29e20271f5ca8a44c1a3f598bf78512b6d1ec333720"
+    },
+    "table-slide.json": {
+      "checksum": "ba5c71e4e9ff4b1b2c97259b2b5863bad1871ebf38dfac0099988c154a7b66e0"
+    },
+    "chart-slide.json": {
+      "checksum": "4819744a76116aa365d4401d5bfe4fb65b157f5674b24b990d457be2fb1e6d4b"
+    },
+    "group-container-slide.json": {
+      "checksum": "23eff1b5369523fcc82eece325698c7464650005742e761c5884850993088a05"
+    },
+    "speaker-notes.json": {
+      "checksum": "672f9e4fdec1ff3edc5298a53ba6a48181e48a1d928a8fd120494413f539de60"
+    },
+    "legacy-v1-converted.json": {
+      "checksum": "dd7ee878a14c855edb4c0d5de74cffdf2d4e8c140c98ec982b36ef5a667345af"
+    },
+    "legacy-v2-converted.json": {
+      "checksum": "4d15dc67ab89f73be4bcd0c2a1bb6ebb937636873f78be826ec30e2c13e65e65"
+    },
+    "maximum-bounded.json": {
+      "checksum": "237a6d1504643fc0e0742e620f39685646618706666c904e5c62394d78f8b43b"
+    }
+  },
+  "invalid": {
+    "executable-content.json": {
+      "expectedCode": "CANONICAL_EXECUTABLE_CONTENT"
+    },
+    "unsafe-url.json": {
+      "expectedCode": "CANONICAL_SCHEMA_INVALID"
+    },
+    "invalid-asset-reference.json": {
+      "expectedCode": "CANONICAL_ASSET_REFERENCE_INVALID"
+    },
+    "excessive-depth.json": {
+      "expectedCode": "CANONICAL_GROUP_DEPTH_EXCEEDED"
+    }
+  }
+}

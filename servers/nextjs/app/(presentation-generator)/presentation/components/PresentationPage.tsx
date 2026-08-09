@@ -45,6 +45,8 @@ import {
   type TemplateV2ActivateSurfaceDetail,
   type TemplateV2SurfaceSelectedDetail,
 } from "@/components/slide-editor/events/events";
+import { useI18n } from "@/i18n/catalog";
+import { localizePathname } from "@/i18n/routing";
 
 function hasTemplateV2Layouts(layout: unknown): boolean {
   if (!layout || typeof layout !== "object") return false;
@@ -105,7 +107,7 @@ type SlideAddedOptions = {
 
 const DEFAULT_LOADING_STATE: LoadingState = {
   isLoading: true,
-  message: "Loading presentation",
+  message: "presentation.loadingPresentation",
   showProgress: false,
   duration: 0,
   extra_info: "",
@@ -113,10 +115,10 @@ const DEFAULT_LOADING_STATE: LoadingState = {
 
 const STREAM_LOADING_STATE: LoadingState = {
   isLoading: true,
-  message: "Creating your presentation",
+  message: "presentation.creatingPresentation",
   showProgress: true,
   duration: 90,
-  extra_info: "This can take a few minutes depending on slide count.",
+  extra_info: "presentation.creationMayTakeTime",
 };
 
 const IDLE_LOADING_STATE: LoadingState = {
@@ -130,6 +132,7 @@ const IDLE_LOADING_STATE: LoadingState = {
 const PresentationPage: React.FC<PresentationPageProps> = ({
   presentation_id,
 }) => {
+  const { locale, t } = useI18n();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const dispatch = useDispatch();
@@ -623,9 +626,9 @@ const PresentationPage: React.FC<PresentationPageProps> = ({
           role="alert"
         >
           <AlertCircle className="w-16 h-16 mb-4 text-red-500" />
-          <h2 className="text-xl font-semibold mb-2">Something went wrong</h2>
+          <h2 className="mb-2 text-xl font-semibold">{t("presentation.somethingWentWrong")}</h2>
           <p className="text-center mb-4">
-            We couldn't load your presentation. Please try again.
+            {t("presentation.loadFailedRetry")}
           </p>
           <div className="flex gap-2 justify-center items-center">
             <Button
@@ -637,7 +640,7 @@ const PresentationPage: React.FC<PresentationPageProps> = ({
                 window.location.reload();
               }}
             >
-              Refresh Page
+              {t("presentation.refreshPage")}
             </Button>
             <Button
               onClick={() => {
@@ -645,10 +648,10 @@ const PresentationPage: React.FC<PresentationPageProps> = ({
                   from: pathname,
                   to: "/upload",
                 });
-                router.push("/upload");
+                router.push(localizePathname("/upload", locale));
               }}
             >
-              Go to Upload
+              {t("presentation.goToUpload")}
             </Button>
           </div>
         </div>
@@ -660,10 +663,10 @@ const PresentationPage: React.FC<PresentationPageProps> = ({
     <div className="h-screen overflow-hidden font-syne">
       <OverlayLoader
         show={loadingState.isLoading}
-        text={loadingState.message}
+        text={loadingState.message ? t(loadingState.message) : ""}
         showProgress={loadingState.showProgress}
         duration={loadingState.duration}
-        extra_info={loadingState.extra_info}
+        extra_info={loadingState.extra_info ? t(loadingState.extra_info) : ""}
       />
       <div
         style={{

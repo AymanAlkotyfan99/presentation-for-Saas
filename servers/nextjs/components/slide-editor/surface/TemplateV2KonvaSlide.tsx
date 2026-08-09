@@ -15,6 +15,7 @@ import { useDispatch } from "react-redux";
 import { Loader2 } from "lucide-react";
 import { Layer, Rect, Stage } from "react-konva";
 import { notify } from "@/components/ui/sonner";
+import { useTranslations } from "@/i18n/catalog";
 import type { TemplateV2Layout } from "@/components/slide-editor/importing/template-v2-import";
 import {
   templateFontOptionsFromMap,
@@ -280,6 +281,7 @@ function TemplateV2KonvaSlideComponent({
   onHistoryAvailabilityChange,
   onLayoutChange,
 }: TemplateV2KonvaSlideProps) {
+  const t = useTranslations();
   const dispatch = useDispatch();
   const surfaceId = useId();
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -2133,7 +2135,9 @@ function TemplateV2KonvaSlideComponent({
     return (
       <div className="flex h-full aspect-video flex-col items-center justify-center rounded-lg bg-gray-100">
         <Loader2 className="mb-2 h-4 w-4 animate-spin" />
-        <p className="text-center text-sm text-gray-600">Loading slide layout...</p>
+        <p className="text-center text-sm text-gray-600">
+          {t("editor.loadingSlideLayout")}
+        </p>
       </div>
     );
   }

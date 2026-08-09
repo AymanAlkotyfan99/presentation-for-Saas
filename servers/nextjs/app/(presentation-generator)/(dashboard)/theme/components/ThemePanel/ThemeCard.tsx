@@ -3,6 +3,7 @@ import React, { useState } from 'react'
 import { AlertTriangle, Check, Copy, Trash } from 'lucide-react'
 import { Theme } from '@/app/(presentation-generator)/services/api/types'
 import ToolTip from '@/components/ToolTip'
+import { useTranslations } from '@/i18n/catalog'
 
 interface ThemeCardProps {
   theme: Theme
@@ -12,6 +13,7 @@ interface ThemeCardProps {
 }
 
 export const ThemeCard: React.FC<ThemeCardProps> = ({ theme, onSelect, onDelete, showDeleteButton = true }) => {
+  const t = useTranslations()
   if (!theme.data.colors['graph_0']) { return null }
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -25,7 +27,8 @@ export const ThemeCard: React.FC<ThemeCardProps> = ({ theme, onSelect, onDelete,
 
   >
     {showDeleteButton && <button
-      className="absolute hidden group-hover:block duration-300 transition-all -top-3 -right-3 z-10 bg-white rounded-full p-2  border border-[#EDEEEF] hover:bg-gray-100 hover:text-gray-700"
+      className="absolute -top-3 -end-3 z-10 hidden rounded-full border border-[#EDEEEF] bg-white p-2 transition-all duration-300 hover:bg-gray-100 hover:text-gray-700 group-hover:block"
+      aria-label={t('common.delete')}
       style={{ boxShadow: '0 6.6px 13.2px 0 rgba(0, 0, 0, 0.10)' }}
       onClick={(e) => {
         e.stopPropagation()
@@ -53,9 +56,9 @@ export const ThemeCard: React.FC<ThemeCardProps> = ({ theme, onSelect, onDelete,
             <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-4">
               <AlertTriangle className="h-6 w-6 text-red-500" />
             </div>
-            <h3 className="text-lg font-semibold text-[#191919] mb-2">Delete Theme?</h3>
+            <h3 className="mb-2 text-lg font-semibold text-[#191919]">{t('theme.deleteConfirm')}</h3>
             <p className="text-sm text-gray-500 leading-relaxed">
-              You're about to delete <span className="font-medium text-gray-700">"{theme.name}"</span>. This action cannot be undone.
+              {t('theme.deleteDescription', { name: theme.name })}
             </p>
           </div>
           <div className="flex border-t border-gray-100">
@@ -63,16 +66,16 @@ export const ThemeCard: React.FC<ThemeCardProps> = ({ theme, onSelect, onDelete,
               onClick={() => setShowDeleteDialog(false)}
               className="flex-1 px-4 py-3.5 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               onClick={() => {
                 onDelete(theme.id)
                 setShowDeleteDialog(false)
               }}
-              className="flex-1 px-4 py-3.5 text-sm font-medium text-red-500 hover:bg-red-50 transition-colors border-l border-gray-100"
+              className="flex-1 border-s border-gray-100 px-4 py-3.5 text-sm font-medium text-red-500 transition-colors hover:bg-red-50"
             >
-              Delete
+              {t('common.delete')}
             </button>
           </div>
         </div>
@@ -84,21 +87,21 @@ export const ThemeCard: React.FC<ThemeCardProps> = ({ theme, onSelect, onDelete,
 
       <img src="/card_bg.svg" alt="" className="absolute top-0 z-[1] left-0 w-[99%] h-full object-cover" />
       <div className=" absolute top-0 left-0 flex items-center justify-between gap-2  z-[2] p-2">
-        <ToolTip content='Font' >
+        <ToolTip content={t('theme.font')} >
 
           <p className=" text-xs font-syne  flex gap-1 capitalize  items-center  rounded-[100px]  px-2.5 py-1 bg-[#3A3A3AF5] text-white font-semibold  z-40 ">
 
             {theme.data.fonts.textFont.name}
           </p>
         </ToolTip>
-        {theme.company_name && <ToolTip content='COMPANY'>
+        {theme.company_name && <ToolTip content={t('theme.company')}>
 
           <p className=" text-xs font-syne  flex gap-1 capitalize  items-center  rounded-[100px]  px-2.5 py-1 bg-[#3A3A3AF5] text-white font-semibold  text-ellipsis overflow-hidden whitespace-nowrap z-40 ">
 
             {theme.company_name}
           </p>
         </ToolTip>}
-        {theme.logo_url && <ToolTip content='LOGO'>
+        {theme.logo_url && <ToolTip content={t('theme.logo')}>
 
           <p className=" text-xs font-syne  flex gap-1 capitalize  items-center  rounded-[100px]  px-2.5 py-1 bg-[#3A3A3AF5] text-white font-semibold  z-40 ">
 
@@ -131,7 +134,7 @@ export const ThemeCard: React.FC<ThemeCardProps> = ({ theme, onSelect, onDelete,
                   className="mt-1 text-base font-medium leading-[1.1]  text-left truncate"
                   style={{ color: theme.data.colors['background_text'], fontFamily: `"${theme.data.fonts.textFont.name}", ui-serif, Georgia, serif` }}
                 >
-                  Choose your preferences.
+                  {t('theme.previewDescription')}
                 </div>
                 <div
                   className="mt-2 h-2.5 w-16 rounded-full"
@@ -171,7 +174,7 @@ export const ThemeCard: React.FC<ThemeCardProps> = ({ theme, onSelect, onDelete,
           }
         }}
         className={copied ? "text-green-500" : "text-gray-500 hover:text-gray-700"}
-        title={copied ? "Copied!" : "Copy ID"}
+        title={copied ? t('theme.copied') : t('theme.copyId')}
       >
         {copied ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
       </button>

@@ -14,23 +14,24 @@ import {
   type FloatingToolbarBox,
 } from "@/components/slide-editor/toolbar/FloatingToolbar";
 import { inlineStyles } from "@/components/slide-editor/toolbar/inlineStyles";
+import { useTranslations } from "@/i18n/catalog";
 
 const DEFAULT_CHART_TOOLBAR_SIZE = { width: 2.5, height: 2.5 };
 const CHART_TYPE_OPTIONS: Array<{
-  label: string;
+  labelKey: string;
   value: ChartSlideElement["chart_type"];
 }> = [
-    { value: "bar", label: "Bar Chart" },
-    { value: "horizontal_bar", label: "Horizontal Bar" },
-    { value: "stacked_bar", label: "Stacked Bar" },
-    { value: "horizontal_stacked_bar", label: "Horizontal Stack Bar" },
-    { value: "line", label: "Line Chart" },
-    { value: "area", label: "Area Chart" },
-    { value: "pie", label: "Pie Chart" },
-    { value: "donut", label: "Donut Chart" },
-    { value: "scatter", label: "Scatter Chart" },
-    { value: "radar", label: "Radar Chart" },
-    { value: "polar_area", label: "Polar Area" },
+    { value: "bar", labelKey: "editor.barChart" },
+    { value: "horizontal_bar", labelKey: "editor.horizontalBar" },
+    { value: "stacked_bar", labelKey: "editor.stackedBar" },
+    { value: "horizontal_stacked_bar", labelKey: "editor.horizontalStackedBar" },
+    { value: "line", labelKey: "editor.lineChart" },
+    { value: "area", labelKey: "editor.areaChart" },
+    { value: "pie", labelKey: "editor.pieChart" },
+    { value: "donut", labelKey: "editor.donutChart" },
+    { value: "scatter", labelKey: "editor.scatterChart" },
+    { value: "radar", labelKey: "editor.radarChart" },
+    { value: "polar_area", labelKey: "editor.polarArea" },
   ];
 
 export function ChartToolbarControls({
@@ -46,6 +47,7 @@ export function ChartToolbarControls({
   onEdit?: () => void;
   onPaletteOpenChange?: (open: boolean) => void;
 }) {
+  const t = useTranslations();
   const [uncontrolledPaletteOpen, setUncontrolledPaletteOpen] =
     useState(false);
   const [activeColorIndex, setActiveColorIndex] = useState(0);
@@ -69,14 +71,14 @@ export function ChartToolbarControls({
           display: "inline-flex",
           alignItems: "center",
           gap: 6,
-          paddingRight: 8,
-          borderRight: "1px solid #E6E6EA",
+          paddingInlineEnd: 8,
+          borderInlineEnd: "1px solid #E6E6EA",
         }}
       >
         <BarChart3 size={16} strokeWidth={2} />
         <select
-          aria-label="Chart type"
-          title="Chart type"
+          aria-label={t("editor.chartType")}
+          title={t("editor.chartType")}
           value={element.chart_type}
           onChange={(event) =>
             onChange({
@@ -89,12 +91,12 @@ export function ChartToolbarControls({
             minWidth: 80,
             maxWidth: 100,
             border: "none",
-            paddingLeft: 0,
+            paddingInlineStart: 0,
           }}
         >
           {CHART_TYPE_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
-              {option.label}
+              {t(option.labelKey)}
             </option>
           ))}
         </select>
@@ -103,8 +105,8 @@ export function ChartToolbarControls({
       {onEdit ? (
         <button
           type="button"
-          aria-label="Edit chart data"
-          title="Edit data"
+          aria-label={t("editor.editChartData")}
+          title={t("editor.editChartData")}
           onClick={() => {
             setPaletteOpen(false);
             onEdit();
@@ -119,8 +121,8 @@ export function ChartToolbarControls({
         <button
           type="button"
           aria-expanded={paletteOpen}
-          aria-label="Chart colors"
-          title="Chart colors"
+          aria-label={t("editor.chartColors")}
+          title={t("editor.chartColors")}
           onClick={() => setPaletteOpen(!paletteOpen)}
           style={{
             ...inlineStyles.iconButton,

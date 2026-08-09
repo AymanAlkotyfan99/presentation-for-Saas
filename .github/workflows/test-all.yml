@@ -39,6 +39,9 @@ jobs:
       - name: Enforce architecture boundaries
         run: npm run check:architecture
 
+      - name: Verify localization and canonical generated contracts
+        run: npm run localization:check && npm run canonical:check
+
       - name: Verify generated product metadata and brand consistency
         run: npm run product:metadata:check && npm run brand:scan
 
@@ -169,6 +172,9 @@ jobs:
       - name: Run Node.js tests
         run: npm test
 
+      - name: Verify localization and canonical generated contracts
+        run: npm run check:i18n && npm run check:canonical
+
       - name: Run ESLint
         run: npm run lint
 
@@ -177,6 +183,9 @@ jobs:
           NEXT_PUBLIC_FAST_API: http://localhost:8000
           NEXT_PUBLIC_URL: http://localhost:3000
         run: npm run build
+
+      - name: Run English/Arabic locale routing E2E
+        run: npm run test:locale-e2e
 
       - name: Run Cypress component tests
         run: npm run test:cypress

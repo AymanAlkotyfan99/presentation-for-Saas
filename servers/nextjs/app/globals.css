@@ -402,7 +402,7 @@ thead {
 }
 
 .chat-markdown :where(ul, ol) {
-  padding-left: 1.25rem;
+  padding-inline-start: 1.25rem;
 }
 
 .chat-markdown :where(code) {

@@ -34,6 +34,8 @@ import {
   clampSlideCountValue,
   parseLimitedSlideCount,
 } from "@/utils/presentationLimits";
+import { useI18n } from "@/i18n/catalog";
+import { localizePathname } from "@/i18n/routing";
 
 const STOCK_IMAGE_PROVIDERS = new Set(["pexels", "pixabay"]);
 const FILE_TYPE_WORD = new Set([".doc", ".docx", ".docm", ".odt", ".rtf"]);
@@ -133,6 +135,7 @@ const getDocumentPaths = (files: unknown): string[] => {
 };
 
 const UploadPage = () => {
+  const { locale, t } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
   const dispatch = useDispatch();
@@ -238,11 +241,10 @@ const UploadPage = () => {
         strictApiKey: true,
       });
       return true;
-    } catch (error: any) {
+    } catch {
       notify.error(
-        "Image provider unavailable",
-        error?.message ||
-        `Unable to reach ${selectedProvider} right now. Please check your API key/settings and try again.`
+        t("errors.network"),
+        t("errors.network")
       );
       return false;
     }
@@ -255,19 +257,19 @@ const UploadPage = () => {
   const validateConfiguration = (): boolean => {
     if (!config.language) {
       trackUploadValidationFailure("language_missing");
-      notify.warning("Language required", "Please select a language.");
+      notify.warning(t("validation.invalidLocale"), t("validation.invalidLocale"));
       return false;
     }
 
     if (files.length > 0 && config.language === LanguageType.Auto) {
       trackUploadValidationFailure("language_auto_with_documents");
-      notify.warning("Language required", "Please choose a language before processing uploaded documents.");
+      notify.warning(t("validation.invalidLocale"), t("generation.presentationLanguageHelp"));
       return false;
     }
 
     if (!config.prompt.trim() && files.length === 0) {
       trackUploadValidationFailure("prompt_or_document_missing");
-      notify.warning("Input required", "Provide a prompt or upload at least one document.");
+      notify.warning(t("validation.required"), t("generation.topicPlaceholder"));
       return false;
     }
     return true;
@@ -306,10 +308,10 @@ const UploadPage = () => {
   const handleDocumentProcessing = async () => {
     setLoadingState({
       isLoading: true,
-      message: "Processing documents...",
+      message: t("generation.processingDocuments"),
       showProgress: true,
       duration: 90,
-      extra_info: files.length > 0 ? "It might take a few minutes for large documents." : "",
+      extra_info: files.length > 0 ? t("generation.largeDocumentsTakeTime") : "",
     });
 
     let documents = [];
@@ -336,7 +338,7 @@ const UploadPage = () => {
 
     setLoadingState({
       isLoading: true,
-      message: "Generating presentation outline...",
+      message: t("generation.generatingOutline"),
       showProgress: true,
       duration: 40,
       extra_info: "",
@@ -377,7 +379,7 @@ const UploadPage = () => {
       destination: "/outline",
     });
     trackEvent(MixpanelEvent.Navigation, { from: pathname, to: "/outline" });
-    router.push("/outline");
+    router.push(localizePathname("/outline", locale));
   };
 
   /**
@@ -386,7 +388,7 @@ const UploadPage = () => {
   const handleDirectPresentationGeneration = async () => {
     setLoadingState({
       isLoading: true,
-      message: "Preparing outline generation...",
+      message: t("generation.preparingOutline"),
       showProgress: true,
       duration: 30,
     });
@@ -420,13 +422,13 @@ const UploadPage = () => {
       destination: "/outline",
     });
     trackEvent(MixpanelEvent.Navigation, { from: pathname, to: "/outline" });
-    router.push("/outline");
+    router.push(localizePathname("/outline", locale));
   };
 
   /**
    * Handles errors during presentation generation
    */
-  const handleGenerationError = (error: any) => {
+  const handleGenerationError = (error: unknown) => {
     console.error("Error in upload page", error);
     setLoadingState({
       isLoading: false,
@@ -435,8 +437,8 @@ const UploadPage = () => {
       showProgress: false,
     });
     notify.error(
-      "Generation failed",
-      error.message || "Something went wrong while starting your presentation."
+      t("generation.failed"),
+      t("generation.failed")
     );
   };
 
@@ -469,7 +471,7 @@ const UploadPage = () => {
           </div>
         </div>
         <div className="p-4 min-[1800px]:p-5 min-[2200px]:p-6">
-          <h3 className="mb-2 text-sm font-medium text-[#333333] min-[1800px]:text-base min-[2200px]:text-lg">Attachments (optional)</h3>
+          <h3 className="mb-2 text-sm font-medium text-[#333333] min-[1800px]:text-base min-[2200px]:text-lg">{t("generation.upload")}</h3>
           <SupportingDoc
             files={[...files]}
             onFilesChange={setFiles}
@@ -482,10 +484,10 @@ const UploadPage = () => {
             style={{
               background: "linear-gradient(270deg, #D5CAFC 2.4%, #E3D2EB 27.88%, #F4DCD3 69.23%, #FDE4C2 100%)"
             }}
-            className="ml-auto mr-0 flex w-fit items-center justify-center rounded-[28px] px-4 py-5 font-syne text-xs font-semibold text-[#101323] min-[1800px]:px-5 min-[1800px]:py-5 min-[1800px]:text-sm min-[2200px]:px-6 min-[2200px]:py-6 min-[2200px]:text-base"
+            className="ms-auto me-0 flex w-fit items-center justify-center rounded-[28px] px-4 py-5 font-syne text-xs font-semibold text-[#101323] min-[1800px]:px-5 min-[1800px]:py-5 min-[1800px]:text-sm min-[2200px]:px-6 min-[2200px]:py-6 min-[2200px]:text-base"
           >
-            <span>Get Started</span>
-            <ChevronRight className="!h-5 !w-5 min-[1800px]:!h-6 min-[1800px]:!w-6" />
+            <span>{t("generation.generate")}</span>
+            <ChevronRight className="rtl-flip !h-5 !w-5 min-[1800px]:!h-6 min-[1800px]:!w-6" />
           </Button>
         </div>
       </div>

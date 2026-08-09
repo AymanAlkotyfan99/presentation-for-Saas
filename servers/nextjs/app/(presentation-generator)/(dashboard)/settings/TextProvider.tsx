@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { LLMConfig } from "@/types/llm_config";
-import { getApiErrorMessage, getApiUrl } from "@/utils/api";
+import { getApiUrl } from "@/utils/api";
 import { LLM_PROVIDERS } from "@/utils/providerConstants";
 import { getDefaultOllamaUrl } from "@/utils/providerUtils";
 import {
@@ -37,6 +37,7 @@ import VertexAzureManualFields from "@/components/VertexAzureManualFields";
 import BedrockManualFields from "@/components/BedrockManualFields";
 import { MixpanelEvent, trackEvent } from "@/utils/mixpanel";
 import OllamaConfig from "@/components/OllamaConfig";
+import { useTranslations } from "@/i18n/catalog";
 
 interface OpenAIConfigProps {
   onInputChange: (value: string | boolean, field: string) => void;
@@ -53,6 +54,7 @@ interface ModelOption {
 const MANUAL_MODEL_PROVIDERS = new Set(["vertex", "azure", "bedrock"]);
 
 const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
+  const t = useTranslations();
   const [openProviderSelect, setOpenProviderSelect] = useState(false);
   const [openModelSelect, setOpenModelSelect] = useState(false);
   const [availableModels, setAvailableModels] = useState<ModelOption[]>([]);
@@ -169,30 +171,14 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
       ...availableModels.filter((model) => model.value !== currentModel),
     ];
   }, [availableModels, currentModel]);
-  const providerApiKeyLabel =
-    selectedProvider === "custom"
-      ? "Custom LLM API Key"
-      : selectedProvider === "deepseek"
-      ? "DeepSeek API Key"
-      : selectedProvider === "vertex"
-      ? "Vertex API Key"
-      : selectedProvider === "azure"
-      ? "Azure OpenAI API Key"
-      : selectedProvider === "bedrock"
-      ? "Bedrock API Key (optional)"
-      : selectedProvider === "openrouter"
-      ? "OpenRouter API Key"
-      : selectedProvider === "fireworks"
-      ? "Fireworks API Key"
-      : selectedProvider === "together"
-      ? "Together API Key"
-      : selectedProvider === "cerebras"
-      ? "Cerebras API Key"
-      : selectedProvider === "litellm"
-      ? "LiteLLM API key (optional)"
-      : selectedProvider === "lmstudio"
-      ? "LM Studio API key (optional)"
-      : `${selectedProvider} API Key`;
+  const providerApiKeyLabel = t(
+    selectedProvider === "bedrock" ||
+      selectedProvider === "litellm" ||
+      selectedProvider === "lmstudio"
+      ? "settings.providerApiKeyOptional"
+      : "settings.providerApiKey",
+    { provider: modelLabel }
+  );
 
   useEffect(() => {
     if (currentDeepseekBaseUrl) setDeepseekAdvancedOpen(true);
@@ -382,22 +368,21 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
           onInputChange(nextModel, currentModelField);
         }
       } else {
-        const message = await getApiErrorMessage(
-          response,
-          `The server could not list ${modelLabel} models. Check your API key or endpoint and try again.`
-        );
         console.error("Failed to fetch models");
         setAvailableModels([]);
         setModelsChecked(true);
-        notify.error("Could not load models", message);
+        notify.error(
+          t("settings.loadModelsFailed"),
+          t("settings.loadModelsFailedDescription")
+        );
       }
     } catch (error) {
       console.error("Error fetching models:", error);
       notify.error(
-        selectedProvider === "ollama" ? "Could not connect to Ollama" : "Could not load models",
-        error instanceof Error
-          ? error.message
-          : "Something went wrong while contacting the provider. Check your network and try again."
+        selectedProvider === "ollama"
+          ? t("onboarding.ollamaConnectionFailed")
+          : t("settings.loadModelsFailed"),
+        t("settings.loadModelsFailedDescription")
       );
       setAvailableModels([]);
       setModelsChecked(true);
@@ -456,10 +441,10 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
             </svg>
           </div>
           <h3 className="text-xl font-normal text-[#191919] py-2.5">
-            Text Generation Settings
+            {t("onboarding.textSettings")}
           </h3>
           <p className=" text-sm  text-gray-500">
-            Choosing where text content comes from
+            {t("settings.textSettingsDescription")}
           </p>
         </div>
         <div className="flex min-w-0 flex-1 flex-col items-stretch justify-end gap-4 sm:items-end">
@@ -475,7 +460,7 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
             >
               <div className="flex flex-col justify-start ">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Text Provider
+                  {t("settings.selectTextProvider")}
                 </label>
                 <Popover
                   open={openProviderSelect}
@@ -493,7 +478,7 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
                           {llmConfig.LLM
                             ? LLM_PROVIDERS[llmConfig.LLM]?.label ||
                               llmConfig.LLM
-                            : "Select text provider"}
+                            : t("settings.selectTextProvider")}
                         </span>
                       </div>
                       <ChevronUp className="w-4 h-4 text-gray-500" />
@@ -505,9 +490,9 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
                     style={{ width: "300px" }}
                   >
                     <Command>
-                      <CommandInput placeholder="Search provider..." />
+                      <CommandInput placeholder={t("onboarding.searchProvider")} />
                       <CommandList>
-                        <CommandEmpty>No provider found.</CommandEmpty>
+                        <CommandEmpty>{t("onboarding.noProvider")}</CommandEmpty>
                         <CommandGroup>
                           {Object.values(LLM_PROVIDERS).map(
                             (provider, index) => (
@@ -528,7 +513,7 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
                               >
                                 <Check
                                   className={cn(
-                                    "mr-2 h-4 w-4",
+                                    "me-2 h-4 w-4",
                                     llmConfig.LLM === provider.value
                                       ? "opacity-100"
                                       : "opacity-0"
@@ -542,7 +527,7 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
                                       </span>
                                     </div>
                                     <span className="text-xs text-gray-600 leading-relaxed">
-                                      {provider.description}
+                                      {t("settings.connectProviderDescription")}
                                     </span>
                                   </div>
                                 </div>
@@ -617,14 +602,15 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
                         className="w-full px-2 py-3 outline-none border  border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
                         placeholder={
                           selectedProvider === "litellm"
-                            ? "Optional if your proxy does not require auth"
-                            : `Enter your ${providerApiKeyLabel}`
+                            ? t("settings.optionalProxyAuth")
+                            : t("onboarding.enterField", { field: providerApiKeyLabel })
                         }
                       />
                       <button
                         type="button"
                         onClick={() => setShowApiKey((prev) => !prev)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-white px-2 py-1 cursor-pointer"
+                        className="absolute end-2 top-1/2 -translate-y-1/2 bg-white px-2 py-1 cursor-pointer"
+                        aria-label={showApiKey ? t("accessibility.hidePassword") : t("accessibility.showPassword")}
                       >
                         {showApiKey ? (
                           <Eye className="w-4 h-4 text-gray-500" />
@@ -643,7 +629,7 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
                       onInputChange(e.target.value, "CUSTOM_LLM_URL")
                     }
                     className="w-full mt-2 px-2 py-3 outline-none border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-                    placeholder="OpenAI-compatible URL"
+                    placeholder={t("settings.compatibleUrl")}
                   />
                 )}
                 {selectedProvider === "deepseek" && (
@@ -657,7 +643,7 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
                         type="button"
                         className="flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-gray-200 bg-[#F9F9FA] px-3 py-2.5 text-left text-sm font-medium text-gray-800 transition-colors hover:bg-gray-100"
                       >
-                        <span>Advanced settings</span>
+                        <span>{t("settings.advancedSettings")}</span>
                         <ChevronDown
                           className={cn(
                             "h-4 w-4 shrink-0 text-gray-600 transition-transform duration-200",
@@ -670,7 +656,7 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
                     <CollapsibleContent className="space-y-3 overflow-hidden">
                       <div className="space-y-1.5 border-t border-gray-100 pt-3">
                         <label className="block text-sm font-medium text-gray-700">
-                          DeepSeek base URL (optional)
+                          {t("settings.baseUrlOptional", { provider: "DeepSeek" })}
                         </label>
                         <input
                           type="text"
@@ -688,7 +674,7 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
                 {selectedProvider === "litellm" && (
                   <>
                     <label className="mt-3 block text-sm font-medium text-gray-700 mb-2">
-                      LiteLLM base URL
+                      {t("settings.baseUrl", { provider: "LiteLLM" })}
                     </label>
                     <input
                       type="text"
@@ -700,16 +686,14 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
                       placeholder="e.g. http://host.docker.internal:4000/v1"
                     />
                     <p className="mt-1.5 text-xs text-gray-500">
-                      OpenAI-compatible root (usually ends with /v1); /v1 is
-                      added if omitted. API key above is optional for local
-                      proxies with no auth.
+                      {t("settings.litellmHelp")}
                     </p>
                   </>
                 )}
                 {selectedProvider === "lmstudio" && (
                   <>
                     <label className="mt-3 block text-sm font-medium text-gray-700 mb-2">
-                      LM Studio base URL
+                      {t("settings.baseUrl", { provider: "LM Studio" })}
                     </label>
                     <input
                       type="text"
@@ -721,15 +705,14 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
                       placeholder="http://localhost:1234/v1"
                     />
                     <p className="mt-1.5 text-xs text-gray-500">
-                      Defaults to localhost:1234/v1, and /v1 is added
-                      automatically when omitted.
+                      {t("settings.lmStudioHelp")}
                     </p>
                   </>
                 )}
                 {selectedProvider === "fireworks" && (
                   <>
                     <label className="mt-3 block text-sm font-medium text-gray-700 mb-2">
-                      Fireworks base URL (optional)
+                      {t("settings.baseUrlOptional", { provider: "Fireworks" })}
                     </label>
                     <input
                       type="text"
@@ -745,7 +728,7 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
                 {selectedProvider === "together" && (
                   <>
                     <label className="mt-3 block text-sm font-medium text-gray-700 mb-2">
-                      Together base URL (optional)
+                      {t("settings.baseUrlOptional", { provider: "Together" })}
                     </label>
                     <input
                       type="text"
@@ -803,10 +786,10 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
                     {modelsLoading ? (
                       <span className="flex items-center justify-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Checking for models...
+                        {t("settings.checkingModels")}
                       </span>
                     ) : (
-                      "Check models"
+                      t("settings.checkModels")
                     )}
                   </button>
                 )}
@@ -821,8 +804,8 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   {selectedProvider === "ollama"
-                    ? "Choose an Ollama model"
-                    : `Select ${modelLabel} Model`}
+                    ? t("settings.chooseProviderModel", { provider: "Ollama" })
+                    : t("settings.chooseProviderModel", { provider: modelLabel })}
                 </label>
                 <div className="w-full">
                   <Popover
@@ -838,7 +821,7 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
                       >
                         <span className="text-sm truncate font-medium text-gray-900">
                           {(() => {
-                            if (!currentModel) return "Select a model";
+                            if (!currentModel) return t("onboarding.selectModel");
                             const selectedModel = modelOptions.find(
                               (model) => model.value === currentModel
                             );
@@ -862,14 +845,14 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
                       style={{ width: "var(--radix-popover-trigger-width)" }}
                     >
                       <Command>
-                        <CommandInput placeholder="Search models..." />
+                        <CommandInput placeholder={t("onboarding.searchModels")} />
                         <CommandList>
-                          <CommandEmpty>No model found.</CommandEmpty>
+                          <CommandEmpty>{t("onboarding.noModel")}</CommandEmpty>
                           <CommandGroup>
                             {modelsLoading ? (
                               <div className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-600">
                                 <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
-                                Fetching models...
+                                {t("settings.fetchingModels")}
                               </div>
                             ) : null}
                             {modelOptions.map((model) => (
@@ -892,7 +875,7 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
                               >
                                 <Check
                                   className={cn(
-                                    "mr-2 h-4 w-4",
+                                    "me-2 h-4 w-4",
                                     currentModel === model.value
                                       ? "opacity-100"
                                       : "opacity-0"
@@ -914,13 +897,13 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
                                         <span
                                           title={
                                             model.tested === false
-                                              ? "Experimental"
-                                              : "Recommended"
+                                              ? t("settings.experimental")
+                                              : t("settings.recommended")
                                           }
                                           aria-label={
                                             model.tested === false
-                                              ? "Experimental"
-                                              : "Recommended"
+                                              ? t("settings.experimental")
+                                              : t("settings.recommended")
                                           }
                                           className={cn(
                                             "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
@@ -955,8 +938,7 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
       {selectedProvider !== "ollama" && modelsChecked && availableModels.length === 0 && (
         <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="text-sm text-yellow-800">
-            No models found. Please make sure your provider credentials are
-            valid and the selected provider is reachable.
+            {t("settings.noModelsFound")}
           </p>
         </div>
       )}
@@ -964,7 +946,7 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
       {/* <div className="bg-white flex justify-between items-center p-10 rounded-[12px]">
                 <div className=' max-w-[290px]'>
 
-                    <h4 className="text-xl font-normal text-[#191919]">Advanced</h4>
+                    <h4 className="text-xl font-normal text-[#191919]">{t("settings.advancedSettings")}</h4>
                     <p className="mt-2.5 text-sm  text-gray-500">
                         Configure advanced AI features.
                     </p>

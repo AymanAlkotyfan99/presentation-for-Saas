@@ -1,18 +1,22 @@
 import React from 'react'
+import { useI18n } from '@/i18n/catalog'
+import { formatNumber } from '@/lib/locale-format'
 
 interface StepIndicatorProps {
   currentStep: number
 }
 
 const steps = [
-  { step: 1, label: 'Brand' },
-  { step: 2, label: 'Palette' },
-  { step: 3, label: 'Fonts' },
-  { step: 4, label: 'Logo' },
+  { step: 1, label: 'theme.brand' },
+  { step: 2, label: 'theme.palette' },
+  { step: 3, label: 'theme.fonts' },
+  { step: 4, label: 'theme.logo' },
 ]
 
-export const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep }) => (
-  <div className="flex flex-col items-center gap-7 px-4 min-w-[104px] pt-8 border-r border-[#EDEEEF]">
+export const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep }) => {
+  const { locale, t } = useI18n()
+  return (
+  <div className="flex min-w-[104px] flex-col items-center gap-7 border-e border-[#EDEEEF] px-4 pt-8">
     {steps.map(({ step, label }) => {
       const isActive = currentStep === step
       return (
@@ -23,11 +27,12 @@ export const StepIndicator: React.FC<StepIndicatorProps> = ({ currentStep }) => 
               : 'bg-white text-[#404348] border border-[#EDEEEF]'
               }`}
           >
-            Step-{step}
+            {t('theme.step', { number: formatNumber(step, locale) })}
           </span>
-          <span className="text-[11px] font-normal text-black">{label}</span>
+          <span className="text-[11px] font-normal text-black">{t(label)}</span>
         </div>
       )
     })}
   </div>
-)
+  )
+}

@@ -37,6 +37,8 @@ import {
   OllamaLibraryModel,
   OllamaPullProgressEvent,
 } from "@/utils/providerUtils";
+import { useI18n } from "@/i18n/catalog";
+import { formatFileSize, formatNumber } from "@/lib/locale-format";
 
 interface CombinedModel {
   name: string;
@@ -58,6 +60,7 @@ export default function OllamaConfig({
   ollamaUrl,
   onInputChange,
 }: OllamaConfigProps) {
+  const { locale, t } = useI18n();
   const [combinedModels, setCombinedModels] = useState<CombinedModel[]>([]);
   const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false);
   const [modelsChecked, setModelsChecked] = useState(false);
@@ -139,49 +142,54 @@ export default function OllamaConfig({
       }
 
       notify.success(
-        "Connected to Ollama",
+        t("settings.ollamaConnected"),
         pulled.length > 0
-          ? `Found ${pulled.length} downloaded model${pulled.length === 1 ? "" : "s"}. ${libraryOnly.length} more available in library.`
-          : "Ollama is reachable. Browse the library to download models."
+          ? t("settings.ollamaConnectedDescription", {
+              downloaded: formatNumber(pulled.length, locale),
+              available: formatNumber(libraryOnly.length, locale),
+            })
+          : t("settings.ollamaConnectedNoModels")
       );
 
       if (reachable.usedFallback) {
         notify.success(
-          "Using in-container Ollama",
+          t("settings.ollamaUsingContainer"),
           requestedUrl
-            ? `host.docker.internal did not respond, so ${DISPLAY_PRODUCT.shortName} switched the Ollama URL to localhost.`
-            : "host.docker.internal did not respond, so this check used localhost."
+            ? t("settings.ollamaUsingContainerDescription", {
+                productShortName: DISPLAY_PRODUCT.shortName,
+              })
+            : t("settings.ollamaUsingContainerCheck")
         );
       }
       if (!reachable.usedFallback && requestedUrl && reachable.resolvedUrl !== requestedUrl) {
         notify.success(
-          "Updated Ollama URL",
-          `Using ${reachable.resolvedUrl} for Ollama checks.`
+          t("settings.ollamaUrlUpdated"),
+          t("settings.ollamaUrlUpdatedDescription", { url: reachable.resolvedUrl })
         );
       }
-    } catch (error) {
+    } catch {
       setCombinedModels([]);
       setModelsChecked(true);
       setResolvedOllamaUrl(null);
       onInputChange("", "ollama_model");
       setModelsCheckError(
-        error instanceof Error ? error.message : "Check the Ollama URL and try again."
+        t("settings.ollamaConnectionFailedDescription")
       );
       notify.error(
-        "Could not connect to Ollama",
-        error instanceof Error ? error.message : "Check the Ollama URL and try again."
+        t("settings.ollamaConnectionFailed"),
+        t("settings.ollamaConnectionFailedDescription")
       );
     } finally {
       setOllamaModelsLoading(false);
     }
-  }, [ollamaUrl, ollamaModel, onInputChange]);
+  }, [locale, ollamaUrl, ollamaModel, onInputChange, t]);
 
   const handlePullModel = useCallback(
     (modelName: string) => {
       const requestId = pullRequestIdRef.current + 1;
       pullRequestIdRef.current = requestId;
       setPullingModel(modelName);
-      setPullStatus("Starting pull...");
+      setPullStatus(t("settings.ollamaStartingDownload"));
       setPullProgress(null);
       setPullCompleted(null);
       setPullTotal(null);
@@ -206,16 +214,16 @@ export default function OllamaConfig({
 
           switch (event.type) {
             case "status":
-              setPullStatus(event.status || "Processing...");
+              setPullStatus(t("settings.ollamaPreparingDownload"));
               break;
             case "progress":
-              setPullStatus(event.status || "Downloading...");
+              setPullStatus(t("settings.ollamaDownloading"));
               setPullProgress(event.progress ?? null);
               setPullCompleted(event.completed ?? null);
               setPullTotal(event.total ?? null);
               break;
             case "complete":
-              setPullStatus("Model downloaded successfully!");
+              setPullStatus(t("settings.ollamaDownloadComplete"));
               setPullProgress(100);
               setPullDone(true);
               setPullCancelled(false);
@@ -226,14 +234,20 @@ export default function OllamaConfig({
                 )
               );
               onInputChange(modelName, "ollama_model");
-              notify.success("Model downloaded", `${modelName} is ready to use.`);
+              notify.success(
+                t("settings.ollamaModelDownloaded"),
+                t("settings.ollamaModelReady", { model: modelName }),
+              );
               break;
             case "error":
-              setPullError(event.detail || "Pull failed");
+              setPullError(t("settings.ollamaDownloadFailedDescription"));
               setPullDone(true);
               setPullCancelled(false);
               abortControllerRef.current = null;
-              notify.error("Pull failed", event.detail || "Unknown error");
+              notify.error(
+                t("settings.ollamaDownloadFailed"),
+                t("settings.ollamaDownloadFailedDescription"),
+              );
               break;
           }
         },
@@ -243,7 +257,7 @@ export default function OllamaConfig({
           controller.signal.aborted &&
           pullRequestIdRef.current === requestId
         ) {
-          setPullStatus("Pull cancelled");
+          setPullStatus(t("settings.ollamaDownloadCancelled"));
           setPullError(null);
           setPullDone(true);
           setPullCancelled(true);
@@ -251,14 +265,14 @@ export default function OllamaConfig({
         }
       });
     },
-    [activeOllamaUrl, onInputChange]
+    [activeOllamaUrl, onInputChange, t]
   );
 
   const handleCancelPull = useCallback(() => {
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
-    setPullStatus("Cancelling...");
-  }, []);
+    setPullStatus(t("settings.ollamaCancelling"));
+  }, [t]);
 
   const handleClosePullDialog = useCallback(() => {
     if (!pullDone) {
@@ -280,21 +294,11 @@ export default function OllamaConfig({
     [onInputChange, handlePullModel]
   );
 
-  const formatBytes = (bytes: number): string => {
-    if (bytes >= 1024 * 1024 * 1024) {
-      return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
-    }
-    if (bytes >= 1024 * 1024) {
-      return `${(bytes / 1024 / 1024).toFixed(0)} MB`;
-    }
-    return `${(bytes / 1024).toFixed(0)} KB`;
-  };
-
   const pulledModels = combinedModels.filter((m) => m.isPulled);
   const libraryModels = combinedModels.filter((m) => !m.isPulled);
   const selectedModel = combinedModels.find((m) => m.name === ollamaModel);
 
-  const compactSize = (value?: string) => (value || "Unknown").replace(/\s+/g, "");
+  const compactSize = (value?: string) => (value || t("common.unavailable")).replace(/\s+/g, "");
   const normalizeParameters = (value?: string) =>
     (value || "").replace(/\s+/g, "").toUpperCase();
   const hasKnownParameters = (model: CombinedModel) => {
@@ -305,7 +309,7 @@ export default function OllamaConfig({
     normalizeParameters(model.parameters);
   const modelSizeBadge = (model: CombinedModel) => compactSize(model.size);
   const modelSupportTitle = (model: CombinedModel) =>
-    model.tested === false ? "Experimental" : "Recommended";
+    model.tested === false ? t("settings.experimental") : t("settings.recommended");
   const modelSupportBadgeClass = (model: CombinedModel) =>
     model.tested === false
       ? "border-[#FDE2B4] bg-[#FFF7E8] text-[#9A5B00]"
@@ -364,7 +368,7 @@ export default function OllamaConfig({
     <div className="space-y-6">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Ollama URL
+          {t("settings.ollamaUrl")}
         </label>
         <input
           type="text"
@@ -385,10 +389,10 @@ export default function OllamaConfig({
           }}
         />
         <p className="mt-2 text-sm text-gray-500">
-          Required for generation. Use {defaultOllamaUrl}
+          {t("settings.ollamaUrlRequired", { url: defaultOllamaUrl })}
           {!isElectronRuntime
-            ? ", or click Check models to detect localhost when Ollama runs in the same container."
-            : "."}
+            ? ` ${t("settings.ollamaContainerHelp")}`
+            : ""}
         </p>
         <Button
           type="button"
@@ -400,10 +404,10 @@ export default function OllamaConfig({
           {ollamaModelsLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Checking models...
+              {t("settings.checkingModels")}
             </>
           ) : (
-            "Check models"
+            t("settings.checkModels")
           )}
         </Button>
       </div>
@@ -411,7 +415,7 @@ export default function OllamaConfig({
       {modelsChecked && combinedModels.length > 0 && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-3">
-            Choose an Ollama model
+            {t("settings.chooseProviderModel", { provider: "Ollama" })}
           </label>
           <Popover open={openModelSelect} onOpenChange={setOpenModelSelect}>
             <PopoverTrigger asChild>
@@ -419,14 +423,14 @@ export default function OllamaConfig({
                 variant="outline"
                 role="combobox"
                 aria-expanded={openModelSelect}
-                className="h-auto min-h-14 w-full justify-between rounded-xl border-[#E8E8E9] bg-white px-4 py-3 text-left hover:bg-[#FAFAFC]"
+                className="h-auto min-h-14 w-full justify-between rounded-xl border-[#E8E8E9] bg-white px-4 py-3 text-start hover:bg-[#FAFAFC]"
               >
                 <div className="min-w-0">
                   <span
                     className="block truncate text-sm font-medium text-[#191919]"
-                    title={selectedModel ? modelInlineLabel(selectedModel) : "Select a model"}
+                    title={selectedModel ? modelInlineLabel(selectedModel) : t("onboarding.selectModel")}
                   >
-                    {selectedModel ? modelInlineLabel(selectedModel) : "Select a model"}
+                    {selectedModel ? modelInlineLabel(selectedModel) : t("onboarding.selectModel")}
                   </span>
                   {selectedModel && renderModelBadges(selectedModel)}
                 </div>
@@ -439,11 +443,11 @@ export default function OllamaConfig({
               style={{ width: "var(--radix-popover-trigger-width)" }}
             >
               <Command>
-                <CommandInput placeholder="Search model..." />
+                <CommandInput placeholder={t("onboarding.searchModels")} />
                 <CommandList>
-                  <CommandEmpty>No model found.</CommandEmpty>
+                  <CommandEmpty>{t("onboarding.noModel")}</CommandEmpty>
                   {pulledModels.length > 0 && (
-                    <CommandGroup heading="Downloaded">
+                    <CommandGroup heading={t("settings.ollamaDownloaded")}>
                       {pulledModels.map((model) => (
                         <CommandItem
                           key={model.name}
@@ -470,14 +474,14 @@ export default function OllamaConfig({
                           </div>
                           <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-[#CFEBD5] bg-[#ECFDF0] px-2 py-0.5 text-[10px] font-semibold text-[#1C7A34]">
                             <HardDrive className="w-3 h-3" />
-                            Downloaded
+                            {t("settings.ollamaDownloaded")}
                           </span>
                         </CommandItem>
                       ))}
                     </CommandGroup>
                   )}
                   {libraryModels.length > 0 && (
-                    <CommandGroup heading="Available in Library">
+                    <CommandGroup heading={t("settings.ollamaAvailableInLibrary")}>
                       {libraryModels.map((model) => (
                         <CommandItem
                           key={model.name}
@@ -502,7 +506,7 @@ export default function OllamaConfig({
                           </div>
                           <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-[#D8E5FF] bg-[#EEF4FF] px-2 py-0.5 text-[10px] font-semibold text-[#2456C3]">
                             <Download className="h-3 w-3" />
-                            Download
+                            {t("settings.ollamaDownload")}
                           </span>
                         </CommandItem>
                       ))}
@@ -519,7 +523,7 @@ export default function OllamaConfig({
         <p className="text-sm text-gray-500">
           {modelsCheckError
             ? modelsCheckError
-            : "Ollama is reachable, but no models are installed. Pull a model in Ollama, then check again."}
+            : t("settings.ollamaNoModels")}
         </p>
       )}
 
@@ -534,18 +538,18 @@ export default function OllamaConfig({
             <DialogTitle className="flex items-center gap-2">
               <Download className="w-5 h-5" />
               {pullDone && pullCancelled
-                ? "Download Cancelled"
+                ? t("settings.ollamaDownloadCancelled")
                 : pullDone && !pullError
-                ? "Download Complete"
+                ? t("settings.ollamaDownloadComplete")
                 : pullError
-                  ? "Download Failed"
-                  : `Downloading ${pullingModel}`}
+                  ? t("settings.ollamaDownloadFailed")
+                  : t("settings.ollamaDownloadingModel", { model: pullingModel || "" })}
             </DialogTitle>
             <DialogDescription>
               {pullDone && pullCancelled
-                ? `${pullingModel} download was cancelled.`
+                ? t("settings.ollamaModelDownloadCancelled", { model: pullingModel || "" })
                 : pullDone && !pullError
-                ? `${pullingModel} is ready to use.`
+                ? t("settings.ollamaModelReady", { model: pullingModel || "" })
                 : pullError
                   ? pullError
                   : pullStatus}
@@ -558,7 +562,7 @@ export default function OllamaConfig({
                   <span className="truncate mr-2">{pullStatus}</span>
                   {pullProgress !== null && (
                     <span className="shrink-0 font-medium">
-                      {pullProgress.toFixed(1)}%
+                      {formatNumber(pullProgress, locale, { maximumFractionDigits: 1 })}%
                     </span>
                   )}
                 </div>
@@ -570,7 +574,7 @@ export default function OllamaConfig({
                 </div>
                 {pullCompleted !== null && pullTotal !== null && (
                   <p className="text-xs text-gray-500">
-                    {formatBytes(pullCompleted)} / {formatBytes(pullTotal)}
+                    {formatFileSize(pullCompleted, locale)} / {formatFileSize(pullTotal, locale)}
                   </p>
                 )}
               </div>
@@ -583,15 +587,14 @@ export default function OllamaConfig({
             {pullDone && pullCancelled && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <p className="text-sm text-amber-700">
-                  Download was cancelled before completion.
+                  {t("settings.ollamaDownloadCancelledDescription")}
                 </p>
               </div>
             )}
             {pullDone && !pullError && !pullCancelled && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                 <p className="text-sm text-green-700">
-                  {pullingModel} has been downloaded and selected as your active
-                  model.
+                  {t("settings.ollamaModelDownloadedSelected", { model: pullingModel || "" })}
                 </p>
               </div>
             )}
@@ -604,7 +607,7 @@ export default function OllamaConfig({
                   onClick={handleCancelPull}
                 >
                   <X className="mr-1.5 h-3.5 w-3.5" />
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
               ) : (
                 <Button
@@ -613,7 +616,7 @@ export default function OllamaConfig({
                   size="sm"
                   onClick={() => setPullDialogOpen(false)}
                 >
-                  Close
+                  {t("common.close")}
                 </Button>
               )}
             </div>

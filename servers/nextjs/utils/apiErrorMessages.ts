@@ -1,7 +1,49 @@
+import { recordLocalizationSignal } from "@/i18n/observability";
+
 export interface ApiErrorResponse {
   detail?: unknown;
   message?: string;
   error?: unknown;
+  code?: string;
+  params?: Record<string, string | number | boolean>;
+}
+
+const LOCALIZED_ERROR_KEYS: Record<string, string> = {
+  AUTH_REQUIRED: "auth.required",
+  AUTH_INVALID_CREDENTIALS: "auth.unauthorized",
+  AUTHENTICATION_UNAVAILABLE: "auth.unavailable",
+  AUTH_RATE_LIMITED: "auth.rateLimited",
+  PRESENTATION_NOT_FOUND: "errors.presentationNotFound",
+  PRESENTATION_ACCESS_DENIED: "errors.forbidden",
+  CANONICAL_REVISION_CONFLICT: "errors.canonicalConflict",
+  EXPORT_DISABLED: "exports.disabled",
+  UNSAFE_FEATURE_DISABLED: "security.unsafeFeatureDisabled",
+};
+
+export function apiErrorLocalization(
+  errorData: unknown,
+): { key: string; params: Record<string, string | number | boolean> } | null {
+  if (!isRecord(errorData) || typeof errorData.code !== "string") {
+    recordLocalizationSignal("api_localization_fallback", {
+      reason: "missing_code",
+    });
+    return null;
+  }
+  const key = LOCALIZED_ERROR_KEYS[errorData.code];
+  if (!key) {
+    recordLocalizationSignal("api_localization_fallback", {
+      reason: "unknown_code",
+    });
+    return null;
+  }
+  const params = isRecord(errorData.params)
+    ? Object.fromEntries(
+        Object.entries(errorData.params).filter(([, value]) =>
+          ["string", "number", "boolean"].includes(typeof value),
+        ),
+      ) as Record<string, string | number | boolean>
+    : {};
+  return { key, params };
 }
 
 const INVALID_API_KEY_MESSAGE =

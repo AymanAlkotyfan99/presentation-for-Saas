@@ -13,7 +13,7 @@
 
 "use client";
 
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OverlayLoader } from "@/components/ui/overlay-loader";
 import { PresentationGenerationApi } from "../../services/api/presentation-generation";
@@ -29,6 +29,8 @@ import ToolTip from "@/components/ToolTip";
 import Header from "@/app/(presentation-generator)/(dashboard)/dashboard/components/Header";
 import { trackEvent, MixpanelEvent } from "@/utils/mixpanel";
 import { parseLimitedSlideCount } from "@/utils/presentationLimits";
+import { useI18n } from "@/i18n/catalog";
+import { localizePathname } from "@/i18n/routing";
 
 // Types
 interface LoadingState {
@@ -48,6 +50,7 @@ interface FileItem {
 }
 
 const DocumentsPreviewPage: React.FC = () => {
+  const { locale, t } = useI18n();
   // Hooks
   const dispatch = useDispatch();
   const router = useRouter();
@@ -104,7 +107,7 @@ const DocumentsPreviewPage: React.FC = () => {
     return res.json();
   };
 
-  const maintainDocumentTexts = async () => {
+  const maintainDocumentTexts = useCallback(async () => {
     const newDocuments: string[] = [];
     const promises: Promise<{ content: string }>[] = [];
 
@@ -132,16 +135,16 @@ const DocumentsPreviewPage: React.FC = () => {
         });
       } catch (error) {
         console.error("Error reading files:", error);
-        notify.error("Could not read document", "Failed to read document content.");
+        notify.error(t("documents.readFailed"), t("documents.readFailedDescription"));
       }
       setDownloadingDocuments([]);
     }
-  };
+  }, [documentKeys, fileItems, t, textContents]);
 
   const handleCreatePresentation = async () => {
     try {
       setShowLoading({
-        message: "Generating presentation outline...",
+        message: t("documents.generatingOutline"),
         show: true,
         duration: 40,
         progress: true,
@@ -170,12 +173,12 @@ const DocumentsPreviewPage: React.FC = () => {
       dispatch(clearOutlines());
       dispatch(setPresentationId(createResponse.id));
       trackEvent(MixpanelEvent.Navigation, { from: pathname, to: "/outline" });
-      router.replace("/outline");
-    } catch (error: any) {
+      router.replace(localizePathname("/outline", locale));
+    } catch (error: unknown) {
       console.error("Error in radar presentation creation:", error);
-      notify.error("Creation failed", error.message || "Something went wrong while creating the presentation.");
+      notify.error(t("documents.creationFailed"), t("documents.creationFailedDescription"));
       setShowLoading({
-        message: "Error in radar presentation creation.",
+        message: t("documents.creationFailedDescription"),
         show: true,
         duration: 10,
         progress: false,
@@ -196,7 +199,7 @@ const DocumentsPreviewPage: React.FC = () => {
       setSelectedDocument(documentKeys[0]);
       maintainDocumentTexts();
     }
-  }, [documentKeys]);
+  }, [documentKeys, maintainDocumentTexts]);
 
   // Render helpers
   const renderDocumentContent = () => {
@@ -207,10 +210,10 @@ const DocumentsPreviewPage: React.FC = () => {
     if (!isDocument) return null;
 
     return (
-      <div className="h-full mr-4">
+      <div className="h-full me-4">
         <div className="overflow-y-auto custom_scrollbar h-full">
           <div className="h-full w-full max-w-full flex flex-col mb-5">
-            <h1 className="text-2xl font-medium mb-5">Content:</h1>
+            <h1 className="mb-5 text-2xl font-medium">{t("documents.content")}</h1>
             {downloadingDocuments.includes(selectedDocument) ? (
               <Skeleton className="w-full h-full" />
             ) : (
@@ -228,17 +231,18 @@ const DocumentsPreviewPage: React.FC = () => {
     if (!isOpen) return null;
 
     return (
-      <div className={`border-r border-gray-200 fixed xl:relative w-full z-50 xl:z-auto
+      <div className={`fixed z-50 h-[85vh] w-full max-w-[200px] rounded-md border-e border-gray-200 bg-white p-5 transition-all duration-300 ease-in-out md:max-w-[300px] xl:relative xl:z-auto
         transition-all duration-300 bg-white ease-in-out max-w-[200px] md:max-w-[300px] h-[85vh] rounded-md p-5`}>
         <X
           onClick={() => setIsOpen(false)}
-          className="text-black mb-4 ml-auto mr-0 cursor-pointer hover:text-gray-600"
+          className="mb-4 ms-auto me-0 cursor-pointer text-black hover:text-gray-600"
+          aria-label={t("documents.closePanel")}
           size={20}
         />
 
         {documentKeys.length > 0 && (
           <div className="mt-8">
-            <p className="text-xs mt-2 text-[#2E2E2E] opacity-70">DOCUMENTS</p>
+            <p className="mt-2 text-xs text-[#2E2E2E] opacity-70">{t("documents.documents")}</p>
             <div className="flex flex-col gap-2 mt-6">
               {documentKeys.map((key: string) => (
                 <div
@@ -250,7 +254,7 @@ const DocumentsPreviewPage: React.FC = () => {
                   <img
                     className="h-6 w-6 border border-gray-200"
                     src={getIconFromFile(key)}
-                    alt="Document icon"
+                    alt={t("documents.documentIcon")}
                   />
                   <span className="text-sm h-6 text-[#2E2E2E] overflow-hidden">
                     {key.split("/").pop() ?? "file.txt"}
@@ -275,8 +279,8 @@ const DocumentsPreviewPage: React.FC = () => {
       <Header />
       <div className="flex mt-6 gap-4 font-instrument_sans">
         {!isOpen && (
-          <div className="fixed left-4 top-1/2 -translate-y-1/2 z-50">
-            <ToolTip content="Open Panel">
+          <div className="fixed start-4 top-1/2 z-50 -translate-y-1/2">
+            <ToolTip content={t("documents.openPanel")}>
               <Button
                 onClick={() => setIsOpen(true)}
                 className="bg-[#5146E5] text-white p-3 shadow-lg"
@@ -289,17 +293,17 @@ const DocumentsPreviewPage: React.FC = () => {
 
         {renderSidebar()}
 
-        <div className="bg-white w-full mx-2 sm:mx-4 h-[calc(100vh-100px)] custom_scrollbar rounded-md overflow-y-auto py-6 pl-6">
+        <div className="custom_scrollbar mx-2 h-[calc(100vh-100px)] w-full overflow-y-auto rounded-md bg-white py-6 ps-6 sm:mx-4">
           {renderDocumentContent()}
         </div>
 
-        <div className="fixed bottom-5 right-5">
+        <div className="fixed bottom-5 end-5">
           <Button
             onClick={handleCreatePresentation}
             className="flex items-center gap-2 px-8 py-6 rounded-sm text-md bg-[#5146E5] hover:bg-[#5146E5]/90"
           >
-            <span className="text-white font-semibold">Next</span>
-            <ChevronRight />
+            <span className="font-semibold text-white">{t("common.next")}</span>
+            <ChevronRight className="rtl:rotate-180" />
           </Button>
         </div>
       </div>

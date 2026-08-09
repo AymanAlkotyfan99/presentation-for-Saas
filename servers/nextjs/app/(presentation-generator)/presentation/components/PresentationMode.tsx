@@ -7,6 +7,8 @@ import {
   LayoutGrid,
   ScreenShareOff,
 } from "lucide-react";
+import { useI18n } from "@/i18n/catalog";
+import { formatNumber } from "@/lib/locale-format";
 import { cn } from "@/lib/utils";
 import { Slide } from "../../types/slide";
 import SlideScale from "../../components/PresentationRender";
@@ -213,6 +215,7 @@ const PresentationMode: React.FC<PresentationModeProps> = ({
   onExit,
   onSlideChange,
 }) => {
+  const { locale, t } = useI18n();
   const rootRef = useRef<HTMLDivElement>(null);
   const hideChromeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showSpeakerNotes, setShowSpeakerNotes] = useState(false);
@@ -396,7 +399,7 @@ const PresentationMode: React.FC<PresentationModeProps> = ({
       id="presentation-mode-wrapper"
       ref={rootRef}
       role="application"
-      aria-label="Presentation"
+      aria-label={t("presentation.present")}
       data-fullscreen={isFullscreen ? "true" : "false"}
       className="fixed inset-0 z-[100] h-[100dvh] w-[100dvw] overflow-hidden bg-black font-syne text-white outline-none select-none"
       tabIndex={0}
@@ -499,7 +502,7 @@ const PresentationMode: React.FC<PresentationModeProps> = ({
             <div className="flex flex-1 items-center justify-between px-5 sm:px-9">
               <div className="flex items-center gap-[26px]">
                 <PresentationIconButton
-                  title="Previous slide"
+                  title={t("presentation.previousSlide")}
                   disabled={activeSlideIndex === 0}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -514,12 +517,13 @@ const PresentationMode: React.FC<PresentationModeProps> = ({
                   aria-live="polite"
                   aria-atomic="true"
                 >
-                  <span>{activeSlideIndex + 1}</span>
-                  <span>of</span>
-                  <span>{slideCount}</span>
+                  <span>{t("presentation.slidePosition", {
+                    current: formatNumber(activeSlideIndex + 1, locale),
+                    total: formatNumber(slideCount, locale),
+                  })}</span>
                 </div>
                 <PresentationIconButton
-                  title="Next slide"
+                  title={t("presentation.nextSlide")}
                   disabled={activeSlideIndex === slideCount - 1}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -531,7 +535,7 @@ const PresentationMode: React.FC<PresentationModeProps> = ({
               </div>
               <div className="flex items-center gap-[26px]">
                 <PresentationIconButton
-                  title="Layout preview"
+                  title={t("presentation.layoutPreview")}
                   active={showSlideGrid}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -542,7 +546,7 @@ const PresentationMode: React.FC<PresentationModeProps> = ({
                   <LayoutGrid className="size-[18px]" strokeWidth={2} />
                 </PresentationIconButton>
                 <PresentationIconButton
-                  title="Speaker note"
+                  title={t("presentation.speakerNote")}
                   active={notesPanelOpen}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -552,7 +556,7 @@ const PresentationMode: React.FC<PresentationModeProps> = ({
                   <SpeakerNoteIcon className="size-[18px]" />
                 </PresentationIconButton>
                 <PresentationIconButton
-                  title="Exit presentation"
+                  title={t("presentation.exitPresentation")}
                   onClick={(event) => {
                     event.stopPropagation();
                     onExit();
@@ -568,19 +572,19 @@ const PresentationMode: React.FC<PresentationModeProps> = ({
             <aside className="presentation-controls absolute bottom-0 right-0 top-0 z-50 w-full border-l border-[#333333] bg-black md:w-[302px]">
               <button
                 type="button"
-                className="absolute right-5 top-5 rounded-[48px] border border-[#4C4C4C] px-5 py-2.5 text-[14px] font-semibold leading-none tracking-[-0.14px] text-white transition-colors hover:border-[#E6E6E6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8]"
+                className="absolute end-5 top-5 rounded-[48px] border border-[#4C4C4C] px-5 py-2.5 text-[14px] font-semibold leading-none tracking-[-0.14px] text-white transition-colors hover:border-[#E6E6E6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8]"
                 onClick={(event) => {
                   event.stopPropagation();
                   setShowSpeakerNotes(false);
                 }}
               >
-                Hide
+                {t("presentation.hide")}
               </button>
               <div className="mx-auto mt-[105px] flex w-[262px] max-w-[calc(100%-40px)] flex-col items-start gap-6">
                 <div className="flex items-center gap-2">
                   <SpeakerNoteIcon className="size-5 text-white" />
                   <h2 className="text-[16px] font-medium leading-none tracking-[-0.16px] text-white">
-                    Speaker Note
+                    {t("presentation.speakerNote")}
                   </h2>
                 </div>
                 <div className="w-full">
@@ -595,7 +599,7 @@ const PresentationMode: React.FC<PresentationModeProps> = ({
                       currentSpeakerNote && "mt-6"
                     )}
                   >
-                    Add notes in the editor
+                    {t("presentation.addNotesInEditor")}
                   </p>
                 </div>
               </div>

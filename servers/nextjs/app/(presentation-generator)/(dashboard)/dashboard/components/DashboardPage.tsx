@@ -28,7 +28,8 @@ import {
   IMAGE_PROVIDERS,
   LLM_PROVIDERS,
 } from "@/utils/providerConstants";
-import { DISPLAY_PRODUCT } from "@/lib/product-metadata";
+import { useI18n } from "@/i18n/catalog";
+import { localizePathname } from "@/i18n/routing";
 
 const GITHUB_REPOSITORY_URL = "https://github.com/presenton/presenton";
 const DISCORD_INVITE_URL = "https://discord.com/invite/9ZsKKxudNE";
@@ -113,17 +114,8 @@ const sortPresentationsNewestFirst = (
     );
   });
 
-function formatGitHubStars(stars: number) {
-  if (stars >= 1_000_000) {
-    return `${(stars / 1_000_000).toFixed(1).replace(/\.0$/, "")}m`;
-  }
-  if (stars >= 1_000) {
-    return `${(stars / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
-  }
-  return stars.toLocaleString();
-}
-
 function DashboardHeader() {
+  const { locale, t } = useI18n();
   const pathname = usePathname();
   const llmConfig = useSelector(
     (state: RootState) => state.userConfig.llm_config
@@ -151,18 +143,18 @@ function DashboardHeader() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 ml-7 mr-[9px] flex h-[105px] items-center justify-between border-b border-[#EDEEEF] bg-white px-1 max-lg:h-auto max-lg:min-h-[105px] max-lg:flex-col max-lg:items-start max-lg:gap-4 max-lg:py-5">
+    <header className="sticky top-0 z-50 ms-7 me-[9px] flex h-[105px] items-center justify-between border-b border-[#EDEEEF] bg-white px-1 max-lg:h-auto max-lg:min-h-[105px] max-lg:flex-col max-lg:items-start max-lg:gap-4 max-lg:py-5">
       <div className="flex w-[504.392px] max-w-full shrink-0 items-center gap-3.5 max-xl:w-auto">
         <h1 className="whitespace-nowrap font-syne text-[22px] font-medium leading-normal tracking-[-0.66px] text-[#101323]">
-          Dashboard
+          {t("navigation.dashboard")}
         </h1>
       </div>
 
       <div className="max-w-full overflow-x-auto hide-scrollbar lg:overflow-visible">
-        <div className="flex h-[42.24px] w-max max-w-none items-center gap-3 rounded-full pl-3">
+        <div className="flex h-[42.24px] w-max max-w-none items-center gap-3 rounded-full ps-3">
           <div className="flex h-[42.24px] items-center gap-[18px] rounded-[32px] border border-[#EDEEEF] bg-white px-3 py-1">
             <Link
-              href="/settings"
+              href={localizePathname("/settings", locale)}
               className={`${dashboardHeaderPill} h-[26.1px] gap-1.5 p-1.5`}
               onClick={() =>
                 trackEvent(MixpanelEvent.Navigation, {
@@ -181,7 +173,7 @@ function DashboardHeader() {
                 {configuredProviders.map((provider, index) => (
                   <span
                     key={`${provider.value}-${index}`}
-                    className={`relative h-[22px] w-[22px] shrink-0 overflow-hidden rounded-full border-[1.238px] border-[#EDEEEF] bg-white ${index > 0 ? "-ml-[4.4px]" : "z-10"
+                    className={`relative h-[22px] w-[22px] shrink-0 overflow-hidden rounded-full border-[1.238px] border-[#EDEEEF] bg-white ${index > 0 ? "-ms-[4.4px]" : "z-10"
                       }`}
                   >
                     <Image
@@ -196,7 +188,7 @@ function DashboardHeader() {
                 ))}
               </span>
               <span className="font-syne text-sm font-medium leading-[17.6px] tracking-[0.56px]">
-                Settings
+                {t("navigation.settings")}
               </span>
             </Link>
 
@@ -226,7 +218,7 @@ function DashboardHeader() {
                 className="h-[17.6px] w-[17.6px] shrink-0"
               />
               <span className="font-syne text-sm font-normal leading-normal tracking-[-0.14px] text-[#191919]">
-                Join Discord
+                {t("dashboard.joinDiscord")}
               </span>
             </Link>
             <DashboardHeaderDivider />
@@ -262,8 +254,8 @@ function DashboardHeader() {
               href={APP_UPDATE_URL}
               target="_blank"
               rel="noreferrer"
-              aria-label={`Update ${DISPLAY_PRODUCT.shortName}`}
-              title={`Update ${DISPLAY_PRODUCT.shortName}`}
+              aria-label={t("dashboard.updateProduct")}
+              title={t("dashboard.updateProduct")}
               className="relative flex h-[42.24px] w-[42.24px] shrink-0 items-center justify-center rounded-full border-[1.32px] border-[#D9D6FE] bg-[#FAFAFF] transition-colors hover:bg-[#F3F0FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8] focus-visible:ring-offset-2"
               onClick={() =>
                 trackEvent(MixpanelEvent.Navigation, {
@@ -299,6 +291,7 @@ function DashboardHeader() {
 }
 
 const DashboardPage: React.FC = () => {
+  const { locale, t } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
   const [presentations, setPresentations] = useState<PresentationResponse[]>([]);
@@ -373,23 +366,19 @@ const DashboardPage: React.FC = () => {
         slide_count: presentation.n_slides,
       });
       router.push(
-        `/presentation?id=${encodeURIComponent(presentation.id)}&type=standard`
+        `${localizePathname("/presentation", locale)}?id=${encodeURIComponent(presentation.id)}&type=standard`
       );
     } catch (creationError) {
-      const message =
-        creationError instanceof Error
-          ? creationError.message
-          : "Something went wrong while creating the presentation.";
       trackEvent(MixpanelEvent.Dashboard_Blank_Presentation_Create_Failed, {
         pathname,
         error_message: sanitizeAnalyticsError(creationError),
       });
-      notify.error("Could not create blank presentation", message);
+      notify.error(t("dashboard.createFailedTitle"), t("dashboard.createFailed"));
     } finally {
       blankPresentationRequestInFlight.current = false;
       setIsCreatingBlankPresentation(false);
     }
-  }, [pathname, router]);
+  }, [locale, pathname, router, t]);
 
   const removePresentation = (presentationId: string) => {
     setPresentations((prev) => prev.filter((p) => p.id !== presentationId));
@@ -408,13 +397,13 @@ const DashboardPage: React.FC = () => {
   return (
     <div className="relative min-h-screen w-full pb-10">
       <DashboardHeader />
-      <section className="relative z-10 overflow-visible pb-0 pl-3 pr-3 pt-[17px] sm:pl-6 sm:pr-[9px]">
+      <section className="relative z-10 overflow-visible pb-0 ps-3 pe-3 pt-[17px] sm:ps-6 sm:pe-[9px]">
         <h2 className="w-full font-syne text-[16px] font-medium leading-[normal] text-[#191919]">
-          Actions
+          {t("dashboard.actions")}
         </h2>
         <div className="mt-[18px] flex flex-wrap items-start gap-4">
           <Link
-            href="/upload"
+            href={localizePathname("/upload", locale)}
             onClick={() =>
               trackEvent(MixpanelEvent.Dashboard_New_Presentation_Clicked, {
                 pathname,
@@ -422,17 +411,18 @@ const DashboardPage: React.FC = () => {
               })
             }
             className="group/action relative z-50 block w-[304.5px] max-w-full cursor-pointer overflow-visible rounded-[10.8px] bg-white outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8] focus-visible:ring-offset-4"
-            aria-label="Create presentation"
+            aria-label={t("dashboard.newPresentation")}
           >
             <FloatingActionCards />
 
             <img
               src="/create_presentation_bg.png"
-              alt="Background of the create presentation card"
+              alt=""
+              aria-hidden="true"
               className="relative z-10 h-[89.983px] w-[304.5px] max-w-full rounded-[10.8px] bg-white object-cover"
             />
             <span className="absolute inset-0 z-20 flex items-center justify-center text-center font-syne text-sm font-medium text-[#191919]">
-              Create Presentation
+              {t("dashboard.newPresentation")}
             </span>
           </Link>
 
@@ -441,16 +431,16 @@ const DashboardPage: React.FC = () => {
             onClick={() => void createBlankPresentation()}
             disabled={isCreatingBlankPresentation}
             aria-busy={isCreatingBlankPresentation}
-            className="group relative z-50 flex h-[89.983px] w-[304.5px] max-w-full items-center overflow-hidden rounded-[10.8px] border border-[#EDEEEF] bg-[linear-gradient(135deg,#FAFAFF_0%,#F3F0FF_100%)] px-5 text-left outline-none transition hover:border-[#CFC7FF] hover:shadow-[0_8px_22px_rgba(81,70,229,0.12)] focus-visible:ring-2 focus-visible:ring-[#7A5AF8] focus-visible:ring-offset-4 disabled:cursor-not-allowed disabled:opacity-70"
-            aria-label="Create blank presentation"
+            className="group relative z-50 flex h-[89.983px] w-[304.5px] max-w-full items-center overflow-hidden rounded-[10.8px] border border-[#EDEEEF] bg-[linear-gradient(135deg,#FAFAFF_0%,#F3F0FF_100%)] px-5 text-start outline-none transition hover:border-[#CFC7FF] hover:shadow-[0_8px_22px_rgba(81,70,229,0.12)] focus-visible:ring-2 focus-visible:ring-[#7A5AF8] focus-visible:ring-offset-4 disabled:cursor-not-allowed disabled:opacity-70"
+            aria-label={t("dashboard.createBlank")}
           >
             <span className="font-syne text-sm font-medium text-[#191919]">
               {isCreatingBlankPresentation
-                ? "Creating blank presentation"
-                : "Blank Presentation"}
+                ? t("dashboard.creatingBlank")
+                : t("dashboard.createBlank")}
             </span>
             <span
-              className="ml-auto flex aspect-video w-[112px] items-center justify-center rounded-[6px] border border-[#DDD9F8] bg-white shadow-[0_6px_14px_rgba(16,24,40,0.12)] transition-transform group-hover:-translate-y-0.5"
+              className="ms-auto flex aspect-video w-[112px] items-center justify-center rounded-[6px] border border-[#DDD9F8] bg-white shadow-[0_6px_14px_rgba(16,24,40,0.12)] transition-transform group-hover:-translate-y-0.5"
               aria-hidden="true"
             >
               {isCreatingBlankPresentation ? (
@@ -462,17 +452,17 @@ const DashboardPage: React.FC = () => {
           </button>
         </div>
       </section>
-      <section className="relative z-10 mt-[46px] pl-3 pr-3 sm:pl-6 sm:pr-[9px]">
+      <section className="relative z-10 mt-[46px] ps-3 pe-3 sm:ps-6 sm:pe-[9px]">
         <div className="mb-[14px] flex items-center justify-between gap-4">
           <h2 className="font-syne text-[16px] font-medium leading-[normal] text-[#191919]">
-            Decks
+            {t("dashboard.title")}
           </h2>
           <div className="flex items-center gap-[17px]">
             <div className="flex items-center rounded-[4px] border border-[#EDEEEF] p-1">
               <button
                 type="button"
                 onClick={() => setDeckViewMode("grid")}
-                aria-label="Grid view"
+                aria-label={t("dashboard.gridView")}
                 aria-pressed={deckViewMode === "grid"}
                 className={`flex items-center rounded px-2 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8] ${deckViewMode === "grid" ? "bg-[#F6F6F9]" : "hover:bg-[#FAFAFC]"}`}
               >
@@ -481,7 +471,7 @@ const DashboardPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setDeckViewMode("list")}
-                aria-label="List view"
+                aria-label={t("dashboard.listView")}
                 aria-pressed={deckViewMode === "list"}
                 className={`flex items-center rounded px-2 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8] ${deckViewMode === "list" ? "bg-[#F6F6F9]" : "hover:bg-[#FAFAFC]"}`}
               >

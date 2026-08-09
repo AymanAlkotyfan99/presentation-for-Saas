@@ -27,11 +27,13 @@ import {
   clampSlideCountValue,
   MAX_NUMBER_OF_SLIDES,
 } from "@/utils/presentationLimits";
+import { useI18n, useTranslations } from "@/i18n/catalog";
+import { formatNumber } from "@/lib/locale-format";
 
 // Types
 interface ConfigurationSelectsProps {
   config: PresentationConfig;
-  onConfigChange: (key: keyof PresentationConfig, value: any) => void;
+  onConfigChange: (key: keyof PresentationConfig, value: unknown) => void;
   compact?: boolean;
 }
 
@@ -79,6 +81,7 @@ const SlideCountSelect: React.FC<{
   onOpenChange: (open: boolean) => void;
   compact?: boolean;
 }> = ({ value, onValueChange, open, onOpenChange, compact = false }) => {
+  const { locale, t } = useI18n();
   const [customInput, setCustomInput] = useState(
     value && !SLIDE_OPTIONS.includes(value as SlideOption) ? value : ""
   );
@@ -110,7 +113,9 @@ const SlideCountSelect: React.FC<{
     }
   };
 
-  const displayLabel = value ? `${value} slides` : "Auto slides";
+  const displayLabel = value
+    ? t("generation.slideCount", { count: formatNumber(Number(value), locale) })
+    : t("generation.autoSlides");
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
@@ -170,7 +175,7 @@ const SlideCountSelect: React.FC<{
                   : "text-xs font-medium min-[1800px]:text-sm min-[2200px]:text-base"
               )}
             >
-              {compact && value ? `Slides ${value}` : displayLabel}
+              {displayLabel}
             </span>
             {compact && (
               <ChevronRight
@@ -181,7 +186,7 @@ const SlideCountSelect: React.FC<{
             )}
           </span>
           {!compact && (
-            <ChevronUp className="ml-2 h-4 w-4 shrink-0 min-[1800px]:h-5 min-[1800px]:w-5" />
+            <ChevronUp className="ms-2 h-4 w-4 shrink-0 min-[1800px]:h-5 min-[1800px]:w-5" />
           )}
         </button>
       </PopoverTrigger>
@@ -223,7 +228,7 @@ const SlideCountSelect: React.FC<{
               placeholder="--"
               className="h-8 w-16 px-2 text-sm min-[1800px]:h-9 min-[1800px]:w-20 min-[1800px]:text-base"
             />
-            <span className="text-sm font-medium min-[1800px]:text-base">slides</span>
+            <span className="text-sm font-medium min-[1800px]:text-base">{t("generation.slideUnit")}</span>
           </div>
         </div>
         <Command>
@@ -250,11 +255,11 @@ const SlideCountSelect: React.FC<{
                 >
                   <Check
                     className={cn(
-                      "mr-2 h-4 w-4",
+                      "me-2 h-4 w-4",
                       value === option ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  {option} slides
+                  {t("generation.slideCount", { count: formatNumber(Number(option), locale) })}
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -274,7 +279,10 @@ const LanguageSelect: React.FC<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
   compact?: boolean;
-}> = ({ value, onValueChange, open, onOpenChange, compact = false }) => (
+}> = ({ value, onValueChange, open, onOpenChange, compact = false }) => {
+  const t = useTranslations();
+
+  return (
   <Popover open={open} onOpenChange={onOpenChange}>
     <PopoverTrigger asChild>
       <button
@@ -314,7 +322,7 @@ const LanguageSelect: React.FC<{
                 : "text-xs font-medium min-[1800px]:text-sm min-[2200px]:text-base"
             )}
           >
-            {value || "Select language"}
+            {value || t("generation.selectLanguage")}
           </span>
           {compact && (
             <ChevronRight
@@ -325,7 +333,7 @@ const LanguageSelect: React.FC<{
           )}
         </span>
         {!compact && (
-          <ChevronUp className="ml-2 h-4 w-4 flex-shrink-0 min-[1800px]:h-5 min-[1800px]:w-5" />
+          <ChevronUp className="ms-2 h-4 w-4 flex-shrink-0 min-[1800px]:h-5 min-[1800px]:w-5" />
         )}
       </button>
     </PopoverTrigger>
@@ -336,11 +344,11 @@ const LanguageSelect: React.FC<{
     >
       <Command>
         <CommandInput
-          placeholder="Search language..."
+          placeholder={t("generation.searchLanguage")}
           className="font-instrument_sans"
         />
         <CommandList>
-          <CommandEmpty>No language found.</CommandEmpty>
+          <CommandEmpty>{t("generation.noLanguage")}</CommandEmpty>
           <CommandGroup>
             {Object.values(LanguageType).map((language) => (
               <CommandItem
@@ -355,7 +363,7 @@ const LanguageSelect: React.FC<{
               >
                 <Check
                   className={cn(
-                    "mr-2 h-4 w-4",
+                    "me-2 h-4 w-4",
                     value === language ? "opacity-100" : "opacity-0"
                   )}
                 />
@@ -367,7 +375,8 @@ const LanguageSelect: React.FC<{
       </Command>
     </PopoverContent>
   </Popover>
-);
+  );
+};
 
 export function ConfigurationSelects({
   config,

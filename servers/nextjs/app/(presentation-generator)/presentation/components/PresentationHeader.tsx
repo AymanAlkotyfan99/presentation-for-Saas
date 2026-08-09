@@ -50,6 +50,8 @@ import MarkdownRenderer from "@/components/MarkDownRender";
 import { cn } from "@/lib/utils";
 import { KeyboardShortcutsDialog } from "./KeyboardShortcutsDialog";
 import { BRAND_ASSETS } from "@/lib/product-metadata";
+import { useI18n } from "@/i18n/catalog";
+import { localizePathname } from "@/i18n/routing";
 
 const MAX_EXPORT_TITLE_LENGTH = 40;
 
@@ -62,7 +64,7 @@ const buildSafeExportFileName = (
 
   let safeBase = titleWithoutExtension
     // Replace all punctuation/special chars (including dots) with dashes
-    .replace(/[^a-zA-Z0-9\s_-]+/g, "-")
+    .replace(/[^\p{L}\p{N}\s_-]+/gu, "-")
     // Replace whitespace with single dashes
     .replace(/\s+/g, "-")
     // Collapse repeated separators
@@ -96,6 +98,7 @@ const PresentationHeader = ({
   isPresentationSaving: boolean;
   currentSlide?: number;
 }) => {
+  const { locale, t } = useI18n();
   const [open, setOpen] = useState(false);
   const [shortcutsDialogOpen, setShortcutsDialogOpen] = useState(false);
   const router = useRouter();
@@ -134,7 +137,7 @@ const PresentationHeader = ({
       return;
     }
     const trimmed = draftTitle.trim();
-    const next = trimmed || presentationData.title || "Presentation";
+    const next = trimmed || presentationData.title || t("presentation.untitled");
     if (next !== presentationData.title) {
       dispatch(updateTitle(next));
       trackEvent(MixpanelEvent.Presentation_Title_Updated, {
@@ -194,8 +197,8 @@ const PresentationHeader = ({
     let exportToastId: string | number | undefined;
     try {
       exportToastId = notify.loading(
-        "Exporting PPTX",
-        "Your presentation is being exported. This may take a moment."
+        t("presentation.exportingFormat", { format: "PPTX" }),
+        t("presentation.exportingDescription")
       );
       setIsExporting(true);
       const safePptxFileName = buildSafeExportFileName(
@@ -229,15 +232,15 @@ const PresentationHeader = ({
         downloadLink(pptxPath, safePptxFileName);
       }
       notify.success(
-        "Export complete",
-        "Your PPTX file has been downloaded.",
+        t("presentation.exportComplete"),
+        t("presentation.formatDownloaded", { format: "PPTX" }),
         { id: exportToastId }
       );
     } catch (error) {
       console.error("Export failed:", error);
       notify.error(
-        "Export failed",
-        "We are having trouble exporting your presentation. Please try again.",
+        t("presentation.exportFailed"),
+        t("presentation.exportFailedDescription"),
         exportToastId !== undefined ? { id: exportToastId } : undefined
       );
     } finally {
@@ -251,8 +254,8 @@ const PresentationHeader = ({
     let exportToastId: string | number | undefined;
     try {
       exportToastId = notify.loading(
-        "Exporting PDF",
-        "Your presentation is being exported. This may take a moment."
+        t("presentation.exportingFormat", { format: "PDF" }),
+        t("presentation.exportingDescription")
       );
       setIsExporting(true);
       const safePdfFileName = buildSafeExportFileName(
@@ -285,15 +288,15 @@ const PresentationHeader = ({
         }
       }
       notify.success(
-        "Export complete",
-        "Your PDF file has been downloaded.",
+        t("presentation.exportComplete"),
+        t("presentation.formatDownloaded", { format: "PDF" }),
         { id: exportToastId }
       );
     } catch (err) {
       console.error(err);
       notify.error(
-        "Export failed",
-        "We are having trouble exporting your presentation. Please try again.",
+        t("presentation.exportFailed"),
+        t("presentation.exportFailedDescription"),
         exportToastId !== undefined ? { id: exportToastId } : undefined
       );
     } finally {
@@ -309,7 +312,7 @@ const PresentationHeader = ({
       presentation_id,
       slide_count: presentationData?.slides?.length || 0,
     });
-    router.push(`/presentation?id=${presentation_id}&stream=true`);
+    router.push(`${localizePathname("/presentation", locale)}?id=${presentation_id}&stream=true`);
   };
   const downloadLink = (path: string, fileName: string) => {
     const link = document.createElement("a");
@@ -338,7 +341,7 @@ const PresentationHeader = ({
     <div
       className={` rounded-[18px] max-md:mt-4 ${mobile ? "" : "bg-white"}  p-5`}
     >
-      <p className="text-sm font-medium text-[#19001F]">Export as</p>
+      <p className="text-sm font-medium text-[#19001F]">{t("presentation.exportAs")}</p>
       <div className="my-[18px] h-[1px] bg-[#E8E8E8]" />
       <div className="space-y-3">
         <Button
@@ -394,29 +397,29 @@ const PresentationHeader = ({
                 cancelTitleEdit();
               }
             }}
-            placeholder="Presentation title"
-            className="min-w-0 flex-1 bg-transparent py-2 pr-2 font-unbounded text-base leading-tight text-[#101323] placeholder:text-[#101323]/35 outline-none border-0 focus:ring-0"
-            aria-label="Presentation title"
+            placeholder={t("presentation.titlePlaceholder")}
+            className="min-w-0 flex-1 bg-transparent py-2 pe-2 font-unbounded text-base leading-tight text-[#101323] placeholder:text-[#101323]/35 outline-none border-0 focus:ring-0"
+            aria-label={t("presentation.titlePlaceholder")}
           />
-          <div className="flex shrink-0 items-center gap-0.5 border-l border-[#EDECEC] pl-1 ml-0.5">
-            <ToolTip content="Save · Enter">
+          <div className="ms-0.5 flex shrink-0 items-center gap-0.5 border-s border-[#EDECEC] ps-1">
+            <ToolTip content={t("presentation.shortcutHint", { action: t("common.save"), key: "Enter" })}>
               <button
                 type="button"
                 onMouseDown={onTitleSaveMouseDown}
                 onClick={commitTitleEdit}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-[#5141e5] hover:bg-[#5141e5]/10 transition-colors"
-                aria-label="Save title"
+                aria-label={t("presentation.saveTitle")}
               >
                 <Check className="h-4 w-4" strokeWidth={2.25} />
               </button>
             </ToolTip>
-            <ToolTip content="Cancel · Esc">
+            <ToolTip content={t("presentation.shortcutHint", { action: t("common.cancel"), key: "Esc" })}>
               <button
                 type="button"
                 onMouseDown={onTitleCancelMouseDown}
                 onClick={cancelTitleEdit}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-[#101323]/55 hover:bg-[#F6F6F9] hover:text-[#101323] transition-colors"
-                aria-label="Cancel editing title"
+                aria-label={t("presentation.cancelTitleEdit")}
               >
                 <X className="h-4 w-4" strokeWidth={2.25} />
               </button>
@@ -436,7 +439,7 @@ const PresentationHeader = ({
         >
           <h2 className="min-w-0 flex-1 font-unbounded text-lg w-[450px] leading-snug text-[#101323]">
             <MarkdownRenderer
-              content={presentationData?.title || "Presentation"}
+              content={presentationData?.title || t("presentation.untitled")}
               className="mb-0 min-w-0 overflow-hidden text-ellipsis line-clamp-1 text-sm text-[#101323] prose-p:my-0 prose-headings:my-0"
             />
           </h2>
@@ -457,14 +460,14 @@ const PresentationHeader = ({
         <div className="flex items-center gap-3">
           <img
             onClick={() => {
-              router.push("/dashboard");
+              router.push(localizePathname("/dashboard", locale));
             }}
             src={BRAND_ASSETS.compactIcon}
             alt=""
             className="w-10 h-10 cursor-pointer object-contain"
           />
           {presentationData && !isStreaming && !isEditingTitle ? (
-            <ToolTip content="Rename presentation">{titleBlock}</ToolTip>
+            <ToolTip content={t("presentation.rename")}>{titleBlock}</ToolTip>
           ) : (
             titleBlock
           )}
@@ -477,7 +480,7 @@ const PresentationHeader = ({
             </div>
           )}
           <div className="flex items-center gap-2 bg-[#F6F6F9] px-3.5 h-[38px] border border-[#EDECEC] rounded-[80px]">
-            <ToolTip content="Regenerate Presentation">
+            <ToolTip content={t("presentation.regenerate")}>
               <button
                 type="button"
                 onClick={() => setIsRegenerateConfirmOpen(true)}
@@ -487,7 +490,7 @@ const PresentationHeader = ({
               </button>
             </ToolTip>
             <Separator orientation="vertical" className="h-4" />
-            <ToolTip content="Undo">
+            <ToolTip content={t("editor.undo")}>
               <button
                 disabled={!canUndo}
                 className=" disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer group"
@@ -499,7 +502,7 @@ const PresentationHeader = ({
               </button>
             </ToolTip>
             <Separator orientation="vertical" className="h-4" />
-            <ToolTip content="Redo">
+            <ToolTip content={t("editor.redo")}>
               <button
                 disabled={!canRedo}
                 className=" disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer group"
@@ -511,7 +514,7 @@ const PresentationHeader = ({
               </button>
             </ToolTip>
             <Separator orientation="vertical" className="h-4 w-[2px]" />
-            <ToolTip content="Present">
+            <ToolTip content={t("presentation.present")}>
               <button
                 onClick={() => {
                   const to = `?id=${presentation_id}&mode=present&slide=${currentSlide || 0
@@ -537,10 +540,10 @@ const PresentationHeader = ({
             </ToolTip>
           </div>
 
-          <ToolTip content="Keyboard shortcuts (?)">
+          <ToolTip content={`${t("editor.keyboardShortcuts")} (?)`}>
             <button
               type="button"
-              aria-label="Keyboard shortcuts"
+              aria-label={t("editor.keyboardShortcuts")}
               aria-haspopup="dialog"
               aria-expanded={shortcutsDialogOpen}
               aria-keyshortcuts="?"
@@ -569,7 +572,7 @@ const PresentationHeader = ({
                 {isExporting ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : (
-                  "Export"
+                  t("presentation.export")
                 )}{" "}
                 <ArrowRightFromLine className="w-3.5 h-3.5" />
               </button>
@@ -593,11 +596,10 @@ const PresentationHeader = ({
               <AlertTriangle className="h-6 w-6 text-red-500" />
             </div>
             <DialogTitle className="text-lg font-semibold text-[#191919]">
-              Regenerate Presentation?
+              {t("presentation.regenerateConfirm")}
             </DialogTitle>
             <DialogDescription className="text-sm leading-relaxed text-gray-500">
-              This will replace the current slides with a newly generated
-              version and clear undo history. Your current edits may be lost.
+              {t("presentation.regenerateDescription")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-row border-t border-gray-100 p-0 sm:space-x-0">
@@ -605,17 +607,17 @@ const PresentationHeader = ({
               type="button"
               variant="ghost"
               onClick={() => setIsRegenerateConfirmOpen(false)}
-              className="h-auto flex-1 rounded-none rounded-bl-2xl px-4 py-3.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-700"
+              className="h-auto flex-1 rounded-none rounded-es-2xl px-4 py-3.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-700"
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               type="button"
               variant="ghost"
               onClick={handleReGenerate}
-              className="h-auto flex-1 rounded-none rounded-br-2xl border-l border-gray-100 px-4 py-3.5 text-sm font-medium text-red-500 hover:bg-red-50 hover:text-red-600"
+              className="h-auto flex-1 rounded-none rounded-ee-2xl border-s border-gray-100 px-4 py-3.5 text-sm font-medium text-red-500 hover:bg-red-50 hover:text-red-600"
             >
-              Regenerate
+              {t("presentation.regenerateAction")}
             </Button>
           </DialogFooter>
         </DialogContent>

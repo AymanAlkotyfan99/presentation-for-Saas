@@ -10,15 +10,15 @@ import {
   isChatGptAuthRequiredMessage,
   requestChatGptReauth,
 } from "@/utils/chatgptAuth";
+import { useTranslations } from "@/i18n/catalog";
 
 const MAX_STREAM_RETRIES = 3;
 const STREAM_RETRY_DELAY_MS = 1_000;
-const DEFAULT_STATUS_MESSAGE = "Preparing your presentation outline";
-
 export const useOutlineStreaming = (
   presentationId: string | null,
   enabled = true
 ) => {
+  const t = useTranslations();
   const dispatch = useDispatch();
   const { outlines } = useSelector(
     (state: RootState) => state.presentationGeneration
@@ -27,7 +27,7 @@ export const useOutlineStreaming = (
   const [isLoading, setIsLoading] = useState(false);
   const [activeSlideIndex, setActiveSlideIndex] = useState<number | null>(null);
   const [highestActiveIndex, setHighestActiveIndex] = useState<number>(-1);
-  const [statusMessage, setStatusMessage] = useState(DEFAULT_STATUS_MESSAGE);
+  const [statusMessage, setStatusMessage] = useState(() => t("outline.preparing"));
   const outlinesRef = useRef<{ content: string }[]>(outlines);
   const prevSlidesRef = useRef<{ content: string }[]>([]);
   const activeIndexRef = useRef<number>(-1);
@@ -38,7 +38,7 @@ export const useOutlineStreaming = (
   }, [outlines]);
 
   useEffect(() => {
-    const resetStreamingState = (message = DEFAULT_STATUS_MESSAGE) => {
+    const resetStreamingState = (message = t("outline.preparing")) => {
       setIsStreaming(false);
       setIsLoading(false);
       setActiveSlideIndex(null);
@@ -91,7 +91,7 @@ export const useOutlineStreaming = (
       prevSlidesRef.current = [];
       activeIndexRef.current = -1;
       highestIndexRef.current = -1;
-      setStatusMessage("Reconnecting to outline stream");
+      setStatusMessage(t("outline.reconnecting"));
 
       retryTimer = setTimeout(() => {
         if (!isClosed) {
@@ -116,8 +116,8 @@ export const useOutlineStreaming = (
           if (!scheduleRetry("invalid SSE payload")) {
             resetStreamingState();
             notify.error(
-              "Stream parse failed",
-              "Failed to parse outline stream response."
+              t("outline.streamParseFailedTitle"),
+              t("outline.streamParseFailed")
             );
           }
           return;
@@ -126,7 +126,7 @@ export const useOutlineStreaming = (
         switch (data.type) {
           case "status":
             if (data.status) {
-              setStatusMessage(data.status);
+              setStatusMessage(t("outline.preparing"));
             }
             break;
 
@@ -182,7 +182,7 @@ export const useOutlineStreaming = (
               setIsLoading(false);
               setActiveSlideIndex(null);
               setHighestActiveIndex(-1);
-              setStatusMessage("Outline ready");
+              setStatusMessage(t("outline.ready"));
               prevSlidesRef.current = outlinesData;
               activeIndexRef.current = -1;
               highestIndexRef.current = -1;
@@ -193,14 +193,14 @@ export const useOutlineStreaming = (
             } catch {
               if (!scheduleRetry("failed to parse complete payload")) {
                 resetStreamingState();
-                notify.error("Parse failed", "Failed to parse presentation data.");
+                notify.error(t("outline.parseFailedTitle"), t("outline.parseFailed"));
               }
             }
             accumulatedChunks = "";
             break;
 
           case "closing":
-            resetStreamingState("Outline ready");
+            resetStreamingState(t("outline.ready"));
             isClosed = true;
             closeEventSource();
             clearRetryTimer();
@@ -221,9 +221,8 @@ export const useOutlineStreaming = (
               resetStreamingState();
               closeEventSource();
               notify.error(
-                "Outline streaming failed",
-                data.detail ||
-                  "Failed to connect to the server. Please try again."
+                t("outline.streamingFailedTitle"),
+                t("outline.connectionFailed")
               );
             }
             break;
@@ -235,14 +234,14 @@ export const useOutlineStreaming = (
           resetStreamingState();
           closeEventSource();
           notify.error(
-            "Connection failed",
-            "Failed to connect to the server. Please try again."
+            t("outline.connectionFailedTitle"),
+            t("outline.connectionFailed")
           );
         }
       };
     };
 
-    setStatusMessage(DEFAULT_STATUS_MESSAGE);
+    setStatusMessage(t("outline.preparing"));
     setIsStreaming(true);
     setIsLoading(true);
     openStream();
@@ -252,7 +251,7 @@ export const useOutlineStreaming = (
       closeEventSource();
       clearRetryTimer();
     };
-  }, [presentationId, dispatch, enabled]);
+  }, [presentationId, dispatch, enabled, t]);
 
   return {
     isStreaming,

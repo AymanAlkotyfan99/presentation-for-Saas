@@ -20,6 +20,7 @@ from models.sql.key_value import KeyValueSqlModel
 from models.sql.ollama_pull_status import OllamaPullStatus
 from models.sql.presentation_layout_code import PresentationLayoutCodeModel
 from models.sql.presentation import PresentationModel
+from models.sql.presentation_document import PresentationDocumentModel
 from models.sql.template import TemplateModel
 from models.sql.template_create_info import TemplateCreateInfoModel
 from models.sql.template_v2 import TemplateV2
@@ -57,6 +58,7 @@ async_session_maker = async_sessionmaker(sql_engine, expire_on_commit=False)
 
 _STRICT_OWNER_MODELS = (
     PresentationModel,
+    PresentationDocumentModel,
     SlideModel,
     PresentationLayoutCodeModel,
     TemplateModel,
@@ -144,6 +146,7 @@ async def create_db_and_tables():
                         User.__table__,
                         AccessToken.__table__,
                         ProviderSettings.__table__,
+                        PresentationDocumentModel.__table__,
                     ],
                 )
             )

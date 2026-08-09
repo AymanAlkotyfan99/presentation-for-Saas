@@ -10,8 +10,10 @@ import { DALLE_3_QUALITY_OPTIONS, GPT_IMAGE_1_5_QUALITY_OPTIONS, IMAGE_PROVIDERS
 import { Check, ChevronUp, Eye, EyeOff } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 import { MixpanelEvent, trackEvent } from '@/utils/mixpanel'
+import { useTranslations } from '@/i18n/catalog'
 
-const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setLlmConfig: (config: any) => void }) => {
+const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setLlmConfig: React.Dispatch<React.SetStateAction<LLMConfig>> }) => {
+    const t = useTranslations();
     const [showApiKey, setShowApiKey] = useState(false);
     const [openImageProviderSelect, setOpenImageProviderSelect] = useState(false);
     const [openaiCompatListMeta, setOpenaiCompatListMeta] = useState<{
@@ -31,13 +33,13 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
             enabled: !value,
             provider: value ? "disabled" : llmConfig.IMAGE_PROVIDER || "",
         });
-        setLlmConfig((prev: any) => ({
+        setLlmConfig((prev) => ({
             ...prev,
             DISABLE_IMAGE_GENERATION: value
         }));
     }
     const input_field_changed = (value: string, field: string) => {
-        setLlmConfig((prev: any) => ({
+        setLlmConfig((prev) => ({
             ...prev,
             [field]: value
         }));
@@ -50,7 +52,7 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
 
     const updateFieldValue = (field: string | undefined, value: string) => {
         if (!field) return;
-        setLlmConfig((prev: any) => ({
+        setLlmConfig((prev) => ({
             ...prev,
             [field]: value,
         }));
@@ -61,16 +63,16 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
             return (
                 <div className="w-[205px] mr-0 ml-auto">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                        DALL·E 3 Image Quality
+                        {t("settings.imageQuality", { provider: "DALL·E 3" })}
                     </label>
                     <div className="">
                         <Select value={llmConfig.DALL_E_3_QUALITY || 'standard'} onValueChange={(value) => input_field_changed(value, "DALL_E_3_QUALITY")}>
                             <SelectTrigger className="w-full h-12 px-4 py-4 outline-none border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors hover:border-gray-400 justify-between">
-                                <SelectValue placeholder="Select a quality" />
+                                <SelectValue placeholder={t("onboarding.selectQuality")} />
                             </SelectTrigger>
                             <SelectContent>
                                 {DALLE_3_QUALITY_OPTIONS.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                    <SelectItem key={option.value} value={option.value}>{t(option.value === "hd" ? "onboarding.qualityHd" : "onboarding.qualityStandard")}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -84,7 +86,7 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
             return (
                 <div className="w-[205px]">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                        GPT Image 1.5 Quality
+                        {t("settings.imageQuality", { provider: "GPT Image 1.5" })}
                     </label>
                     <div className="">
                         <Select
@@ -94,11 +96,11 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
                             <SelectTrigger
 
                                 className="w-full h-12 px-4 py-4 outline-none border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors hover:border-gray-400 justify-between">
-                                <SelectValue placeholder="Select a quality" />
+                                <SelectValue placeholder={t("onboarding.selectQuality")} />
                             </SelectTrigger>
                             <SelectContent>
                                 {GPT_IMAGE_1_5_QUALITY_OPTIONS.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                    <SelectItem key={option.value} value={option.value}>{t(`onboarding.quality${option.value.charAt(0).toUpperCase()}${option.value.slice(1)}` as "onboarding.qualityLow" | "onboarding.qualityMedium" | "onboarding.qualityHigh" | "onboarding.qualityAuto")}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -118,7 +120,7 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
         <div className="space-y-6 bg-[#F9F8F8] p-7 rounded-[12px] ">
             {/* API Key Input */}
             <div className="mb-4  bg-white p-10 pt-5 rounded-[12px]">
-                <ToolTip content="Enable/Disable Image Generation" className='flex justify-end items-center'>
+                <ToolTip content={t("settings.toggleImageGeneration")} className='flex items-center justify-end'>
                     <div className='flex justify-end items-center'>
                         <Switch
                             checked={!isImageGenerationDisabled}
@@ -135,11 +137,11 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
                         <div className='w-[60px] h-[60px] px-[13.5px] py-[14.2px] rounded-[4px] flex items-center justify-center'
                             style={{ backgroundColor: '#F4F3FF' }}
                         >
-                            <img src="/image-markup.svg" className='w-full h-full object-cover' alt='image-markup' />
+                        <img src="/image-markup.svg" className='w-full h-full object-cover' alt="" aria-hidden="true" />
                         </div>
-                        <h3 className="text-xl font-normal text-[#191919] py-2.5">Image Generation Settings</h3>
+                        <h3 className="text-xl font-normal text-[#191919] py-2.5">{t("onboarding.imageSettings")}</h3>
                         <p className=" text-sm  text-gray-500">
-                            Choosing where images come from
+                            {t("settings.imageSettingsDescription")}
                         </p>
                     </div>
                     <div className=' '>
@@ -151,7 +153,7 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
                                     {/* Image Provider Selection */}
                                     <div className="">
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Select Image Provider
+                                            {t("settings.selectImageProvider")}
                                         </label>
                                         <div className="w-full">
                                             <Popover
@@ -169,7 +171,7 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
                                                             <span className="text-sm font-medium text-gray-900">
                                                                 {llmConfig.IMAGE_PROVIDER
                                                                     ? IMAGE_PROVIDERS[llmConfig.IMAGE_PROVIDER]?.label || llmConfig.IMAGE_PROVIDER
-                                                                    : "Select image provider"}
+                                                                    : t("settings.selectImageProvider")}
                                                             </span>
                                                         </div>
                                                         <ChevronUp className="w-4 h-4 text-gray-500" />
@@ -181,9 +183,9 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
                                                     style={{ width: "300px" }}
                                                 >
                                                     <Command>
-                                                        <CommandInput placeholder="Search provider..." />
+                                                        <CommandInput placeholder={t("onboarding.searchProvider")} />
                                                         <CommandList>
-                                                            <CommandEmpty>No provider found.</CommandEmpty>
+                                                            <CommandEmpty>{t("onboarding.noProvider")}</CommandEmpty>
                                                             <CommandGroup>
                                                                 {Object.values(IMAGE_PROVIDERS).map((provider) => (
                                                                     <CommandItem
@@ -199,7 +201,7 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
                                                                         }}
                                                                     >
                                                                         <Check
-                                                                            className={llmConfig.IMAGE_PROVIDER === provider.value ? "mr-2 h-4 w-4 opacity-100" : "mr-2 h-4 w-4 opacity-0"}
+                                                                            className={llmConfig.IMAGE_PROVIDER === provider.value ? "me-2 h-4 w-4 opacity-100" : "me-2 h-4 w-4 opacity-0"}
                                                                         />
                                                                         <div className="flex gap-3 items-center">
                                                                             <div className="flex flex-col space-y-1 flex-1">
@@ -209,7 +211,7 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
                                                                                     </span>
                                                                                 </div>
                                                                                 <span className="text-xs text-gray-600 leading-relaxed">
-                                                                                    {provider.description}
+                                                                                    {t("settings.connectProviderDescription")}
                                                                                 </span>
                                                                             </div>
                                                                         </div>
@@ -241,13 +243,13 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
                                                         apiKey={llmConfig.OPENAI_COMPAT_IMAGE_API_KEY || ""}
                                                         model={llmConfig.OPENAI_COMPAT_IMAGE_MODEL || ""}
                                                         onBaseUrlChange={(v) => {
-                                                            setLlmConfig((prev: any) => ({ ...prev, OPENAI_COMPAT_IMAGE_BASE_URL: v }));
+                                                            setLlmConfig((prev) => ({ ...prev, OPENAI_COMPAT_IMAGE_BASE_URL: v }));
                                                         }}
                                                         onApiKeyChange={(v) => {
-                                                            setLlmConfig((prev: any) => ({ ...prev, OPENAI_COMPAT_IMAGE_API_KEY: v }));
+                                                            setLlmConfig((prev) => ({ ...prev, OPENAI_COMPAT_IMAGE_API_KEY: v }));
                                                         }}
                                                         onModelChange={(v) => {
-                                                            setLlmConfig((prev: any) => ({ ...prev, OPENAI_COMPAT_IMAGE_MODEL: v }));
+                                                            setLlmConfig((prev) => ({ ...prev, OPENAI_COMPAT_IMAGE_MODEL: v }));
                                                         }}
                                                         onModelListMetaChange={setOpenaiCompatListMeta}
                                                     />
@@ -260,7 +262,7 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
                                                     <div className=" space-y-4">
                                                         <div className='w-[205px]'>
                                                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                                ComfyUI Server URL
+                                                                {t("onboarding.comfyUrl")}
                                                             </label>
                                                             <div className="relative">
                                                                 <input
@@ -289,7 +291,7 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
                                                     <div className="space-y-4">
                                                         <div className='w-[205px]'>
                                                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                                Open WebUI URL
+                                                                {t("onboarding.openWebUiUrl")}
                                                             </label>
                                                             <div className="relative">
                                                                 <input
@@ -319,7 +321,7 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
                                                     <div className="relative">
                                                         <input
                                                             type={showApiKey ? 'text' : 'password'}
-                                                            placeholder={`Enter your ${provider.apiKeyFieldLabel}`}
+                                                            placeholder={t("onboarding.enterField", { field: provider.apiKeyFieldLabel ?? t("onboarding.apiKey") })}
                                                             className="w-full px-4 py-2.5 h-12 outline-none border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
                                                             value={getFieldValue(provider.apiKeyField)}
                                                             onChange={(e) =>
@@ -332,7 +334,8 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
                                                         <button
                                                             type="button"
                                                             onClick={() => setShowApiKey((prev) => !prev)}
-                                                            className='absolute right-2 top-1/2 -translate-y-1/2 bg-white px-2 py-1 cursor-pointer'
+                                                            className='absolute end-2 top-1/2 -translate-y-1/2 bg-white px-2 py-1 cursor-pointer'
+                                                            aria-label={showApiKey ? t("accessibility.hidePassword") : t("accessibility.showPassword")}
                                                         >
                                                             {showApiKey ? <Eye className='w-4 h-4 text-gray-500' /> : <EyeOff className='w-4 h-4 text-gray-500' />}
                                                         </button>
@@ -351,12 +354,12 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
                             {llmConfig.IMAGE_PROVIDER === "open_webui" && (
                                 <div className='w-[205px]'>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        API Key (optional)
+                                        {t("onboarding.apiKeyOptional")}
                                     </label>
                                     <div className="relative">
                                         <input
                                             type={showApiKey ? 'text' : 'password'}
-                                            placeholder="API key"
+                                            placeholder={t("onboarding.apiKey")}
                                             className="w-full px-4 py-2.5 h-12 outline-none border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
                                             value={llmConfig.OPEN_WEBUI_IMAGE_API_KEY || ""}
                                             onChange={(e) => {
@@ -366,7 +369,8 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
                                         <button
                                             type="button"
                                             onClick={() => setShowApiKey((prev) => !prev)}
-                                            className='absolute right-2 top-1/2 -translate-y-1/2 bg-white px-2 py-1 cursor-pointer'
+                                            className='absolute end-2 top-1/2 -translate-y-1/2 bg-white px-2 py-1 cursor-pointer'
+                                            aria-label={showApiKey ? t("accessibility.hidePassword") : t("accessibility.showPassword")}
                                         >
                                             {showApiKey ? <Eye className='w-4 h-4 text-gray-500' /> : <EyeOff className='w-4 h-4 text-gray-500' />}
                                         </button>
@@ -375,11 +379,11 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
                             )}
                             {llmConfig.IMAGE_PROVIDER === "comfyui" && <div className='w-full'>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Workflow JSON
+                                    {t("settings.workflowJson")}
                                 </label>
                                 <div className="relative">
                                     <textarea
-                                        placeholder='Paste your ComfyUI workflow JSON here (export via "Export (API)" in ComfyUI)'
+                                        placeholder={t("settings.workflowJsonPlaceholder")}
                                         className="w-full px-4 py-2.5 outline-none border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors font-mono text-xs"
                                         rows={3}
                                         value={llmConfig.COMFYUI_WORKFLOW || ""}
@@ -405,19 +409,19 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
                     <>
                         <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 p-3">
                             <p className="text-sm text-yellow-800">
-                                No models found. Please make sure your provider credentials are valid and the selected provider is reachable.
+                                {t("settings.noModelsFound")}
                             </p>
                         </div>
                         <div className="flex w-full justify-end">
                             <div className="w-[205px]">
-                                <label className="mb-2 block text-sm font-medium text-gray-700">Image model id</label>
+                                <label className="mb-2 block text-sm font-medium text-gray-700">{t("settings.imageModelId")}</label>
                                 <input
                                     type="text"
-                                    placeholder="e.g. dall-e-3, gpt-image-1"
+                                    placeholder={t("settings.imageModelIdPlaceholder")}
                                     className="w-full rounded-lg border border-gray-300 px-4 py-2.5 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                                     value={llmConfig.OPENAI_COMPAT_IMAGE_MODEL || ""}
                                     onChange={(e) => {
-                                        setLlmConfig((prev: any) => ({
+                                        setLlmConfig((prev) => ({
                                             ...prev,
                                             OPENAI_COMPAT_IMAGE_MODEL: e.target.value,
                                         }));
@@ -433,7 +437,7 @@ const ImageProvider = ({ llmConfig, setLlmConfig }: { llmConfig: LLMConfig, setL
             {/* <div className="bg-white flex justify-between items-center p-10 rounded-[12px]">
                 <div className=' max-w-[290px]'>
 
-                    <h4 className="text-xl font-normal text-[#191919]">Advanced</h4>
+                    <h4 className="text-xl font-normal text-[#191919]">{t("settings.advancedSettings")}</h4>
                     <p className="mt-2.5 text-sm  text-gray-500">
                         Configure advanced AI features.
                     </p>

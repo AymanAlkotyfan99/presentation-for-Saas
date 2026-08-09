@@ -16,6 +16,8 @@ import {
 } from "@/components/slide-editor/types";
 import { useNearViewport } from "@/app/hooks/useNearViewport";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/catalog";
+import { formatNumber } from "@/lib/locale-format";
 import { TemplateV2HtmlSlidePreview } from "../../../components/TemplateV2HtmlSlidePreview";
 import { hashKey, readLayoutId } from "./templatePreviewUtils";
 
@@ -24,13 +26,17 @@ const SlideThumbnail = memo(function SlideThumbnail({
   fonts,
   index,
   layout,
+  locale,
   onSelect,
+  selectLabel,
 }: {
   active: boolean;
   fonts?: unknown;
   index: number;
   layout: TemplateV2Layout;
+  locale: "en" | "ar";
   onSelect: (index: number) => void;
+  selectLabel: string;
 }) {
   const scale = 0.082;
   const previewSlide = useMemo(() => ({ ui: layout }), [layout]);
@@ -43,20 +49,21 @@ const SlideThumbnail = memo(function SlideThumbnail({
 
   return (
     <button
-      className="group relative shrink-0 rounded-[9.68px] p-1 text-left outline-none"
+      aria-label={selectLabel}
+      className="group relative shrink-0 rounded-[9.68px] p-1 text-start outline-none"
       onClick={() => onSelect(index)}
       title={readLayoutId(layout, index)}
       type="button"
     >
       <span
         className={cn(
-          "absolute -left-2 bottom-[18px] z-10 flex h-[24.394px] w-[24.394px] items-center justify-center rounded-full border bg-white text-[12px] font-medium shadow-sm",
+          "absolute -start-2 bottom-[18px] z-10 flex h-[24.394px] w-[24.394px] items-center justify-center rounded-full border bg-white text-[12px] font-medium shadow-sm",
           active
             ? "border-[#D9D6FE] text-[#191919]"
             : "border-[#ECECEC] text-[#191919]",
         )}
       >
-        {index + 1}
+        {formatNumber(index + 1, locale)}
       </span>
       <span
         ref={setViewportRoot}
@@ -77,7 +84,7 @@ const SlideThumbnail = memo(function SlideThumbnail({
             width: EDITOR_STAGE_WIDTH,
             height: EDITOR_STAGE_HEIGHT,
             transform: `scale(${scale})`,
-            transformOrigin: "top left",
+            transformOrigin: locale === "ar" ? "top right" : "top left",
           }}
         >
           {isNearViewport ? (
@@ -110,6 +117,7 @@ export function ThumbnailStrip({
   templateId,
   onSelect,
 }: ThumbnailStripProps) {
+  const { locale, t } = useI18n();
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef({
     active: false,
@@ -177,11 +185,11 @@ export function ThumbnailStrip({
   return (
     <div className="relative overflow-hidden bg-[#FBFBFA] px-[52px] pb-[20px] pt-0">
       <button
-        className="absolute left-[24px] top-[24%] z-20 flex h-7 w-7 items-center justify-center rounded-full border border-[#EDEEEF] bg-white text-[#101323] shadow-sm transition-colors hover:bg-[#F7F6F9] disabled:pointer-events-none disabled:opacity-35"
+        className="absolute start-[24px] top-[24%] z-20 flex h-7 w-7 items-center justify-center rounded-full border border-[#EDEEEF] bg-white text-[#101323] shadow-sm transition-colors hover:bg-[#F7F6F9] disabled:pointer-events-none disabled:opacity-35"
         disabled={activeLayoutIndex === 0}
         onClick={() => selectByOffset(-1)}
         type="button"
-        title="Previous slide"
+        title={t("templates.previousSlide")}
       >
         <ChevronLeft className="h-4 w-4" />
       </button>
@@ -189,7 +197,7 @@ export function ThumbnailStrip({
       <div
         ref={scrollerRef}
         data-template-preview-thumbnail-scroll="true"
-        className="hide-scrollbar flex h-[76px] cursor-grab items-center gap-[12px] overflow-x-auto overflow-y-hidden pl-2 pr-[72px] active:cursor-grabbing [-webkit-overflow-scrolling:touch]"
+        className="hide-scrollbar flex h-[76px] cursor-grab items-center gap-[12px] overflow-x-auto overflow-y-hidden ps-2 pe-[72px] active:cursor-grabbing [-webkit-overflow-scrolling:touch]"
         onKeyDown={(event) => {
           if (event.key === "ArrowLeft") {
             event.preventDefault();
@@ -249,7 +257,11 @@ export function ThumbnailStrip({
                 fonts={fonts}
                 index={index}
                 layout={layout}
+                locale={locale}
                 onSelect={selectThumbnail}
+                selectLabel={t("templates.selectLayout", {
+                  number: formatNumber(index + 1, locale),
+                })}
               />
             </div>
           );
@@ -257,16 +269,16 @@ export function ThumbnailStrip({
       </div>
 
       <button
-        className="absolute right-[24px] top-[24%] z-20 flex h-7 w-7 items-center justify-center rounded-full border border-[#EDEEEF] bg-white text-[#101323] shadow-sm transition-colors hover:bg-[#F7F6F9] disabled:pointer-events-none disabled:opacity-35"
+        className="absolute end-[24px] top-[24%] z-20 flex h-7 w-7 items-center justify-center rounded-full border border-[#EDEEEF] bg-white text-[#101323] shadow-sm transition-colors hover:bg-[#F7F6F9] disabled:pointer-events-none disabled:opacity-35"
         disabled={activeLayoutIndex >= layouts.length - 1}
         onClick={() => selectByOffset(1)}
         type="button"
-        title="Next slide"
+        title={t("templates.nextSlide")}
       >
         <ChevronRight className="h-4 w-4" />
       </button>
 
-      <div className="pointer-events-none absolute bottom-0 right-0 top-0 w-[72px] bg-gradient-to-r from-[#FBFBFA]/0 to-[#FBFBFA]" />
+      <div className="pointer-events-none absolute bottom-0 end-0 top-0 w-[72px] bg-gradient-to-r from-[#FBFBFA]/0 to-[#FBFBFA] rtl:bg-gradient-to-l" />
     </div>
   );
 }

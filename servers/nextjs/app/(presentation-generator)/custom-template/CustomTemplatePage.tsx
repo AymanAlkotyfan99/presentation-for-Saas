@@ -51,6 +51,9 @@ import type { RootState } from "@/store/store";
 import { normalizeBackendAssetUrls, resolveBackendAssetUrl } from "@/utils/api";
 import { setupImageUrlConverter } from "@/utils/image-url-converter";
 import { MixpanelEvent, trackEvent } from "@/utils/mixpanel";
+import { useI18n, useTranslations } from "@/i18n/catalog";
+import { localizePathname } from "@/i18n/routing";
+import { formatFileSize as formatLocaleFileSize } from "@/lib/locale-format";
 
 import { useFontLoader as loadFontAssets } from "../hooks/useFontLoad";
 import TemplateService from "../services/api/template";
@@ -76,11 +79,11 @@ type StudioStep = 1 | 2 | 3 | 4;
 
 
 
-const studioSteps: { id: StudioStep; label: string }[] = [
-  { id: 1, label: "Upload" },
-  { id: 2, label: "Analyze" },
-  { id: 3, label: "Preview" },
-  { id: 4, label: "Review" },
+const studioSteps: { id: StudioStep; messageKey: string }[] = [
+  { id: 1, messageKey: "customTemplates.stepUpload" },
+  { id: 2, messageKey: "customTemplates.stepAnalyze" },
+  { id: 3, messageKey: "customTemplates.stepPreview" },
+  { id: 4, messageKey: "customTemplates.stepReview" },
 ];
 
 const pillGradient =
@@ -95,10 +98,6 @@ function getDefaultTemplateName(file: File | null): string {
   return file.name.replace(/\.pptx$/i, "").trim();
 }
 
-function formatFileSize(size: number): string {
-  return `${(size / (1024 * 1024)).toFixed(2)} MB`;
-}
-
 function activeStudioStep(step: TemplateCreationStep): StudioStep {
   if (step === "font-check" || step === "font-upload") return 2;
   if (step === "slides-preview") return 3;
@@ -107,13 +106,14 @@ function activeStudioStep(step: TemplateCreationStep): StudioStep {
 }
 
 function StudioTopBar({ activeStep }: { activeStep: StudioStep }) {
+  const { locale, t } = useI18n();
   return (
     <header className="pointer-events-none fixed inset-x-0 top-0 z-40 h-[72px] sm:h-[80px] 2xl:h-[96px] bg-gradient-to-b from-white via-white to-white/0">
       <div className="relative mx-auto flex h-full max-w-[1280px] 2xl:max-w-[1536px] items-center justify-between px-5 sm:px-8 2xl:px-[90px]">
         <a
-          href="/dashboard"
+          href={localizePathname("/dashboard", locale)}
           className="pointer-events-auto block h-8 w-8 sm:h-[34px] sm:w-[34px] 2xl:h-[44px] 2xl:w-[44px] shrink-0"
-          aria-label="Dashboard"
+          aria-label={t("navigation.dashboard")}
         >
           <img
             src={BRAND_ASSETS.compactIcon}
@@ -125,7 +125,7 @@ function StudioTopBar({ activeStep }: { activeStep: StudioStep }) {
 
         <nav
           className="pointer-events-auto flex items-center"
-          aria-label="Template Studio progress"
+          aria-label={t("customTemplates.progressLabel")}
         >
           {studioSteps.map((step, index) => {
             const isActive = step.id === activeStep;
@@ -143,7 +143,7 @@ function StudioTopBar({ activeStep }: { activeStep: StudioStep }) {
                   <span
                     className={`hidden text-[10px] font-medium sm:inline sm:text-[11px] 2xl:text-xs ${isActive ? "text-black" : "text-[#9B9CA3]"}`}
                   >
-                    {step.label}
+                    {t(step.messageKey)}
                   </span>
                 </div>
                 {index < studioSteps.length - 1 ? (
@@ -202,16 +202,16 @@ function GradientPillButton({
 }
 
 function TemplateStudioTitle({ compact = false }: { compact?: boolean }) {
+  const t = useTranslations();
   return (
     <div
       className={`px-4 text-center ${compact ? "pt-[88px] sm:pt-[96px] 2xl:pt-[112px]" : "pt-[96px] sm:pt-[108px] 2xl:pt-[128px]"}`}
     >
       <h1 className="font-unbounded text-[36px] font-normal leading-none tracking-[-1.2px] text-[#101323] sm:text-[48px] sm:tracking-[-1.4px] md:text-[56px] 2xl:text-[68px] 2xl:tracking-[-1.8px]">
-        Template Studio
+        {t("customTemplates.title")}
       </h1>
       <p className="mx-auto mt-3 max-w-[480px] text-center font-syne text-[15px] font-normal leading-[1.4] text-[#101323CC] sm:mt-4 sm:max-w-[520px] sm:text-[16px] 2xl:mt-5 2xl:max-w-[600px] 2xl:text-[18px]">
-        Upload your PPTX file to extract slides and convert them to a template
-        which you can use to generate AI presentations.
+        {t("customTemplates.studioDescription")}
       </p>
     </div>
   );
@@ -232,6 +232,7 @@ function UploadPanel({
   onRemove: () => void;
   onStart: () => void;
 }) {
+  const { locale, t } = useI18n();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const dropInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -255,14 +256,14 @@ function UploadPanel({
 
       <section className="mt-8 w-full max-w-[640px] px-4 sm:mt-10 sm:max-w-[700px] 2xl:mt-12 2xl:max-w-[820px]">
         <div className="group relative">
-          <div className="relative z-10 ml-8 2xl:ml-10 w-max rounded-t-[28px] 2xl:rounded-t-[32px] border border-b-0 border-[#EDEEF4] bg-white px-3 2xl:px-4 pb-2.5 2xl:pb-3 pt-2 2xl:pt-2.5">
+          <div className="relative z-10 ms-8 w-max rounded-t-[28px] border border-b-0 border-[#EDEEF4] bg-white px-3 pb-2.5 pt-2 2xl:ms-10 2xl:rounded-t-[32px] 2xl:px-4 2xl:pb-3 2xl:pt-2.5">
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
               className="flex h-[34px] 2xl:h-[42px] items-center gap-1.5 2xl:gap-2 rounded-[80px] bg-white px-3.5 2xl:px-4 text-[12px] 2xl:text-sm font-semibold text-black shadow-[0_0_4px_rgba(0,0,0,0.06)]"
             >
               <Upload className="h-3.5 w-3.5 2xl:h-4 2xl:w-4 text-[#7A5AF8]" />
-              Upload PPTX File
+              {t("customTemplates.uploadPptx")}
             </button>
             <input
               ref={inputRef}
@@ -303,12 +304,12 @@ function UploadPanel({
                       </p>
                       <p className="mt-2 2xl:mt-2.5 text-sm 2xl:text-base text-[#777985]">
                         {isProcessing ? (
-                          "Processing..."
+                          t("customTemplates.processing")
                         ) : (
                           <>
-                            {formatFileSize(selectedFile.size)}
+                            {formatLocaleFileSize(selectedFile.size, locale)}
                             <span className="px-2">•</span>
-                            Ready
+                            {t("customTemplates.ready")}
                           </>
                         )}
                       </p>
@@ -324,7 +325,7 @@ function UploadPanel({
                       }}
                       disabled={isProcessing}
                       className="w-[36px] h-[36px] 2xl:w-[44px] 2xl:h-[44px] top-1/2 z-20 flex items-center justify-center rounded-full border border-[#E8E8EF] bg-[#EFF0F4] text-black disabled:opacity-50"
-                      aria-label="Remove file"
+                      aria-label={t("customTemplates.removeFile")}
                     >
                       <X className="h-3.5 w-3.5 2xl:h-4 2xl:w-4" />
                     </button>
@@ -339,7 +340,7 @@ function UploadPanel({
                     draggable={false}
                   />
                   <p className="mt-3 2xl:mt-4 text-sm 2xl:text-base font-normal text-[#808080]">
-                    Drag &amp; Drop your files here
+                    {t("customTemplates.dragDrop")}
                   </p>
                 </div>
               )}
@@ -351,7 +352,7 @@ function UploadPanel({
                 disabled={isProcessing}
                 className="h-9 px-5 text-xs font-semibold"
               >
-                {isProcessing ? "Processing" : "Get Started"}
+                {isProcessing ? t("customTemplates.processing") : t("customTemplates.getStarted")}
                 {isProcessing ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
@@ -363,7 +364,7 @@ function UploadPanel({
         </div>
 
         <ul className="mx-auto mt-6 2xl:mt-8 flex max-w-[480px] 2xl:max-w-[600px] items-center justify-between gap-5 2xl:gap-8">
-          {["Test in Real Time", "Max 100MB", "5min Generation"].map((item) => (
+          {[t("customTemplates.realTime"), t("customTemplates.maxFileSize"), t("customTemplates.generationTime")].map((item) => (
             <li key={item} className="flex items-center gap-2 2xl:gap-2.5">
               <span className="h-2.5 w-2.5 2xl:h-3 2xl:w-3 rounded-full bg-[#EBE9FE]" />
               <span className="text-[13px] 2xl:text-[15px] font-normal text-[#3A3A3A]">{item}</span>
@@ -378,9 +379,7 @@ function UploadPanel({
             i
           </span>
           <p>
-            {DISPLAY_PRODUCT.shortName} sends each slide as a screenshot and HTML reference. Use a
-            vision-enabled model for accurate layouts. Text-only models may produce
-            poor results or fail.
+            {t("customTemplates.modelGuidance")}
           </p>
         </div>
       </div>
@@ -388,14 +387,14 @@ function UploadPanel({
   );
 }
 
-function chipLabel(font: FontItem): string {
-  return font.name || font.family_name || font.original_name || "Unknown font";
+function chipLabel(font: FontItem, unknownFont: string): string {
+  return font.name || font.family_name || font.original_name || unknownFont;
 }
 
-function uniqueFontChips(fontsData: FontData): FontItem[] {
+function uniqueFontChips(fontsData: FontData, unknownFont: string): FontItem[] {
   const seen = new Set<string>();
   return [...fontsData.available_fonts, ...fontsData.unavailable_fonts].filter((font) => {
-    const key = chipLabel(font).toLowerCase();
+    const key = chipLabel(font, unknownFont).toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -447,6 +446,7 @@ function FontFallbackPicker({
   onLoadOptions: () => void;
   onChange: (option: GoogleFontOption) => void;
 }) {
+  const t = useTranslations();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [scrollTop, setScrollTop] = useState(0);
@@ -524,12 +524,12 @@ function FontFallbackPicker({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          aria-label={`Fallback font for ${fontName}`}
+          aria-label={t("customTemplates.fallbackFor", { font: fontName })}
           disabled={disabled}
           className="h-11 w-full justify-between rounded-lg border-[#DADDE6] bg-white px-3 font-syne text-sm font-medium text-[#282A32] shadow-none hover:border-[#B8BCC8] hover:bg-white"
         >
           <span className="min-w-0 truncate">
-            {selectedOption?.family ?? "Choose fallback"}
+            {selectedOption?.family ?? t("customTemplates.chooseFallback")}
           </span>
           <ChevronDown className="h-4 w-4 shrink-0 text-[#61646F]" />
         </Button>
@@ -542,7 +542,7 @@ function FontFallbackPicker({
           <CommandInput
             value={query}
             onValueChange={setQuery}
-            placeholder="Search fonts"
+            placeholder={t("customTemplates.searchFonts")}
             className="font-syne text-sm"
           />
           <CommandList
@@ -553,7 +553,7 @@ function FontFallbackPicker({
           >
             {filteredOptions.length === 0 ? (
               <CommandEmpty>
-                {options.length === 0 ? "Loading fonts..." : "No fonts found"}
+                {options.length === 0 ? t("customTemplates.loadingFonts") : t("customTemplates.noFonts")}
               </CommandEmpty>
             ) : (
               <CommandGroup
@@ -616,12 +616,14 @@ function AnalyzePanel({
   onLoadGoogleFontOptions: () => void;
   onContinue: () => void;
 }) {
+  const t = useTranslations();
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [resolvingFont, setResolvingFont] = useState<FontItem | null>(null);
   const missingFonts = fontsData?.unavailable_fonts ?? [];
-  const fontChips = fontsData ? uniqueFontChips(fontsData) : [];
+  const unknownFont = t("customTemplates.unknownFont");
+  const fontChips = fontsData ? uniqueFontChips(fontsData, unknownFont) : [];
   const missingFontsByKey = new Map(
-    missingFonts.map((font) => [chipLabel(font).toLowerCase(), font]),
+    missingFonts.map((font) => [chipLabel(font, unknownFont).toLowerCase(), font]),
   );
 
   const uploadedFontNames = new Set(uploadedFonts.map((font) => font.fontName));
@@ -648,7 +650,7 @@ function AnalyzePanel({
 
 
 
-        <div className="relative z-10 ml-8 2xl:ml-10 w-max rounded-t-[28px] 2xl:rounded-t-[32px] border border-b-0 border-[#EDEEF4] bg-white px-3 2xl:px-4 pb-2.5 2xl:pb-3 pt-2 2xl:pt-2.5">
+        <div className="relative z-10 ms-8 w-max rounded-t-[28px] border border-b-0 border-[#EDEEF4] bg-white px-3 pb-2.5 pt-2 2xl:ms-10 2xl:rounded-t-[32px] 2xl:px-4 2xl:pb-3 2xl:pt-2.5">
           <button
             type="button"
             onClick={() => {
@@ -658,7 +660,7 @@ function AnalyzePanel({
             className="flex h-[34px] 2xl:h-[42px] items-center gap-1.5 2xl:gap-2 rounded-[80px] bg-white px-3.5 2xl:px-4 text-[12px] 2xl:text-sm font-semibold text-black shadow-[0_0_4px_rgba(0,0,0,0.06)]"
           >
             <Upload className="h-3.5 w-3.5 2xl:h-4 2xl:w-4 text-[#7A5AF8]" />
-            Fonts Upload
+            {t("customTemplates.fontsUpload")}
           </button>
         </div>
 
@@ -666,7 +668,7 @@ function AnalyzePanel({
           <div className="flex flex-wrap gap-3 pt-2 min-h-[140px] ">
             {fontChips.length > 0 ? (
               fontChips.map((font, index) => {
-                const label = chipLabel(font);
+                const label = chipLabel(font, unknownFont);
                 const missingFont = missingFontsByKey.get(label.toLowerCase());
                 const isMissing = Boolean(missingFont);
                 const isUploaded = missingFont
@@ -704,7 +706,7 @@ function AnalyzePanel({
               })
             ) : (
               <div className="col-span-full flex min-h-[140px] items-center justify-center rounded-xl border border-[#E8EAF0] bg-white text-sm font-medium text-[#686C78]">
-                No fonts detected
+                {t("customTemplates.noFontsDetected")}
               </div>
             )}
           </div>
@@ -718,12 +720,12 @@ function AnalyzePanel({
               {isUploading ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Creating...
+                  {t("customTemplates.creating")}
                 </>
               ) : (
                 <>
-                  Continue
-                  <ChevronRight className="h-4 w-4" />
+                  {t("common.continue")}
+                  <ChevronRight className="h-4 w-4 rtl:rotate-180" />
                 </>
               )}
             </GradientPillButton>
@@ -736,8 +738,8 @@ function AnalyzePanel({
               <button
                 type="button"
                 onClick={() => setResolvingFont(null)}
-                aria-label="Close"
-                className="absolute -right-14 top-0 flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#20222B] shadow-sm"
+                aria-label={t("common.close")}
+                className="absolute -end-14 top-0 flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#20222B] shadow-sm"
               >
                 <X className="h-6 w-6" />
               </button>
@@ -745,10 +747,10 @@ function AnalyzePanel({
               <div className="flex items-center justify-between gap-4 border-b border-[#EEF0F5] px-5 py-4">
                 <div className="min-w-0">
                   <h3 className=" text-lg font-semibold text-[#191919]">
-                    Resolve Missing Font
+                    {t("customTemplates.resolveMissingFont")}
                   </h3>
                   <p className="mt-1 text-xs text-[#808080]">
-                    {resolvingFontName} is missing.
+                    {t("customTemplates.fontMissing", { font: resolvingFontName })}
                   </p>
                 </div>
                 <button
@@ -757,14 +759,14 @@ function AnalyzePanel({
                   className="h-9 rounded-full px-5 text-sm font-medium text-black"
                   style={{ background: pillGradient }}
                 >
-                  Save
+                  {t("common.save")}
                 </button>
               </div>
 
               <div className="space-y-4 px-5 py-4">
                 <div>
                   <p className="mb-2 text-xs font-semibold text-[#30323A]">
-                    Upload original font file
+                    {t("customTemplates.uploadOriginalFont")}
                   </p>
                   <input
                     ref={(node) => {
@@ -788,19 +790,19 @@ function AnalyzePanel({
                         <Upload className="h-4 w-4" />
                       )}
                     </span>
-                    {resolvingFontUploaded ? "Font file uploaded" : "Upload .ttf / .otf"}
+                    {resolvingFontUploaded ? t("customTemplates.fontUploaded") : t("customTemplates.uploadFontTypes")}
                   </button>
                 </div>
 
                 <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
                   <span className="h-px bg-[#EEF0F5]" />
-                  <span className="text-xs font-medium text-[#686C78]">or</span>
+                  <span className="text-xs font-medium text-[#686C78]">{t("customTemplates.or")}</span>
                   <span className="h-px bg-[#EEF0F5]" />
                 </div>
 
                 <div>
                   <p className="mb-2 text-xs font-semibold text-[#30323A]">
-                    Fallback font
+                    {t("customTemplates.fallbackFont")}
                   </p>
                   <FontFallbackPicker
                     fontName={resolvingFontName}
@@ -826,8 +828,7 @@ function AnalyzePanel({
             i
           </span>
           <p>
-            Exact font files maintain typography and spacing. Fallback fonts may
-            slightly change the layout and text wrapping.
+            {t("customTemplates.fontGuidance")}
           </p>
         </div>
       </div>
@@ -940,13 +941,14 @@ function KonvaLayoutSlide({
 }
 
 function GeneratingSlidesOverlay() {
+  const t = useTranslations();
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center sm:bottom-8">
       <span className="relative z-20 flex items-center overflow-hidden rounded-[50px] bg-white px-4 py-2.5 text-sm font-medium text-[#666666] shadow-[0_2px_12px_rgba(16,24,40,0.08)]">
         <span aria-hidden className="generating-slides-background absolute" />
         <span className="relative z-10 flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-[#9034EA]" />
-          Updating slides...
+          {t("customTemplates.updatingSlides")}
         </span>
       </span>
     </div>
@@ -1003,6 +1005,7 @@ function ThumbnailStrip({
   onSelect: (index: number) => void;
   bottomOffset?: string;
 }) {
+  const t = useTranslations();
   const count = slides?.length ?? urls?.length ?? 0;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -1062,7 +1065,7 @@ function ThumbnailStrip({
       <button
         type="button"
         onClick={() => scrollThumbnails(-1)}
-        aria-label="Scroll thumbnails left"
+        aria-label={t("customTemplates.scrollThumbnailsLeft")}
         className={`absolute left-0 top-1/2 z-10 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-[#E6E7ED] bg-white/95 text-black shadow-[0_2px_10px_rgba(16,24,40,0.14)] transition sm:h-9 sm:w-9 ${canScrollLeft ? "opacity-100" : "pointer-events-none opacity-0"}`}
       >
         <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -1090,7 +1093,7 @@ function ThumbnailStrip({
               {isReady && url ? (
                 <img
                   src={resolveBackendAssetUrl(url)}
-                  alt={`Slide ${index + 1}`}
+                  alt={t("customTemplates.slideAlt", { number: index + 1 })}
                   className="h-full w-full rounded-[5px] object-cover sm:rounded-[6px]"
                   draggable={false}
                 />
@@ -1107,7 +1110,7 @@ function ThumbnailStrip({
       <button
         type="button"
         onClick={() => scrollThumbnails(1)}
-        aria-label="Scroll thumbnails right"
+        aria-label={t("customTemplates.scrollThumbnailsRight")}
         className={`absolute right-0 top-1/2 z-10 flex h-8 w-8 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-[#E6E7ED] bg-white/95 text-black shadow-[0_2px_10px_rgba(16,24,40,0.14)] transition sm:h-9 sm:w-9 ${canScrollRight ? "opacity-100" : "pointer-events-none opacity-0"}`}
       >
         <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -1131,6 +1134,7 @@ function ReviewSlideCanvas({
   fonts?: Record<string, string>;
   isGenerating?: boolean;
 }) {
+  const t = useTranslations();
   if (hasRenderableKonvaLayout(slide)) {
     return (
       <KonvaLayoutSlide
@@ -1157,7 +1161,7 @@ function ReviewSlideCanvas({
     return (
       <ScaledScreenshotSlide
         src={slide.screenshot_url}
-        alt={`Slide ${slide.slide_number}`}
+        alt={t("customTemplates.slideAlt", { number: slide.slide_number })}
       />
     );
   }
@@ -1165,7 +1169,7 @@ function ReviewSlideCanvas({
   return (
     <ResponsiveSlideViewport className="border border-[#E8E8EF] bg-[#F7F7FA]">
       <div className="flex h-full w-full items-center justify-center text-sm text-[#777985] 2xl:text-base">
-        {slide.processing ? "Generating slide..." : "Slide unavailable"}
+        {slide.processing ? t("customTemplates.generatingSlide") : t("customTemplates.slideUnavailable")}
       </div>
     </ResponsiveSlideViewport>
   );
@@ -1200,6 +1204,7 @@ function PreviewPanel({
   selectedIndex: number;
   onSelect: (index: number) => void;
 }) {
+  const t = useTranslations();
   const selectedUrl = previewUrls[selectedIndex] ?? previewUrls[0];
 
   return (
@@ -1208,7 +1213,7 @@ function PreviewPanel({
         {selectedUrl ? (
           <ScaledScreenshotSlide
             src={selectedUrl}
-            alt={`Slide ${selectedIndex + 1}`}
+            alt={t("customTemplates.slideAlt", { number: selectedIndex + 1 })}
             fitToAvailableHeight
             bottomReserve={176}
           />
@@ -1219,7 +1224,7 @@ function PreviewPanel({
             bottomReserve={176}
           >
             <div className="flex h-full w-full items-center justify-center text-sm text-[#777985] 2xl:text-base">
-              Preview unavailable
+              {t("customTemplates.previewUnavailable")}
             </div>
           </ResponsiveSlideViewport>
         )}
@@ -1249,6 +1254,7 @@ function ReviewPanel({
   enableEditing?: boolean;
   isGenerating?: boolean;
 }) {
+  const t = useTranslations();
   const selectedSlide = slides[selectedIndex] ?? slides[0];
   const isReady =
     Boolean(selectedSlide?.processed && !selectedSlide.processing && selectedSlide.v2Layout) ||
@@ -1277,7 +1283,7 @@ function ReviewPanel({
                     disabled={!selectedSlide || selectedSlide.processing}
                     className="h-8 rounded-[4px] px-2.5 text-[12px] font-medium text-black transition hover:bg-[#F6F6F9] disabled:cursor-not-allowed disabled:opacity-50 2xl:h-9 2xl:px-3 2xl:text-sm"
                   >
-                    Re-Construct
+                    {t("customTemplates.reconstruct")}
                   </button>
                   <span className="h-6 w-px bg-[#E8E8EE] 2xl:h-7" />
                   <button
@@ -1285,7 +1291,7 @@ function ReviewPanel({
                     onClick={handleDelete}
                     disabled={!isReady}
                     className="flex h-8 w-8 items-center justify-center rounded-[4px] text-black transition hover:bg-[#F6F6F9] disabled:cursor-not-allowed disabled:opacity-50 2xl:h-9 2xl:w-9"
-                    aria-label="Delete slide"
+                    aria-label={t("customTemplates.deleteSlide")}
                   >
                     <Trash2 className="h-4 w-4 2xl:h-[18px] 2xl:w-[18px]" />
                   </button>
@@ -1316,9 +1322,9 @@ function SaveTemplateModal({
   isOpen,
   defaultName,
   isSaving,
-  title = "Save Template",
-  subtitle = "Give your template a name.",
-  submitLabel = "Save",
+  title,
+  subtitle,
+  submitLabel,
   onClose,
   onSave,
 }: {
@@ -1331,6 +1337,7 @@ function SaveTemplateModal({
   onClose: () => void;
   onSave: (name: string, description: string) => Promise<void>;
 }) {
+  const t = useTranslations();
   const [name, setName] = useState(defaultName);
   const [description, setDescription] = useState("");
 
@@ -1356,15 +1363,15 @@ function SaveTemplateModal({
           type="button"
           onClick={onClose}
           disabled={isSaving}
-          aria-label="Close"
-          className="absolute -right-[54px] 2xl:-right-[62px] top-0 flex h-[46px] w-[46px] 2xl:h-[52px] 2xl:w-[52px] items-center justify-center rounded-full bg-white text-black shadow-sm disabled:opacity-50"
+          aria-label={t("common.close")}
+          className="absolute -end-[54px] top-0 flex h-[46px] w-[46px] items-center justify-center rounded-full bg-white text-black shadow-sm disabled:opacity-50 2xl:-end-[62px] 2xl:h-[52px] 2xl:w-[52px]"
         >
           <X className="h-6 w-6 2xl:h-7 2xl:w-7" />
         </button>
         <div className="flex h-[74px] 2xl:h-[84px] items-center justify-between border-b border-[#EDEEF3] px-5 2xl:px-6">
           <div>
-            <h2 className="text-[16px] 2xl:text-lg font-medium text-black">{title}</h2>
-            <p className="mt-1 text-[11px] 2xl:text-[13px] text-[#7E818C]">{subtitle}</p>
+            <h2 className="text-[16px] 2xl:text-lg font-medium text-black">{title ?? t("customTemplates.saveTemplate")}</h2>
+            <p className="mt-1 text-[11px] 2xl:text-[13px] text-[#7E818C]">{subtitle ?? t("customTemplates.saveTemplateDescription")}</p>
           </div>
           <button
             type="button"
@@ -1373,32 +1380,32 @@ function SaveTemplateModal({
             className="inline-flex h-8 2xl:h-9 min-w-[78px] 2xl:min-w-[88px] items-center justify-center rounded-[58px] px-5 2xl:px-6 text-[13px] 2xl:text-sm font-medium text-black disabled:cursor-not-allowed disabled:opacity-60"
             style={{ background: pillGradient }}
           >
-            {isSaving ? <Loader2 className="h-4 w-4 2xl:h-5 2xl:w-5 animate-spin" /> : submitLabel}
+            {isSaving ? <Loader2 className="h-4 w-4 2xl:h-5 2xl:w-5 animate-spin" /> : (submitLabel ?? t("common.save"))}
           </button>
         </div>
 
         <div className="space-y-4 2xl:space-y-5 px-[18px] 2xl:px-6 pb-[18px] 2xl:pb-6 pt-5 2xl:pt-6">
           <label className="block">
             <span className="mb-2 2xl:mb-2.5 block text-[12px] 2xl:text-sm font-medium text-[#25272F]">
-              Template Name
+              {t("customTemplates.templateName")}
             </span>
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
               disabled={isSaving}
-              placeholder="e.g. Modern Tech Pitch Deck"
+              placeholder={t("customTemplates.templateNamePlaceholder")}
               className="h-9 2xl:h-10 w-full rounded-[5px] border border-[#E1E2E8] bg-white px-3 2xl:px-4 text-[13px] 2xl:text-[15px] text-black outline-none placeholder:text-[#8C8E96] focus:border-[#B9ABFF]"
             />
           </label>
           <label className="block">
             <span className="mb-2 2xl:mb-2.5 block text-[12px] 2xl:text-sm font-medium text-[#25272F]">
-              Description
+              {t("customTemplates.description")}
             </span>
             <textarea
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               disabled={isSaving}
-              placeholder="Briefly describe when or how this template should be used."
+              placeholder={t("customTemplates.descriptionPlaceholder")}
               rows={4}
               className="h-[86px] 2xl:h-[100px] w-full resize-none rounded-[5px] border border-[#E1E2E8] bg-white px-3 2xl:px-4 py-3 2xl:py-3.5 text-[13px] 2xl:text-[15px] text-black outline-none placeholder:text-[#8C8E96] focus:border-[#B9ABFF]"
             />
@@ -1410,6 +1417,7 @@ function SaveTemplateModal({
 }
 
 const CustomTemplatePage = () => {
+  const { locale, t } = useI18n();
   const router = useRouter();
   const llmConfig = useSelector((state: RootState) => state.userConfig.llm_config);
   const [reviewSlideIndex, setReviewSlideIndex] = useState(0);
@@ -1440,7 +1448,7 @@ const CustomTemplatePage = () => {
     retrySlide,
   } = useTemplateCreation();
 
-  const defaultTemplateName = getDefaultTemplateName(selectedFile) || "Untitled Template";
+  const defaultTemplateName = getDefaultTemplateName(selectedFile) || t("customTemplates.untitled");
   const activeStep = activeStudioStep(state.step);
   const showUpload = state.step === "file-upload";
   const showAnalyze = state.step === "font-check" || state.step === "font-upload";
@@ -1507,11 +1515,15 @@ const CustomTemplatePage = () => {
   );
 
   useEffect(() => {
-    showTemplateV2ModelWarningIfNeeded(llmConfig);
+    showTemplateV2ModelWarningIfNeeded(llmConfig, {
+      title: t("customTemplates.modelWarning"),
+      description: t("customTemplates.modelWarningDescription"),
+      dismiss: t("customTemplates.dontShowAgain"),
+    });
     return () => {
       dismissTemplateV2ModelWarning();
     };
-  }, [llmConfig]);
+  }, [llmConfig, t]);
 
   const handleLoadGoogleFontOptions = useCallback(() => {
     if (googleFontLoadStartedRef.current) return;
@@ -1602,8 +1614,8 @@ const CustomTemplatePage = () => {
     if (!selectedFile) return;
     if (hasPendingMissingFonts) {
       notify.warning(
-        "Missing fonts",
-        "Continuing without uploaded font files. Selected Google replacements will be applied.",
+        t("customTemplates.missingFonts"),
+        t("customTemplates.missingFontsDescription"),
       );
     }
     const data = await fontUploadAndPreview(
@@ -1623,12 +1635,13 @@ const CustomTemplatePage = () => {
     loadFontAssets,
     selectedGoogleFontReplacements,
     selectedFile,
+    t,
   ]);
 
   const handleCreateTemplate = useCallback(
     async (name: string, description: string) => {
       if (!state.previewData) {
-        notify.error("Preview unavailable", "Create the slide preview before continuing.");
+        notify.error(t("customTemplates.previewUnavailable"), t("customTemplates.previewRequired"));
         return;
       }
 
@@ -1649,27 +1662,27 @@ const CustomTemplatePage = () => {
           description: description || null,
         });
         notify.success(
-          "Template generation started",
-          "You can track the template status from the Templates page.",
+          t("customTemplates.generationStarted"),
+          t("customTemplates.generationStartedDescription"),
         );
         setTemplateModalMode(null);
-        router.push("/templates?tab=custom");
-      } catch (error) {
+        router.push(`${localizePathname("/templates", locale)}?tab=custom`);
+      } catch {
         notify.error(
-          "Failed to create template",
-          error instanceof Error ? error.message : "An unexpected error occurred",
+          t("customTemplates.createFailed"),
+          t("errors.unknown"),
         );
       } finally {
         setIsSubmittingTemplate(false);
       }
     },
-    [router, selectedGoogleFontAssets, state.previewData],
+    [locale, router, selectedGoogleFontAssets, state.previewData, t],
   );
 
   const handleSaveTemplate = useCallback(
     async (name: string, description: string) => {
       if (!state.templateId) {
-        notify.error("Template unavailable", "Generate the template before saving.");
+        notify.error(t("customTemplates.templateUnavailable"), t("customTemplates.templateUnavailableDescription"));
         return;
       }
 
@@ -1679,19 +1692,19 @@ const CustomTemplatePage = () => {
           name,
           description: description || null,
         });
-        notify.success("Template saved", "The template was saved successfully.");
+        notify.success(t("customTemplates.templateSaved"), t("customTemplates.templateSavedDescription"));
         setTemplateModalMode(null);
-        router.push(`/template-preview?templateV2Id=${encodeURIComponent(state.templateId)}`);
-      } catch (error) {
+        router.push(`${localizePathname("/template-preview", locale)}?templateV2Id=${encodeURIComponent(state.templateId)}`);
+      } catch {
         notify.error(
-          "Failed to save template",
-          error instanceof Error ? error.message : "An unexpected error occurred",
+          t("customTemplates.saveFailed"),
+          t("errors.unknown"),
         );
       } finally {
         setIsSubmittingTemplate(false);
       }
     },
-    [router, state.templateId],
+    [locale, router, state.templateId, t],
   );
 
   const handleTemplateModalSubmit = useCallback(
@@ -1717,7 +1730,7 @@ const CustomTemplatePage = () => {
           disabled={state.isLoading || isSubmittingTemplate}
           fullWidth
         >
-          {isSubmittingTemplate ? "Creating Template..." : "Create Template"}
+          {isSubmittingTemplate ? t("customTemplates.creatingTemplate") : t("customTemplates.create")}
         </GradientPillButton>
       );
     }
@@ -1729,7 +1742,7 @@ const CustomTemplatePage = () => {
           disabled={!generatedSlidesReady || state.isLoading || isSubmittingTemplate}
           fullWidth
         >
-          {generatedSlidesReady ? "Save as Template" : "Generating Template"}
+          {generatedSlidesReady ? t("customTemplates.saveAsTemplate") : t("customTemplates.generatingTemplate")}
         </GradientPillButton>
       );
     }
@@ -1742,6 +1755,7 @@ const CustomTemplatePage = () => {
     showPreview,
     showReview,
     state.isLoading,
+    t,
   ]);
 
   return (
@@ -1802,13 +1816,13 @@ const CustomTemplatePage = () => {
         isOpen={isTemplateModalOpen}
         defaultName={defaultTemplateName}
         isSaving={isSubmittingTemplate}
-        title={isCreateTemplateModal ? "Create Template" : "Save Template"}
+        title={isCreateTemplateModal ? t("customTemplates.create") : t("customTemplates.saveTemplate")}
         subtitle={
           isCreateTemplateModal
-            ? "Name this template before generation starts."
-            : "Give your template a name."
+            ? t("customTemplates.createTemplateDescription")
+            : t("customTemplates.saveTemplateDescription")
         }
-        submitLabel={isCreateTemplateModal ? "Create" : "Save"}
+        submitLabel={isCreateTemplateModal ? t("customTemplates.create") : t("common.save")}
         onClose={() => {
           if (!isSubmittingTemplate) setTemplateModalMode(null);
         }}

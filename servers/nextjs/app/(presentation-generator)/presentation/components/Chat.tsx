@@ -77,6 +77,7 @@ import {
   setPresentationData,
   type PresentationData,
 } from "@/store/slices/presentationGeneration";
+import { useTranslations } from "@/i18n/catalog";
 
 const suggestions: { id: string; icon: ReactNode; suggestion: string }[] = [
   {
@@ -323,7 +324,6 @@ type ChatProps = {
   resourceId?: string;
   chatAdapter?: ChatApiAdapter;
   conversationStorageScope?: string;
-  resourceLabel?: string;
   variant?: "presentation" | "outline" | "template-v2";
   useEditorLayout?: boolean;
   inputDisabled?: boolean;
@@ -584,19 +584,23 @@ const AssistantSparkleIcon = ({ size = 14 }: { size?: number }) => (
   </svg>
 );
 
-const AssistantMarker = () => (
-  <div className="mb-2 flex items-center gap-1.5 text-[#8A8F98]">
-    <AssistantSparkleIcon size={14} />
-    <span className="text-[11px] font-medium leading-4">Assistant</span>
-  </div>
-);
+const AssistantMarker = () => {
+  const t = useTranslations();
+  return (
+    <div className="mb-2 flex items-center gap-1.5 text-[#8A8F98]">
+      <AssistantSparkleIcon size={14} />
+      <span className="text-[11px] font-medium leading-4">{t("presentation.assistant")}</span>
+    </div>
+  );
+};
 
 const ActivityStatusIcon = ({ activity }: { activity: AssistantActivity }) => {
+  const t = useTranslations();
   if (activity.state === "running") {
     return (
       <span
         className="activity-flow-dots mt-1 relative h-[9px] w-[22px] shrink-0"
-        aria-label="Working"
+        aria-label={t("presentation.working")}
       >
         <span className="absolute left-0 top-[1.5px] h-[6px] w-[6px] rounded-full bg-[#C3C3CB]" />
         <span className="absolute left-[8px] top-[1.5px] h-[6px] w-[6px] rounded-full bg-[#C3C3CB]" />
@@ -658,11 +662,12 @@ const EditComparisonPreview = ({
   isApplying: boolean;
   onSelectVersion: (version: "original" | "modified") => void;
 }) => {
+  const t = useTranslations();
   if (!preview.modifiedSlides?.length) return null;
 
   const cards = [
-    { label: "Original", slides: preview.originalSlides, version: "original" as const },
-    { label: "Modified", slides: preview.modifiedSlides, version: "modified" as const },
+    { label: t("presentation.original"), slides: preview.originalSlides, version: "original" as const },
+    { label: t("presentation.modified"), slides: preview.modifiedSlides, version: "modified" as const },
   ];
 
   return (
@@ -675,9 +680,9 @@ const EditComparisonPreview = ({
           height={14}
           className="h-[14px] w-[14px] shrink-0"
         />
-        <span className="font-semibold text-[#191919]">Select edits</span>
+        <span className="font-semibold text-[#191919]">{t("presentation.selectEdits")}</span>
         <span className="ml-auto text-[11px] font-medium leading-[normal] text-[#7A5AF8]">
-          {preview.changeCount} {preview.changeCount === 1 ? "Change" : "Changes"}
+          {preview.changeCount} {preview.changeCount === 1 ? t("presentation.change") : t("presentation.changes")}
         </span>
       </div>
       <div className="grid grid-cols-2 gap-[5px]">
@@ -688,13 +693,13 @@ const EditComparisonPreview = ({
             onClick={() => onSelectVersion(card.version)}
             disabled={isApplying}
             className={cn(
-              "min-w-0 overflow-hidden rounded-[6px] border bg-[#F9FAFB] px-[6px] py-[10px] text-left transition-[border-color,background-color,box-shadow,opacity] hover:border-[#B7ACFC] disabled:cursor-wait disabled:opacity-70",
+              "min-w-0 overflow-hidden rounded-[6px] border bg-[#F9FAFB] px-[6px] py-[10px] text-start transition-[border-color,background-color,box-shadow,opacity] hover:border-[#B7ACFC] disabled:cursor-wait disabled:opacity-70",
               selectedVersion === card.version
                 ? "border-[#7A5AF8] bg-[#FAFAFF]"
                 : "border-[#EDEEEF]",
             )}
             aria-pressed={selectedVersion === card.version}
-            aria-label={`Restore ${card.label.toLowerCase()} slide state`}
+            aria-label={t("presentation.restoreSlideState", { version: card.label })}
           >
             <span className="mb-[7px] flex items-center justify-center gap-1 truncate text-center text-[13px] font-medium leading-[normal] text-[#191919]">
               {isApplying && selectedVersion === card.version && (
@@ -717,32 +722,6 @@ const EditComparisonPreview = ({
       </div>
     </div>
   );
-};
-
-const TOOL_LABELS: Record<string, string> = {
-  addOutline: "Outline adder",
-  updateOutline: "Outline editor",
-  deleteOutline: "Outline remover",
-  addNewSlide: "Blank slide adder",
-  addNewSlideLayout: "Layout slide adder",
-  getAvailableLayouts: "Layout finder",
-  getTemplateSummary: "Template reader",
-  readSourceDocuments: "Source document reader",
-  searchSlide: "Slide search",
-  getSlideAtIndex: "Slide reader",
-  saveSlide: "Slide saver",
-  updateSlide: "Slide updater",
-  deleteSlide: "Slide remover",
-  addElement: "Element adder",
-  updateElement: "Element updater",
-  deleteElement: "Element remover",
-  addComponent: "Component adder",
-  createComponent: "Component creator",
-  updateComponent: "Component updater",
-  deleteComponent: "Component remover",
-  getPresentationTheme: "Theme reader",
-  setPresentationTheme: "Theme applier",
-  generateAssets: "Asset generator",
 };
 
 const MUTATING_TOOLS = new Set([
@@ -781,118 +760,6 @@ const SLIDE_FOCUS_TOOLS = new Set([
 ]);
 const SLIDE_FOCUS_STATUSES = new Set(["start"]);
 const MIN_SLIDE_FOCUS_DWELL_MS = 700;
-
-const getToolLabel = (tool?: string) => {
-  if (!tool) {
-    return "";
-  }
-  return TOOL_LABELS[tool] ?? tool;
-};
-
-const humanizeTraceMessage = (message: string, tool?: string) => {
-  const trimmed = message.trim();
-  if (!trimmed) {
-    return "";
-  }
-
-  const lower = trimmed.toLowerCase();
-  if (lower === "reading deck context") {
-    return "Reviewing your presentation context.";
-  }
-  if (lower === "reading the presentation outline") {
-    return "Reading the presentation outline.";
-  }
-  if (lower === "reading the outline draft") {
-    return "Reading the outline draft.";
-  }
-  if (lower === "adding an outline slide") {
-    return "Adding an outline slide.";
-  }
-  if (lower === "updating the outline slide") {
-    return "Updating the outline slide.";
-  }
-  if (lower === "deleting the outline slide") {
-    return "Deleting the outline slide.";
-  }
-  if (lower === "reordering outline slides") {
-    return "Reordering outline slides.";
-  }
-  if (lower === "searching relevant slides") {
-    return "Searching slides for relevant content.";
-  }
-  if (lower === "opening the requested slide") {
-    return "Opening the selected slide.";
-  }
-  if (lower === "checking available themes") {
-    return "Checking available color themes.";
-  }
-  if (lower === "checking available layouts") {
-    return "Checking available layouts.";
-  }
-  if (lower === "checking the layout schema") {
-    return "Validating the slide schema.";
-  }
-  if (lower === "generating slide assets") {
-    return "Generating images and icons.";
-  }
-  if (lower === "saving the slide") {
-    return "Saving slide updates.";
-  }
-  if (lower === "deleting the slide") {
-    return "Deleting the slide.";
-  }
-  if (lower === "applying presentation theme") {
-    return "Applying the selected theme.";
-  }
-  if (lower === "reading template structure") {
-    return "Reading the template structure.";
-  }
-  if (lower === "reading source documents") {
-    return "Reading the source documents.";
-  }
-  if (lower === "opening the requested template slide") {
-    return "Opening the selected template slide.";
-  }
-  if (lower === "searching template content") {
-    return "Searching template content.";
-  }
-  if (lower === "finding editable elements") {
-    return "Finding editable elements.";
-  }
-  if (lower === "updating template content") {
-    return "Updating template content.";
-  }
-  if (lower === "deleting the template component") {
-    return "Deleting the selected component.";
-  }
-  if (lower === "swapping component variant") {
-    return "Swapping the component variant.";
-  }
-  if (lower.startsWith("using tools:")) {
-    const toolNames = trimmed
-      .slice("using tools:".length)
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter(Boolean)
-      .map((entry) => getToolLabel(entry));
-    return toolNames.length === 0
-      ? "Planning the next step."
-      : "Choosing the best way to help.";
-  }
-  if (lower.includes("found requested data")) {
-    if (tool === "getSlideAtIndex") {
-      return "Found the requested slide details.";
-    }
-    return "Found the requested information.";
-  }
-  if (lower.endsWith("completed.")) {
-    return trimmed;
-  }
-  if (lower.includes("failed")) {
-    return trimmed;
-  }
-  return trimmed;
-};
 
 const inferStatusState = (status: string): AssistantActivity["state"] => {
   const normalized = status.trim().toLowerCase();
@@ -935,28 +802,37 @@ const stripBackendContextFromUserMessage = (rawMessage: string) => {
 };
 
 const formatTraceActivity = (
-  trace: ChatStreamTrace
+  trace: ChatStreamTrace,
+  t: ReturnType<typeof useTranslations>,
 ): Omit<AssistantActivity, "id"> | null => {
   if (typeof trace.message === "string" && trace.message.trim().length > 0) {
+    const state =
+      trace.status === "error"
+        ? "error"
+        : trace.status === "success"
+          ? "success"
+          : trace.status === "ready" || trace.status === "info"
+            ? "info"
+            : "running";
     return {
-      label: humanizeTraceMessage(trace.message, trace.tool),
+      label:
+        state === "error"
+          ? t("presentation.toolStepFailed")
+          : trace.tool
+            ? humanActivityForTool(trace.tool, state === "success" ? "success" : "start", t)
+            : state === "success"
+              ? t("presentation.toolStepDone")
+              : t("presentation.toolStepStart"),
       kind: trace.kind,
       round: trace.round,
       tool: trace.tool,
-      state:
-        trace.status === "error"
-          ? "error"
-          : trace.status === "success"
-            ? "success"
-            : trace.status === "ready" || trace.status === "info"
-              ? "info"
-              : "running",
+      state,
     };
   }
 
   if (trace.tool && trace.status === "start") {
     return {
-      label: humanActivityForTool(trace.tool, "start"),
+      label: humanActivityForTool(trace.tool, "start", t),
       kind: trace.kind,
       round: trace.round,
       tool: trace.tool,
@@ -966,7 +842,7 @@ const formatTraceActivity = (
 
   if (trace.tool && trace.status === "success") {
     return {
-      label: humanActivityForTool(trace.tool, "success"),
+      label: humanActivityForTool(trace.tool, "success", t),
       kind: trace.kind,
       round: trace.round,
       tool: trace.tool,
@@ -976,7 +852,7 @@ const formatTraceActivity = (
 
   if (trace.tool && trace.status === "error") {
     return {
-      label: "I could not finish that step.",
+      label: t("presentation.toolStepFailed"),
       kind: trace.kind,
       round: trace.round,
       tool: trace.tool,
@@ -990,7 +866,7 @@ const formatTraceActivity = (
     trace.tools.length
   ) {
     return {
-      label: "Planning the next step.",
+      label: t("presentation.toolPlanning"),
       kind: trace.kind,
       round: trace.round,
       state: "info",
@@ -1002,14 +878,15 @@ const formatTraceActivity = (
 
 const humanActivityForTool = (
   tool: string | undefined,
-  state: "start" | "success"
+  state: "start" | "success",
+  t: ReturnType<typeof useTranslations>,
 ) => {
   const isDone = state === "success";
   switch (tool) {
     case "searchSlide":
-      return isDone ? "Found the relevant content." : "Looking through the content.";
+      return t(isDone ? "presentation.toolSearchDone" : "presentation.toolSearchStart");
     case "getSlideAtIndex":
-      return isDone ? "Checked the slide." : "Checking the slide.";
+      return t(isDone ? "presentation.toolCheckDone" : "presentation.toolCheckStart");
     case "addNewSlide":
     case "addNewSlideLayout":
     case "updateElement":
@@ -1019,17 +896,17 @@ const humanActivityForTool = (
     case "createComponent":
     case "updateSlide":
     case "saveSlide":
-      return isDone ? "Applied the change." : "Applying the change.";
+      return t(isDone ? "presentation.toolApplyDone" : "presentation.toolApplyStart");
     case "deleteComponent":
     case "deleteElement":
     case "deleteSlide":
-      return isDone ? "Removed the selected item." : "Removing the selected item.";
+      return t(isDone ? "presentation.toolRemoveDone" : "presentation.toolRemoveStart");
     case "generateAssets":
-      return isDone ? "Prepared the visual assets." : "Preparing visual assets.";
+      return t(isDone ? "presentation.toolAssetsDone" : "presentation.toolAssetsStart");
     case "setPresentationTheme":
-      return isDone ? "Updated the theme." : "Updating the theme.";
+      return t(isDone ? "presentation.toolThemeDone" : "presentation.toolThemeStart");
     default:
-      return isDone ? "Finished that step." : "Working on it.";
+      return t(isDone ? "presentation.toolStepDone" : "presentation.toolStepStart");
   }
 };
 
@@ -1049,7 +926,6 @@ const Chat = ({
   resourceId,
   chatAdapter = presentationChatAdapter,
   conversationStorageScope = "presentation",
-  resourceLabel = "presentation",
   variant = "presentation",
   useEditorLayout = false,
   inputDisabled = false,
@@ -1064,6 +940,7 @@ const Chat = ({
   onChatSendingStateChange,
   onFollowModeChange,
 }: ChatProps) => {
+  const t = useTranslations();
   const dispatch = useDispatch<AppDispatch>();
   const llmConfig = useSelector(
     (state: RootState) => state.userConfig.llm_config,
@@ -1275,11 +1152,7 @@ const Chat = ({
         );
       } catch (error) {
         console.error("Failed to load chat history:", error);
-        const detail =
-          error instanceof Error
-            ? error.message
-            : "Could not load previous chat";
-        notify.error("Could not load chat", detail);
+        notify.error(t("presentation.chatError"), t("presentation.chatError"));
       } finally {
         if (!cancelled) {
           setIsHistoryLoading(false);
@@ -1290,7 +1163,7 @@ const Chat = ({
     return () => {
       cancelled = true;
     };
-  }, [activeResourceId, chatAdapter, conversationStorageScope]);
+  }, [activeResourceId, chatAdapter, conversationStorageScope, t]);
 
   useEffect(() => {
     const activePreview = activeEditPreviewRef.current;
@@ -1627,11 +1500,7 @@ const Chat = ({
         );
       } catch (error) {
         console.error("Failed to delete chat conversations:", error);
-        const detail =
-          error instanceof Error
-            ? error.message
-            : "Could not delete the saved chat conversations";
-        notify.error("Could not delete chat", detail);
+        notify.error(t("presentation.chatError"), t("presentation.chatError"));
       }
     }
   };
@@ -1643,13 +1512,13 @@ const Chat = ({
   ) => {
     if (applyingEditPreviewMessageId) return;
     if (!presentationData || typeof presentationData !== "object") {
-      notify.error("Preview unavailable", "The presentation is not ready yet.");
+      notify.error(t("presentation.previewUnavailable"), t("presentation.previewUnavailable"));
       return;
     }
 
     const currentPresentation = presentationData as Record<string, unknown>;
     if (!Array.isArray(currentPresentation.slides)) {
-      notify.error("Preview unavailable", "No slide data is available.");
+      notify.error(t("presentation.previewUnavailable"), t("presentation.previewUnavailable"));
       return;
     }
 
@@ -1690,21 +1559,14 @@ const Chat = ({
         }
       }
       await onPresentationChanged?.();
-      notify.success(
-        version === "original" ? "Original restored" : "Changes restored",
-        `${preview.slideIndices.length} ${preview.slideIndices.length === 1 ? "slide" : "slides"
-        } updated.`,
-      );
-    } catch (error) {
+      notify.success(t("common.saved"), t("presentation.saved"));
+    } catch {
       dispatch(setPresentationData(presentationData as PresentationData));
       setSelectedEditVersionByMessage((previous) => ({
         ...previous,
         [messageId]: previousVersion,
       }));
-      notify.error(
-        "Could not restore slides",
-        error instanceof Error ? error.message : "Please try again.",
-      );
+      notify.error(t("presentation.chatError"), t("common.retry"));
     } finally {
       onChatMutationStateChange?.(false);
       setApplyingEditPreviewMessageId(null);
@@ -1729,7 +1591,7 @@ const Chat = ({
         "Failed to refresh presentation after tool mutation:",
         error
       );
-      notify.error("Refresh failed", "Changes were saved, but refresh failed.");
+      notify.error(t("presentation.refreshFailed"), t("presentation.refreshFailed"));
     } finally {
       refreshInFlightRef.current = false;
       if (refreshQueuedRef.current) {
@@ -1737,7 +1599,7 @@ const Chat = ({
         void refreshPresentationIncrementally();
       }
     }
-  }, [onPresentationChanged]);
+  }, [onPresentationChanged, t]);
 
   const refreshPresentationIfNeeded = async (toolCalls: string[]) => {
     const hasMutation = toolCalls.some((tool) => MUTATING_TOOLS.has(tool));
@@ -1753,7 +1615,7 @@ const Chat = ({
       await onPresentationChanged();
     } catch (error) {
       console.error("Failed to refresh presentation after chat update:", error);
-      notify.error("Refresh failed", "Chat completed, but refresh failed.");
+      notify.error(t("presentation.refreshFailed"), t("presentation.refreshFailed"));
     }
   };
 
@@ -1851,7 +1713,7 @@ const Chat = ({
       return;
     }
     if (variant !== "template-v2") {
-      notify.info("Attachments are available in Template V2 chat.");
+      notify.info(t("presentation.attachFiles"));
       return;
     }
 
@@ -1905,10 +1767,7 @@ const Chat = ({
         setAttachedDocuments((previous) => [...previous, ...documents]);
       }
 
-      notify.success(
-        "Attachment ready",
-        `${files.length} file${files.length === 1 ? "" : "s"} attached.`
-      );
+      notify.success(t("presentation.attachFiles"), t("common.done"));
       trackEvent(MixpanelEvent.AI_Assistant_Attachment_Added, {
         ...baseAnalyticsProps(),
         source,
@@ -1923,10 +1782,7 @@ const Chat = ({
         file_count: files.length,
         error_message: sanitizeAnalyticsError(error, "Attachment upload failed"),
       });
-      notify.error(
-        "Could not attach file",
-        error instanceof Error ? error.message : "Upload failed."
-      );
+      notify.error(t("files.uploadFailed"), t("files.uploadFailed"));
     } finally {
       setIsUploadingPastedImage(false);
     }
@@ -1992,10 +1848,7 @@ const Chat = ({
     }
 
     if (!activeResourceId) {
-      notify.error(
-        `${resourceLabel.charAt(0).toUpperCase()}${resourceLabel.slice(1)} not ready`,
-        `The ${resourceLabel} is not ready yet.`
-      );
+      notify.error(t("presentation.previewUnavailable"), t("presentation.previewUnavailable"));
       return;
     }
 
@@ -2015,10 +1868,7 @@ const Chat = ({
           file_count: pastedImages.length,
           error_message: sanitizeAnalyticsError(error, "Image processing failed"),
         });
-        notify.error(
-          "Could not read image",
-          error instanceof Error ? error.message : "Image processing failed."
-        );
+        notify.error(t("files.uploadFailed"), t("files.uploadFailed"));
         return;
       }
     }
@@ -2193,7 +2043,7 @@ const Chat = ({
             if (trace.status === "start") {
               markChatMutationStarted(trace.tool);
             }
-            const traceActivity = formatTraceActivity(trace);
+            const traceActivity = formatTraceActivity(trace, t);
             if (!traceActivity) {
               return;
             }
@@ -2321,16 +2171,17 @@ const Chat = ({
         delete next[assistantMessageId];
         return next;
       });
-      setErrorMessage(message);
+      const safeMessage = t("presentation.chatError");
+      setErrorMessage(safeMessage);
       setMessages((previous) => [
         ...previous,
         {
           id: createMessageId(),
           role: "error",
-          content: message,
+          content: safeMessage,
         },
       ]);
-      notify.error("Chat error", message);
+      notify.error(t("presentation.chatError"), safeMessage);
     } finally {
       setHasChatMutationStarted(false);
       if (abortControllerRef.current === streamAbortController) {
@@ -2496,10 +2347,7 @@ const Chat = ({
         document_count: 0,
         total_count: nextImages.length,
       });
-      notify.success(
-        "Image pasted",
-        `${nextImages.length} image${nextImages.length === 1 ? "" : "s"} ready to use.`
-      );
+      notify.success(t("presentation.attachFiles"), t("common.done"));
     } catch (error) {
       trackEvent(MixpanelEvent.AI_Assistant_Attachment_Failed, {
         ...baseAnalyticsProps(),
@@ -2507,10 +2355,7 @@ const Chat = ({
         file_count: imageFiles.length,
         error_message: sanitizeAnalyticsError(error, "Image upload failed"),
       });
-      notify.error(
-        "Could not paste image",
-        error instanceof Error ? error.message : "Image upload failed."
-      );
+      notify.error(t("files.uploadFailed"), t("files.uploadFailed"));
     } finally {
       setIsUploadingPastedImage(false);
     }
@@ -2560,7 +2405,7 @@ const Chat = ({
     event.stopPropagation();
     setIsDraggingAttachment(false);
     if (files.length === 0) {
-      notify.warning("Drop unavailable", "Use the attach button for this file.");
+      notify.warning(t("presentation.dropUnavailable"), t("presentation.dropUnavailable"));
       return;
     }
     void processTemplateV2Files(files, "drop");
@@ -2609,11 +2454,11 @@ const Chat = ({
             onClick={() => void resetChat()}
             disabled={isSending || isHistoryLoading}
             className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#E5E5E8] bg-white px-3 font-manrope text-xs font-medium text-[#55555F] shadow-sm transition-colors hover:border-[#D7D7DC] hover:bg-[#F7F7F8] hover:text-[#252529] disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="Start a new chat"
-            title="Start a new chat"
+            aria-label={t("presentation.newChat")}
+            title={t("presentation.newChat")}
           >
             <Plus className="h-3.5 w-3.5" />
-            New chat
+            {t("presentation.newChat")}
           </button>
         </div>
 
@@ -2621,7 +2466,7 @@ const Chat = ({
           {isHistoryLoading && messages.length === 0 ? (
             <div className="flex h-full items-center justify-center text-xs text-[#999999]">
               <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-              Loading chat…
+              {t("presentation.loadingChat")}
             </div>
           ) : messages.length > 0 ? (
             <div className="flex flex-col gap-0">
@@ -2739,11 +2584,11 @@ const Chat = ({
                               <span className="flex h-[14px] w-[14px] items-start justify-center pt-0.5">
                                 <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[#E6E6E6]" />
                               </span>
-                              <span>Understanding</span>
+                              <span>{t("presentation.understanding")}</span>
                               <ActivityStatusIcon
                                 activity={{
                                   id: "fallback",
-                                  label: "Understanding",
+                                  label: t("presentation.understanding"),
                                   state: "running",
                                 }}
                               />
@@ -2868,7 +2713,7 @@ const Chat = ({
             {(chatSlideReference || chatTargetReference) && (
               <div
                 className="mb-2 flex max-w-full items-center gap-1.5 overflow-hidden"
-                aria-label="Current editor selection"
+                aria-label={t("presentation.currentSelection")}
               >
                 {chatSlideReference && (
                   <span
@@ -2881,8 +2726,8 @@ const Chat = ({
                         type="button"
                         onClick={onClearChatSlideReference}
                         className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[#8069C5] transition-colors hover:bg-[#E4DFFF] hover:text-[#5235A8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/40"
-                        aria-label={`Remove ${chatSlideReference} from context`}
-                        title={`Remove ${chatSlideReference} from context`}
+                        aria-label={t("presentation.removeContext")}
+                        title={t("presentation.removeContext")}
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -2900,8 +2745,8 @@ const Chat = ({
                         type="button"
                         onClick={onClearChatTargetReference}
                         className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[#8069C5] transition-colors hover:bg-[#E4DFFF] hover:text-[#5235A8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/40"
-                        aria-label="Remove selected element from context"
-                        title="Remove selected element from context"
+                        aria-label={t("presentation.removeContext")}
+                        title={t("presentation.removeContext")}
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -2930,7 +2775,7 @@ const Chat = ({
                             previous.filter((item) => item.id !== link.id),
                           )
                         }
-                        aria-label="Remove link"
+                        aria-label={t("presentation.removeLink")}
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -2950,7 +2795,7 @@ const Chat = ({
                             previous.filter((item) => item.id !== image.id),
                           )
                         }
-                        aria-label="Remove pasted image"
+                        aria-label={t("presentation.removeImage")}
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -2970,7 +2815,7 @@ const Chat = ({
                             previous.filter((item) => item.id !== document.id),
                           )
                         }
-                        aria-label="Remove attached document"
+                        aria-label={t("presentation.removeDocument")}
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -2978,7 +2823,7 @@ const Chat = ({
                   ))}
                   {isUploadingPastedImage && (
                     <span className="inline-flex items-center gap-1 text-[10px] text-[#808080]">
-                      <Loader2 className="h-3 w-3 animate-spin" /> Processing
+                      <Loader2 className="h-3 w-3 animate-spin" /> {t("presentation.processing")}
                     </span>
                   )}
                 </div>
@@ -2999,11 +2844,7 @@ const Chat = ({
               onDragOverCapture={handleDragOver}
               onDropCapture={handleDrop}
               onKeyDown={handleKeyDown}
-              placeholder={
-                isOutlineVariant
-                  ? "Ask about your outline.\nType / to get Quick prompts."
-                  : "Ask anything.\nType / to get Quick prompts."
-              }
+              placeholder={isOutlineVariant ? t("outline.title") : t("presentation.chatPlaceholder")}
               aria-invalid={Boolean(errorMessage)}
             />
 
@@ -3015,7 +2856,7 @@ const Chat = ({
                     onClick={() => fileInputRef.current?.click()}
                     disabled={!isTemplateV2Variant || chatInputDisabled}
                     className="inline-flex h-[14px] w-[14px] items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
-                    aria-label="Attach files"
+                    aria-label={t("presentation.attachFiles")}
                   >
                     <Plus className="h-[14px] w-[14px] text-black" />
                   </button>
@@ -3023,8 +2864,8 @@ const Chat = ({
                   <ToolTip
                     content={
                       isFollowAgentEnabled
-                        ? "Disable follow AI mode"
-                        : "Enable follow AI mode"
+                        ? t("presentation.disableFollow")
+                        : t("presentation.enableFollow")
                     }
                   >
                     <button
@@ -3036,8 +2877,8 @@ const Chat = ({
                       className="inline-flex h-[14px] w-[14px] items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
                       aria-label={
                         isFollowAgentEnabled
-                          ? "Disable follow AI mode"
-                          : "Enable follow AI mode"
+                          ? t("presentation.disableFollow")
+                          : t("presentation.enableFollow")
                       }
                     >
                       <svg
@@ -3074,7 +2915,7 @@ const Chat = ({
                       type="button"
                       disabled={chatInputDisabled}
                       className="inline-flex h-[28px] items-center gap-1.5 rounded-full border border-[#EDEEEF] bg-white px-[11px] font-syne text-xs font-medium tracking-[0.16px] text-[#191919] transition-colors hover:bg-[#FAFAFF] disabled:cursor-not-allowed disabled:opacity-40"
-                      aria-label="Open quick prompts"
+                      aria-label={t("presentation.quickPrompts")}
                     >
                       <Image
                         src="/ai-star.svg"
@@ -3109,7 +2950,7 @@ const Chat = ({
                   type="button"
                   onClick={stopStreaming}
                   className="flex h-8 w-10 shrink-0 items-center justify-center rounded-full bg-[#EDEEEF] text-[#191919]"
-                  aria-label="Stop chat response"
+                  aria-label={t("presentation.stopResponse")}
                 >
                   <Square className="h-3 w-3 fill-current" />
                 </button>
@@ -3130,7 +2971,7 @@ const Chat = ({
                       ? "linear-gradient(270deg, #D5CAFC 2.4%, #E3D2EB 27.88%, #F4DCD3 69.23%, #FDE4C2 100%)"
                       : "#EDEEEF",
                   }}
-                  aria-label="Send prompt"
+                  aria-label={t("presentation.sendMessage")}
                 >
                   <ArrowUp className="h-4 w-4" />
                 </button>
@@ -3206,8 +3047,8 @@ const Chat = ({
               onClick={() => void resetChat()}
               disabled={isSending || isHistoryLoading}
               className="rounded-full p-1 text-[#8C8C8C] transition-colors hover:bg-[#F7F7F7] hover:text-[#191919] disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="Reset chat"
-              title="Reset chat"
+              aria-label={t("presentation.resetChat")}
+              title={t("presentation.resetChat")}
             >
               <RefreshCw className="h-4 w-4" />
             </button>
@@ -3224,7 +3065,7 @@ const Chat = ({
         {isHistoryLoading && messages.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-sm text-[#99A1AF]">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Loading chat…
+            {t("presentation.loadingChat")}
           </div>
         ) : showEditorEmptyState ? (
           <h3 className="-translate-y-7 text-center text-[clamp(20px,1.55vw,24px)] font-normal leading-[1.08] tracking-[-0.72px] text-[#4A4A4A]">
@@ -3405,7 +3246,7 @@ const Chat = ({
                         ) : (
                           <ChevronRight className="h-3 w-3" />
                         )}
-                        <span>Thinking</span>
+                        <span>{t("presentation.thinking")}</span>
                         {message.activity.some(
                           (item) => item.state === "running"
                         ) && (
@@ -3469,7 +3310,7 @@ const Chat = ({
         {(chatSlideReference || chatTargetReference) && (
           <div
             className="mb-2 flex max-w-full items-center gap-1.5 overflow-hidden"
-            aria-label="Current editor selection"
+            aria-label={t("presentation.currentSelection")}
           >
             {chatSlideReference && (
               <span
@@ -3482,8 +3323,8 @@ const Chat = ({
                     type="button"
                     onClick={onClearChatSlideReference}
                     className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[#8069C5] transition-colors hover:bg-[#E4DFFF] hover:text-[#5235A8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/40"
-                    aria-label={`Remove ${chatSlideReference} from context`}
-                    title={`Remove ${chatSlideReference} from context`}
+                    aria-label={t("presentation.removeContext")}
+                    title={t("presentation.removeContext")}
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -3501,8 +3342,8 @@ const Chat = ({
                     type="button"
                     onClick={onClearChatTargetReference}
                     className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[#8069C5] transition-colors hover:bg-[#E4DFFF] hover:text-[#5235A8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/40"
-                    aria-label="Remove selected element from context"
-                    title="Remove selected element from context"
+                    aria-label={t("presentation.removeContext")}
+                    title={t("presentation.removeContext")}
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -3531,8 +3372,8 @@ const Chat = ({
                       )
                     }
                     className="rounded-full p-0.5 text-[#2563EB] transition-colors hover:bg-[#DBEAFE]"
-                    aria-label="Remove link"
-                    title="Remove link"
+                    aria-label={t("presentation.removeLink")}
+                    title={t("presentation.removeLink")}
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -3553,8 +3394,8 @@ const Chat = ({
                       )
                     }
                     className="rounded-full p-0.5 text-[#667085] transition-colors hover:bg-[#E4E7EC]"
-                    aria-label="Remove pasted image"
-                    title="Remove pasted image"
+                    aria-label={t("presentation.removeImage")}
+                    title={t("presentation.removeImage")}
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -3575,8 +3416,8 @@ const Chat = ({
                       )
                     }
                     className="rounded-full p-0.5 text-[#667085] transition-colors hover:bg-[#E4E7EC]"
-                    aria-label="Remove attached document"
-                    title="Remove attached document"
+                    aria-label={t("presentation.removeDocument")}
+                    title={t("presentation.removeDocument")}
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -3585,7 +3426,7 @@ const Chat = ({
               {isUploadingPastedImage && (
                 <span className="inline-flex items-center gap-1.5 rounded-[8px] border border-[#EDEEEF] bg-[#F9FAFB] px-2 py-1 text-xs font-medium text-[#667085]">
                   <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-                  Processing attachment
+                  {t("presentation.processing")}
                 </span>
               )}
             </div>
@@ -3608,15 +3449,7 @@ const Chat = ({
           onDragOverCapture={handleDragOver}
           onDropCapture={handleDrop}
           onKeyDown={handleKeyDown}
-          placeholder={
-            isOutlineVariant
-              ? "Regenerate this outline"
-              : showEditorEmptyState
-                ? "Ask anything.\nType / to get Quick prompts."
-                : isTemplateV2Variant
-                  ? "Change slide 2 title"
-                  : "Improve slide design"
-          }
+          placeholder={isOutlineVariant ? t("outline.regenerate") : t("presentation.chatPlaceholder")}
           aria-invalid={Boolean(errorMessage)}
         />
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
@@ -3627,11 +3460,11 @@ const Chat = ({
                 onClick={() => fileInputRef.current?.click()}
                 disabled={!isTemplateV2Variant || chatInputDisabled}
                 className="inline-flex h-[28px] items-center rounded-[64px] disabled:cursor-not-allowed disabled:opacity-50"
-                aria-label="Attach files"
+                aria-label={t("presentation.attachFiles")}
                 title={
                   isTemplateV2Variant
-                    ? "Attach files"
-                    : "Attachments are available in Template V2 chat"
+                    ? t("presentation.attachFiles")
+                    : t("presentation.attachmentsTemplateOnly")
                 }
               >
                 <Plus className="h-3 w-3 text-black" />
@@ -3648,8 +3481,8 @@ const Chat = ({
               <ToolTip
                 content={
                   isFollowAgentEnabled
-                    ? "Disable follow AI mode"
-                    : "Enable follow AI mode"
+                    ? t("presentation.disableFollow")
+                    : t("presentation.enableFollow")
                 }
               >
                 <button
@@ -3661,8 +3494,8 @@ const Chat = ({
                   className="inline-flex h-[28px] items-center gap-1 rounded-[64px] text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   aria-label={
                     isFollowAgentEnabled
-                      ? "Disable follow AI mode"
-                      : "Enable follow AI mode"
+                      ? t("presentation.disableFollow")
+                      : t("presentation.enableFollow")
                   }
                   title={
                     isFollowAgentEnabled
@@ -3729,7 +3562,7 @@ const Chat = ({
               onClick={() => inputRef.current?.focus()}
               disabled={chatInputDisabled}
               className="inline-flex h-[30px] items-center gap-1.5 rounded-[64px] border border-[#EDEEEF] bg-white px-3 text-[12px] font-medium text-[#4A4A4A] transition-colors hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="Focus prompt input"
+              aria-label={t("presentation.focusPrompt")}
             >
               <svg
                 width="13"
@@ -3756,14 +3589,14 @@ const Chat = ({
                 type="button"
                 onClick={stopStreaming}
                 className="flex items-center gap-1.5 whitespace-nowrap rounded-[34px] border border-[#E4E7EC] bg-white px-3 py-2 text-sm font-medium text-[#344054] transition-colors hover:bg-[#F9FAFB]"
-                aria-label="Stop chat response"
+                aria-label={t("presentation.stopResponse")}
               >
                 <Loader2
                   className="h-3 w-3 animate-spin text-[#667085]"
                   aria-hidden="true"
                 />
                 <Square className="h-3 w-3 fill-current" aria-hidden="true" />
-                Stop
+                {t("presentation.stopGenerating")}
               </button>
             ) : (
               <button
@@ -3781,7 +3614,7 @@ const Chat = ({
                   background:
                     "linear-gradient(270deg, #D5CAFC 2.4%, #E3D2EB 27.88%, #F4DCD3 69.23%, #FDE4C2 100%)",
                 }}
-                aria-label="Send prompt"
+                aria-label={t("presentation.sendMessage")}
               >
                 <ArrowUp className="h-4 w-4 text-[#191919]" />
               </button>

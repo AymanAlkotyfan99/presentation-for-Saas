@@ -18,18 +18,42 @@ import {
 } from "@/components/ui/dialog";
 import {
   EDITOR_SHORTCUT_SECTIONS,
+  type EditorShortcut,
   type EditorShortcutSection,
 } from "@/components/slide-editor/shortcuts/editorShortcuts";
 import {
   ShortcutKeys,
   useAppleShortcutPlatform,
 } from "@/components/slide-editor/shortcuts/ShortcutKeys";
+import { useTranslations } from "@/i18n/catalog";
 
 const SECTION_ICONS: Record<EditorShortcutSection["id"], LucideIcon> = {
   selection: MousePointer2,
   editing: PencilLine,
   arrange: Layers3,
   help: CircleHelp,
+};
+
+const SECTION_COPY: Record<EditorShortcutSection["id"], [string, string]> = {
+  selection: ["editor.selectionSection", "editor.selectionSectionDescription"],
+  editing: ["editor.editingSection", "editor.editingSectionDescription"],
+  arrange: ["editor.arrangeSection", "editor.arrangeSectionDescription"],
+  help: ["editor.helpSection", "editor.helpSectionDescription"],
+};
+
+const SHORTCUT_COPY: Record<EditorShortcut["id"], [string, string]> = {
+  "multi-select": ["editor.multiSelectShortcut", "editor.multiSelectShortcutDescription"],
+  group: ["editor.groupShortcut", "editor.groupShortcutDescription"],
+  delete: ["editor.deleteShortcut", "editor.deleteShortcutDescription"],
+  undo: ["editor.undo", "editor.undoShortcutDescription"],
+  redo: ["editor.redo", "editor.redoShortcutDescription"],
+  copy: ["editor.copyShortcut", "editor.copyShortcutDescription"],
+  paste: ["editor.pasteShortcut", "editor.pasteShortcutDescription"],
+  "bring-forward": ["editor.bringForwardShortcut", "editor.bringForwardShortcutDescription"],
+  "bring-to-front": ["editor.bringFrontShortcut", "editor.bringFrontShortcutDescription"],
+  "send-backward": ["editor.sendBackwardShortcut", "editor.sendBackwardShortcutDescription"],
+  "send-to-back": ["editor.sendBackShortcut", "editor.sendBackShortcutDescription"],
+  "shortcut-help": ["editor.keyboardShortcuts", "editor.shortcutHelpDescription"],
 };
 
 export function KeyboardShortcutsDialog({
@@ -39,6 +63,7 @@ export function KeyboardShortcutsDialog({
   onOpenChange: (open: boolean) => void;
   open: boolean;
 }) {
+  const t = useTranslations();
   const detectedApplePlatform = useAppleShortcutPlatform();
   const [platformOverride, setPlatformOverride] = useState<boolean | null>(null);
   const applePlatform = platformOverride ?? detectedApplePlatform;
@@ -70,7 +95,7 @@ export function KeyboardShortcutsDialog({
         className="z-[10021] max-h-[calc(100vh-32px)] w-[calc(100%-32px)] max-w-[780px] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-[20px] border border-[#E7E8EC] bg-white p-0 font-syne shadow-[0_24px_80px_rgba(16,24,40,0.24)]"
         overlayClassName="z-[10020] bg-[#101323]/45 backdrop-blur-[2px]"
       >
-        <DialogHeader className="space-y-0 border-b border-[#EAECF0] px-6 py-5 pr-14 text-left">
+        <DialogHeader className="space-y-0 border-b border-[#EAECF0] px-6 py-5 pe-14 text-start">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-start gap-3.5">
               <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-[12px] bg-[#F0EDFF] text-[#6847F4]">
@@ -82,27 +107,26 @@ export function KeyboardShortcutsDialog({
               </span>
               <div>
                 <DialogTitle className="text-[18px] font-semibold leading-6 text-[#101323]">
-                  Keyboard shortcuts
+                  {t("editor.keyboardShortcuts")}
                 </DialogTitle>
                 <DialogDescription className="mt-1 text-[13px] leading-5 text-[#667085]">
-                  Work faster while the slide canvas is active. Shortcuts pause
-                  while you are typing in a text field.
+                  {t("editor.shortcutIntro")}
                 </DialogDescription>
               </div>
             </div>
             <div
-              aria-label="Shortcut platform"
+              aria-label={t("editor.shortcutPlatform")}
               className="inline-flex w-fit shrink-0 rounded-[9px] border border-[#E1E3E9] bg-[#F6F6F9] p-1"
               role="group"
             >
               <PlatformButton
                 active={!applePlatform}
-                label="Windows / Linux"
+                label={t("editor.windowsLinux")}
                 onClick={() => setPlatformOverride(false)}
               />
               <PlatformButton
                 active={applePlatform}
-                label="macOS"
+                label={t("editor.macOS")}
                 onClick={() => setPlatformOverride(true)}
               />
             </div>
@@ -126,11 +150,11 @@ export function KeyboardShortcutsDialog({
                         strokeWidth={1.8}
                       />
                       <h3 className="text-[14px] font-semibold text-[#101323]">
-                        {section.title}
+                        {t(SECTION_COPY[section.id][0])}
                       </h3>
                     </div>
                     <p className="mt-1 text-[11px] leading-4 text-[#7A8295]">
-                      {section.description}
+                      {t(SECTION_COPY[section.id][1])}
                     </p>
                   </div>
                   <div className="divide-y divide-[#EAECF0]">
@@ -141,15 +165,19 @@ export function KeyboardShortcutsDialog({
                       >
                         <div className="min-w-0">
                           <p className="text-[13px] font-semibold text-[#344054]">
-                            {shortcut.label}
+                            {t(SHORTCUT_COPY[shortcut.id][0])}
                           </p>
                           <p className="mt-0.5 text-[11px] leading-4 text-[#7A8295]">
-                            {shortcut.description}
+                            {t(SHORTCUT_COPY[shortcut.id][1])}
                           </p>
                         </div>
                         <ShortcutKeys
                           applePlatform={applePlatform}
-                          shortcut={shortcut}
+                          shortcut={{
+                            ...shortcut,
+                            label: t(SHORTCUT_COPY[shortcut.id][0]),
+                            description: t(SHORTCUT_COPY[shortcut.id][1]),
+                          }}
                         />
                       </div>
                     ))}
@@ -161,7 +189,9 @@ export function KeyboardShortcutsDialog({
         </div>
 
         <div className="border-t border-[#EAECF0] bg-[#FCFCFD] px-6 py-3 text-center text-[11px] text-[#7A8295]">
-          Showing shortcuts for {applePlatform ? "macOS" : "Windows and Linux"}.
+          {t("editor.showingShortcuts", {
+            platform: applePlatform ? t("editor.macOS") : t("editor.windowsLinux"),
+          })}
         </div>
       </DialogContent>
     </Dialog>

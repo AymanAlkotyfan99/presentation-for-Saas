@@ -10,6 +10,7 @@ import {
   TemplateListSection,
 } from "../../components/TemplateListUi";
 import { MixpanelEvent, trackEvent } from "@/utils/mixpanel";
+import { useTranslations } from "@/i18n/catalog";
 
 interface TemplateSelectionProps {
   presentationId: string | null;
@@ -30,6 +31,7 @@ const TemplateSelection: React.FC<TemplateSelectionProps> = memo(
     onSelectTemplate,
     onCreateTemplate,
   }) {
+    const t = useTranslations();
     const { defaultTemplates, customTemplates, loading } =
       useTemplateSummaries();
 
@@ -67,7 +69,7 @@ const TemplateSelection: React.FC<TemplateSelectionProps> = memo(
     if (customTemplates.length === 0) {
       return (
         <div className="mb-8">
-          <TemplateListSection label="Templates" selectionPage>
+          <TemplateListSection label={t("templates.title")} selectionPage>
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               <CreateCustomTemplate
                 selectionPage
@@ -84,7 +86,7 @@ const TemplateSelection: React.FC<TemplateSelectionProps> = memo(
 
     return (
       <div className="mb-8 space-y-[30px]">
-        <TemplateListSection label="Custom" selectionPage>
+        <TemplateListSection label={t("templates.custom")} selectionPage>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <CreateCustomTemplate
               selectionPage
@@ -96,9 +98,9 @@ const TemplateSelection: React.FC<TemplateSelectionProps> = memo(
           </div>
         </TemplateListSection>
 
-        <TemplateListSection label="Built-In" selectionPage>
+        <TemplateListSection label={t("templates.builtIn")} selectionPage>
           {defaultTemplates.length === 0 ? (
-            <TemplateListEmptyState message="No built-in templates available." />
+            <TemplateListEmptyState message={t("templates.noBuiltIn")} />
           ) : (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {defaultTemplates.map((template, index) =>

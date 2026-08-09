@@ -1,10 +1,15 @@
+"use client";
+
 import React from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import Wrapper from "@/components/Wrapper";
 import { FileText, Plus, ArrowRight } from "lucide-react";
+import { useI18n } from "@/i18n/catalog";
+import { localizePathname } from "@/i18n/routing";
 
 const EmptyStateView: React.FC = () => {
+    const { locale, t } = useI18n();
     const router = useRouter();
 
     return (
@@ -26,23 +31,22 @@ const EmptyStateView: React.FC = () => {
                     {/* Content */}
                     <div className="space-y-4">
                         <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 font-instrument_sans">
-                            No Presentation Found
+                            {t("outline.missingPresentationTitle")}
                         </h1>
                         <p className="text-lg text-gray-600 max-w-md mx-auto leading-relaxed">
-                            It looks like the presentation you are looking for is not found.
-                            Let's create a brand new presentation!
+                            {t("outline.missingPresentationDescription")}
                         </p>
                     </div>
 
                     {/* Action Button */}
                     <div className="pt-4">
                         <Button
-                            onClick={() => router.push("/upload")}
+                            onClick={() => router.push(localizePathname("/upload", locale))}
                             className="group bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-4 rounded-xl text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                         >
-                            <Plus className="w-5 h-5 mr-2" />
-                            Create New Presentation
-                            <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
+                            <Plus className="me-2 h-5 w-5" />
+                            {t("outline.createNewPresentation")}
+                            <ArrowRight className="ms-2 h-5 w-5 transition-transform duration-200 group-hover:translate-x-1 rtl:rotate-180" />
                         </Button>
                     </div>
 
@@ -52,4 +56,4 @@ const EmptyStateView: React.FC = () => {
     );
 };
 
-export default EmptyStateView; 
+export default EmptyStateView;

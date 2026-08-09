@@ -19,6 +19,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { useI18n, useTranslations } from "@/i18n/catalog";
+import { formatNumber } from "@/lib/locale-format";
 import type { Density, PanelMode, SchemaField } from "./templatePreviewUtils";
 import {
   BlocksPanel,
@@ -62,24 +64,24 @@ function BlocksIcon({ className }: { className?: string }) {
 
 const insertNavItems: Array<{
   id: PanelMode;
-  label: string;
+  labelKey: string;
   Icon: RailIcon;
 }> = [
-  { id: "blocks", label: "Blocks", Icon: BlocksIcon },
-  { id: "texts", label: "Texts", Icon: Type },
-  { id: "charts", label: "Charts", Icon: BarChart3 },
-  { id: "tables", label: "Tables", Icon: Rows3 },
-  { id: "images", label: "Images", Icon: ImageIcon },
-  { id: "elements", label: "Elements", Icon: Shapes },
+  { id: "blocks", labelKey: "templates.blocks", Icon: BlocksIcon },
+  { id: "texts", labelKey: "templates.texts", Icon: Type },
+  { id: "charts", labelKey: "templates.charts", Icon: BarChart3 },
+  { id: "tables", labelKey: "templates.tables", Icon: Rows3 },
+  { id: "images", labelKey: "templates.images", Icon: ImageIcon },
+  { id: "elements", labelKey: "templates.elements", Icon: Shapes },
 ];
 
 const templateNavItems: Array<{
   id: PanelMode;
-  label: string;
+  labelKey: string;
   Icon: RailIcon;
 }> = [
-  { id: "schema", label: "Schema", Icon: Edit3 },
-  { id: "layouts", label: "Layouts", Icon: List },
+  { id: "schema", labelKey: "templates.schema", Icon: Edit3 },
+  { id: "layouts", labelKey: "templates.layouts", Icon: List },
 ];
 
 function ToolRailButton({
@@ -126,10 +128,11 @@ export function ToolRail({
   activePanel: PanelMode;
   onPanelChange: (panel: PanelMode) => void;
 }) {
+  const t = useTranslations();
   return (
     <div className="hide-scrollbar hidden w-[70px] shrink-0 flex-col items-center overflow-y-auto bg-[#FEFEFF] px-[6px] py-2 lg:flex">
       <div className="flex w-full shrink-0 flex-col items-center gap-1 rounded-[10px] bg-[rgba(244,243,255,0.6)] py-3">
-        {templateNavItems.map(({ id, label, Icon }, index) => (
+        {templateNavItems.map(({ id, labelKey, Icon }, index) => (
           <React.Fragment key={id}>
             {index > 0 ? (
               <div className="h-px w-[30px] shrink-0 bg-[#EDEEEF]" />
@@ -137,7 +140,7 @@ export function ToolRail({
             <ToolRailButton
               active={activePanel === id}
               Icon={Icon}
-              label={label}
+              label={t(labelKey)}
               onClick={() => onPanelChange(id)}
             />
           </React.Fragment>
@@ -147,12 +150,12 @@ export function ToolRail({
       <div className="my-3 h-px w-[30px] shrink-0 bg-[#EDEEEF]" />
 
       <nav className="flex w-full shrink-0 flex-col items-center gap-1">
-        {insertNavItems.map(({ id, label, Icon }, index) => (
+        {insertNavItems.map(({ id, labelKey, Icon }, index) => (
           <React.Fragment key={id}>
             <ToolRailButton
               active={activePanel === id}
               Icon={Icon}
-              label={label}
+              label={t(labelKey)}
               onClick={() => onPanelChange(id)}
             />
             {index < insertNavItems.length - 1 ? (
@@ -186,6 +189,7 @@ export function TemplateInsertPanel({
   template: unknown;
   templateId: string;
 }) {
+  const t = useTranslations();
   return (
     <aside className="hidden w-[299px] shrink-0 overflow-hidden bg-[#FEFEFF] lg:block">
       {activePanel === "blocks" ? (
@@ -196,35 +200,35 @@ export function TemplateInsertPanel({
         />
       ) : activePanel === "texts" ? (
         <InsertPanel
-          title="Texts"
-          groups={[{ label: "Add", items: textItems }]}
+          title={t("templates.texts")}
+          groups={[{ label: t("templates.add"), items: textItems }]}
           onItemSelect={onTextItemSelect}
         />
       ) : activePanel === "charts" ? (
         <InsertPanel
-          title="Charts"
+          title={t("templates.charts")}
           groups={[
-            { label: "Chart Type", items: chartTypeItems },
-            { label: "Infographics", items: infographicItems },
+            { label: t("templates.chartType"), items: chartTypeItems },
+            { label: t("templates.infographics"), items: infographicItems },
           ]}
           onItemSelect={onChartItemSelect}
         />
       ) : activePanel === "tables" ? (
         <InsertPanel
-          title="Tables"
-          groups={[{ label: "Table Type", items: tableTypeItems }]}
+          title={t("templates.tables")}
+          groups={[{ label: t("templates.tableType"), items: tableTypeItems }]}
           onItemSelect={onTableItemSelect}
         />
       ) : activePanel === "images" ? (
         <InsertPanel
-          title="Images"
-          groups={[{ label: "Add", items: imageItems }]}
+          title={t("templates.images")}
+          groups={[{ label: t("templates.add"), items: imageItems }]}
           onItemSelect={onImageItemSelect}
         />
       ) : activePanel === "elements" ? (
         <InsertPanel
-          title="Elements"
-          groups={[{ label: "Add", items: elementItems }]}
+          title={t("templates.elements")}
+          groups={[{ label: t("templates.add"), items: elementItems }]}
           onItemSelect={onElementItemSelect}
         />
       ) : null}
@@ -241,7 +245,11 @@ export function AiPanel({
   onPromptChange: (prompt: string) => void;
   onSubmit: () => void;
 }) {
-  const quickPrompts = ["Make it shorter", "Make it more engaging"];
+  const t = useTranslations();
+  const quickPrompts = [
+    t("templates.makeShorter"),
+    t("templates.makeEngaging"),
+  ];
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -250,14 +258,12 @@ export function AiPanel({
 
   return (
     <aside className="relative hidden w-[299px] shrink-0 overflow-hidden bg-[#FEFEFF] lg:flex lg:flex-col">
-      <div className="pointer-events-none absolute left-[22px] top-[100px] h-[390px] w-[260px] rounded-full bg-[radial-gradient(circle_at_52%_47%,rgba(83,177,253,0.28)_0%,rgba(217,214,254,0.35)_38%,rgba(255,255,255,0)_72%)] blur-[30px]" />
+      <div className="pointer-events-none absolute start-[22px] top-[100px] h-[390px] w-[260px] rounded-full bg-[radial-gradient(circle_at_52%_47%,rgba(83,177,253,0.28)_0%,rgba(217,214,254,0.35)_38%,rgba(255,255,255,0)_72%)] blur-[30px]" />
 
       <div className="relative flex min-h-0 flex-1 flex-col px-3 pb-6 pt-[132px]">
         <div className="flex flex-1 items-start justify-center pt-[58px] text-center">
           <p className="text-[22.68px] font-normal leading-[24.3px] tracking-[-0.4536px] text-[#4C4C4C]">
-            What can I do
-            <br />
-            for your deck today?
+            {t("templates.assistantQuestion")}
           </p>
         </div>
 
@@ -266,7 +272,7 @@ export function AiPanel({
             <Textarea
               value={prompt}
               onChange={(event) => onPromptChange(event.target.value)}
-              placeholder={"Ask anything.\nType / to get Quick prompts."}
+              placeholder={t("templates.askAnything")}
               className="min-h-[79px] resize-none border-0 bg-transparent p-0 text-[14px] font-normal leading-[18px] text-[#191919] shadow-none placeholder:text-[#999999] focus-visible:ring-0"
             />
             <div className="mt-2 flex h-[28px] items-center justify-between">
@@ -274,14 +280,14 @@ export function AiPanel({
                 <button
                   type="button"
                   className="flex h-[28px] w-[28px] items-center justify-center rounded-full border border-[#EDEEEF] text-[#191919]"
-                  title="Add"
+                  title={t("templates.add")}
                 >
                   <Plus className="h-[14px] w-[14px]" />
                 </button>
                 <button
                   type="button"
                   className="flex h-[28px] w-[28px] items-center justify-center rounded-full border border-[#EDEEEF] text-[#191919]"
-                  title="AI options"
+                  title={t("templates.aiOptions")}
                 >
                   <Sparkles className="h-[13px] w-[13px] text-[#7A5AF8]" />
                 </button>
@@ -290,14 +296,14 @@ export function AiPanel({
                   className="flex h-[28px] items-center gap-[6px] rounded-full border border-[#EDEEEF] px-[10px] text-[12px] font-medium text-[#191919]"
                 >
                   <Sparkles className="h-[13px] w-[13px] text-[#7A5AF8]" />
-                  Prompt
+                  {t("templates.prompt")}
                 </button>
               </div>
               <button
                 type="submit"
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EFEFF2] text-[#191919] disabled:text-[#9A9A9A]"
                 disabled={!prompt.trim()}
-                title="Send"
+                title={t("templates.send")}
               >
                 <ArrowUp className="h-4 w-4" />
               </button>
@@ -329,7 +335,13 @@ function DensitySelector({
   density: Density;
   onDensityChange: (density: Density) => void;
 }) {
+  const t = useTranslations();
   const options: Exclude<Density, "">[] = ["Low", "Medium", "High"];
+  const optionLabels: Record<Exclude<Density, "">, string> = {
+    Low: t("templates.densityLow"),
+    Medium: t("templates.densityMedium"),
+    High: t("templates.densityHigh"),
+  };
 
   return (
     <div className="mt-[12px] grid grid-cols-3 gap-[8px]">
@@ -346,12 +358,16 @@ function DensitySelector({
           onClick={() => onDensityChange(option)}
           title={
             density === option
-              ? `${option} content density selected`
-              : `Preview ${option.toLowerCase()} content density`
+              ? t("templates.densitySelected", {
+                  density: optionLabels[option],
+                })
+              : t("templates.densityPreview", {
+                  density: optionLabels[option],
+                })
           }
           type="button"
         >
-          {option}
+          {optionLabels[option]}
         </button>
       ))}
 
@@ -386,15 +402,16 @@ export function SchemaPanel({
   onFieldChange: (field: SchemaField, value: string) => void;
   onOpenFieldChange: (fieldId: string) => void;
 }) {
+  const { locale, t } = useI18n();
   const fieldGroups = [
     {
       id: "non-decorative",
-      label: "Content",
+      label: t("templates.contentFields"),
       fields: fields.filter((field) => !field.decorative),
     },
     {
       id: "decorative",
-      label: "Decorative",
+      label: t("templates.decorativeFields"),
       fields: fields.filter((field) => field.decorative),
     },
   ];
@@ -403,38 +420,35 @@ export function SchemaPanel({
     <aside className="hidden w-[299px] shrink-0 bg-[#FEFEFF] lg:flex lg:flex-col">
       <div className="px-3 pt-[33px]">
         <h2 className="text-[18px] font-medium text-[#101323]">
-          Schema Editor
+          {t("templates.schemaEditor")}
         </h2>
         <div className="mt-[18px] flex items-center justify-between gap-3">
           <p className="text-[14px] font-normal text-[#191919]">
-            Content Density
+            {t("templates.contentDensity")}
           </p>
           <button
-            aria-label="Reset content density preview"
+            aria-label={t("templates.resetDensity")}
             className="flex h-7 items-center gap-1.5 rounded-[6px] border border-[#EDEEEF] bg-white px-2 text-[11px] font-medium text-[#667085] transition-colors hover:border-[#D9D6FE] hover:bg-[#F8F6FF] hover:text-[#7A5AF8] disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!canResetDensity}
             onClick={onDensityReset}
-            title="Restore the original slide content"
+            title={t("templates.restoreOriginal")}
             type="button"
           >
             <RotateCcw className="h-3 w-3" />
-            Reset
+            {t("templates.reset")}
           </button>
         </div>
         <DensitySelector density={density} onDensityChange={onDensityChange} />
         <div className="mt-[10px] flex min-h-[62px] gap-[10px] rounded-[6px] bg-[#F3F6FB] px-[16px] py-[10px] text-[12px] leading-[14px] text-[#5F6470]">
           <Info className="mt-[2px] h-[14px] w-[14px] shrink-0 text-[#1F5FBF]" />
-          <p>
-            Preview realistic content lengths without changing your saved
-            template. Reset restores the original content.
-          </p>
+          <p>{t("templates.densityHelp")}</p>
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-6 pt-[40px]">
         {fields.length === 0 ? (
           <div className="rounded-[6px] border border-dashed border-[#DCDCE1] px-4 py-8 text-center text-[13px] text-[#808080]">
-            No schema elements were found for this layout.
+            {t("templates.noSchemaElements")}
           </div>
         ) : (
           <div className="space-y-6">
@@ -445,12 +459,12 @@ export function SchemaPanel({
                     {group.label}
                   </h3>
                   <span className="rounded-full bg-[#F2F4F7] px-2 py-0.5 text-[10px] text-[#667085]">
-                    {group.fields.length}
+                    {formatNumber(group.fields.length, locale)}
                   </span>
                 </div>
                 {group.fields.length === 0 ? (
                   <div className="rounded-[6px] border border-dashed border-[#E4E7EC] px-3 py-4 text-center text-[11px] text-[#98A2B3]">
-                    No {group.label.toLowerCase()} elements.
+                    {t("templates.noGroupElements", { group: group.label })}
                   </div>
                 ) : (
                   <div className="space-y-[8px]">
@@ -499,6 +513,7 @@ function SchemaFieldRow({
   onDecorativeChange: (decorative: boolean) => void;
   onToggle: () => void;
 }) {
+  const { locale, t } = useI18n();
   const Icon =
     field.type === "image"
       ? ImageIcon
@@ -507,16 +522,16 @@ function SchemaFieldRow({
         : Type;
   const typeLabel =
     field.type === "text-list"
-      ? "List"
+      ? t("templates.typeList")
       : field.type === "image"
         ? field.elementType === "icon"
-          ? "Icon"
-          : "Image"
+          ? t("templates.typeIcon")
+          : t("templates.typeImage")
         : field.type === "element"
           ? field.elementType
               .replace(/[_-]+/g, " ")
               .replace(/\b\w/g, (letter) => letter.toUpperCase())
-          : "String";
+          : t("templates.typeString");
 
   return (
     <div className="space-y-[3px]">
@@ -535,7 +550,7 @@ function SchemaFieldRow({
         <span className="h-px w-[14.5px] shrink-0 bg-[#D9D9DE]" />
         <button
           className={cn(
-            "flex h-[30px] min-w-0 flex-1 items-center gap-[8px] rounded-[4px] border bg-[#FEFEFF] px-[10px] text-left transition-colors",
+            "flex h-[30px] min-w-0 flex-1 items-center gap-[8px] rounded-[4px] border bg-[#FEFEFF] px-[10px] text-start transition-colors",
             isOpen
               ? "border-[#D9D6FE] text-[#191919]"
               : "border-[#EDEEEF] text-[#191919] hover:bg-[#F8F8F8]",
@@ -552,41 +567,42 @@ function SchemaFieldRow({
               className="shrink-0 text-[12px] font-normal tracking-[0.48px] text-[#808080]"
               style={{ fontFamily: "Outfit, var(--font-syne), sans-serif" }}
             >
-              ({field.maxChars} Characters)
+              ({t("templates.characters", {
+                count: formatNumber(field.maxChars, locale),
+              })})
             </span>
           ) : null}
         </button>
       </div>
 
       {isOpen ? (
-        <div className="ml-[28.5px] flex flex-col gap-[2px]">
+        <div className="ms-[28.5px] flex flex-col gap-[2px]">
           <div className="flex h-[30px] items-center gap-[8px] rounded-[4px] border border-[#E7E8EC] bg-[#FEFEFF] px-[10px] text-[14px] font-normal tracking-[0.56px] text-[#17181E]">
             <span className="text-[16px] leading-none text-[#808080]">#</span>
-            <span>Type</span>
-            <span className="ml-auto text-[#191919]">{typeLabel}</span>
+            <span>{t("templates.fieldType")}</span>
+            <span className="ms-auto text-[#191919]">{typeLabel}</span>
           </div>
           <div className="flex h-[36px] items-center rounded-[4px] border border-[#E7E8EC] bg-[#FEFEFF] px-[10px] text-[14px] font-normal tracking-[0.56px] text-[#17181E]">
-            <span>Decorative</span>
+            <span>{t("templates.fieldDecorative")}</span>
             <Switch
-              aria-label={`Set ${field.label} decorative`}
+              aria-label={t("templates.setDecorative", { field: field.label })}
               checked={field.decorative}
-              className="ml-auto data-[state=checked]:bg-[#7A5AF8] data-[state=unchecked]:bg-[#D0D5DD]"
+              className="ms-auto data-[state=checked]:bg-[#7A5AF8] data-[state=unchecked]:bg-[#D0D5DD]"
               onCheckedChange={onDecorativeChange}
             />
           </div>
           {field.decorative ? (
             <div className="rounded-[4px] border border-[#E7E8EC] bg-[#F8F8FA] px-[10px] py-[8px] text-[11px] leading-4 tracking-normal text-[#667085]">
-              Decorative elements are read-only. Turn off Decorative to edit
-              their content or constraints.
+              {t("templates.decorativeHelp")}
             </div>
           ) : null}
           {field.type === "text" || field.type === "text-list" ? (
             <>
               <label className="flex h-[30px] items-center rounded-[4px] border border-[#E7E8EC] bg-[#FEFEFF] px-[10px] text-[14px] font-normal tracking-[0.56px] text-[#17181E]">
-                <span>Min Chars</span>
+                <span>{t("templates.minimumCharacters")}</span>
                 <input
                   className={cn(
-                    "ml-auto h-[24px] w-[76px] rounded-[4px] border border-transparent bg-transparent text-right text-[#191919] outline-none transition-colors focus:border-[#D9D6FE] focus:bg-[#F8F6FF]",
+                    "ms-auto h-[24px] w-[76px] rounded-[4px] border border-transparent bg-transparent text-end text-[#191919] outline-none transition-colors focus:border-[#D9D6FE] focus:bg-[#F8F6FF]",
                     field.decorative &&
                       "cursor-default bg-[#F8F8FA] text-[#667085] focus:border-transparent",
                   )}
@@ -600,10 +616,10 @@ function SchemaFieldRow({
                 />
               </label>
               <label className="flex h-[30px] items-center rounded-[4px] border border-[#E7E8EC] bg-[#FEFEFF] px-[10px] text-[14px] font-normal tracking-[0.56px] text-[#17181E]">
-                <span>Max Chars</span>
+                <span>{t("templates.maximumCharacters")}</span>
                 <input
                   className={cn(
-                    "ml-auto h-[24px] w-[76px] rounded-[4px] border border-transparent bg-transparent text-right text-[#191919] outline-none transition-colors focus:border-[#D9D6FE] focus:bg-[#F8F6FF]",
+                    "ms-auto h-[24px] w-[76px] rounded-[4px] border border-transparent bg-transparent text-end text-[#191919] outline-none transition-colors focus:border-[#D9D6FE] focus:bg-[#F8F6FF]",
                     field.decorative &&
                       "cursor-default bg-[#F8F8FA] text-[#667085] focus:border-transparent",
                   )}
@@ -620,7 +636,11 @@ function SchemaFieldRow({
           ) : null}
           {field.type !== "element" ? (
             <label className="flex flex-col gap-[6px] rounded-[4px] border border-[#E7E8EC] bg-[#FEFEFF] px-[10px] py-[8px] text-[14px] font-normal tracking-[0.56px] text-[#17181E]">
-              <span>{field.type === "image" ? "Prompt" : "Content"}</span>
+              <span>
+                {field.type === "image"
+                  ? t("templates.fieldPrompt")
+                  : t("templates.fieldContent")}
+              </span>
               {field.type === "image" ? (
                 <input
                   className={cn(
@@ -647,8 +667,7 @@ function SchemaFieldRow({
             </label>
           ) : (
             <p className="rounded-[4px] border border-[#E7E8EC] bg-[#F8F8FA] px-[10px] py-[8px] text-[11px] leading-4 tracking-normal text-[#667085]">
-              This element has no editable content. Its decorative role can
-              still be changed.
+              {t("templates.elementNoContent")}
             </p>
           )}
         </div>

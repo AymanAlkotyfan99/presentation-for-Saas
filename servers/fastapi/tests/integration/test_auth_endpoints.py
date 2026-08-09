@@ -83,6 +83,7 @@ def test_public_setup_route_is_not_registered(monkeypatch, tmp_path):
         "username": None,
         "user_id": None,
         "role": None,
+        "preferred_locale": None,
     }
     assert "setup_required" not in status.json()
     client.close()
@@ -110,6 +111,40 @@ def test_login_sets_http_only_jwt_cookie_for_username_only_account(
     assert "access_token" not in payload
     assert SESSION_COOKIE_NAME in response.cookies
     assert "HttpOnly" in response.headers["set-cookie"]
+
+    client.close()
+    asyncio.run(engine.dispose())
+
+
+def test_authenticated_locale_preference_round_trip(monkeypatch, tmp_path):
+    monkeypatch.setenv("USER_CONFIG_PATH", str(tmp_path / "userConfig.json"))
+    monkeypatch.delenv("DISABLE_AUTH", raising=False)
+    client, engine = _build_client(tmp_path)
+    asyncio.run(_seed_admin(engine))
+
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "unit-test-password"},
+    )
+    assert login.status_code == 200
+    assert login.json()["preferred_locale"] is None
+
+    updated = client.put(
+        "/api/v1/auth/preferences/locale",
+        json={"preferred_locale": "ar"},
+    )
+    assert updated.status_code == 200
+    assert updated.json() == {"preferred_locale": "ar"}
+    assert client.get("/api/v1/auth/preferences/locale").json() == {
+        "preferred_locale": "ar"
+    }
+    assert client.get("/api/v1/auth/status").json()["preferred_locale"] == "ar"
+
+    invalid = client.put(
+        "/api/v1/auth/preferences/locale",
+        json={"preferred_locale": "fr"},
+    )
+    assert invalid.status_code == 422
 
     client.close()
     asyncio.run(engine.dispose())

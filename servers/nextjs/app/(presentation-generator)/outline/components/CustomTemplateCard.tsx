@@ -8,6 +8,7 @@ import {
     LayoutsBadge,
 } from "../../components/TemplatePreviewComponents";
 import { TemplateThumbnailPreview } from "../../components/TemplateListUi";
+import { useTranslations } from "@/i18n/catalog";
 
 interface TemplateListItem {
     id: string;
@@ -25,6 +26,7 @@ export const CustomTemplateCard = memo(function CustomTemplateCard({
     onSelectTemplate: (template: string) => void;
     selectedTemplate: string | null;
 }) {
+    const t = useTranslations();
     const isSelected = selectedTemplate === template.id;
     const handleSelect = useCallback(() => onSelectTemplate(template.id), [onSelectTemplate, template.id]);
     const handleKeyDown = useCallback(
@@ -43,7 +45,7 @@ export const CustomTemplateCard = memo(function CustomTemplateCard({
             role="button"
             tabIndex={0}
             aria-pressed={isSelected}
-            aria-label={`Select ${template.name} template`}
+            aria-label={t("templates.selectTemplate", { name: template.name })}
             className={cn(
                 "font-syne cursor-pointer flex flex-col justify-between relative transition-all duration-200 group overflow-hidden rounded-[22px] bg-white border outline-none",
                 "hover:-translate-y-1 hover:border-[#7A5AF8] hover:ring-2 hover:ring-[#7A5AF8]/20 hover:shadow-[0_18px_40px_rgba(34,31,54,0.12)]",
@@ -57,7 +59,7 @@ export const CustomTemplateCard = memo(function CustomTemplateCard({
         >
             <div className="pointer-events-none absolute inset-0 z-30 rounded-[22px] bg-[#7A5AF8]/[0.04] opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100" />
             {isSelected && (
-                <span className="absolute right-4 top-3.5 z-50 inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#7A5AF8] text-white shadow-sm">
+                <span className="absolute end-4 top-3.5 z-50 inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#7A5AF8] text-white shadow-sm">
                     <CheckCircle2 className="h-4 w-4" />
                 </span>
             )}
@@ -70,7 +72,7 @@ export const CustomTemplateCard = memo(function CustomTemplateCard({
             </TemplatePreviewStage>
             <div className="flex items-center justify-between px-6 py-5 bg-white border-t border-[#EDEEEF] relative z-40">
                 <h3 className="text-sm font-bold text-gray-900 font-syne">
-                    {template.name}
+                    <span dir="auto">{template.name}</span>
                 </h3>
             </div>
         </Card>

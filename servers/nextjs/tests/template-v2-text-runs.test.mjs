@@ -16,12 +16,8 @@ before(async () => {
   const outfile = path.join(tempDirectory, "template-v2-text.mjs");
 
   await build({
-    entryPoints: [
-      path.join(
-        nextRoot,
-        "components/slide-editor/text/template-v2-text.ts",
-      ),
-    ],
+    absWorkingDir: nextRoot,
+    entryPoints: ["./components/slide-editor/text/template-v2-text.ts"],
     bundle: true,
     platform: "node",
     format: "esm",

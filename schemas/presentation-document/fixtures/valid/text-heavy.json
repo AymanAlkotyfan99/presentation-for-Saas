@@ -1,0 +1,686 @@
+{
+  "schemaVersion": "1.0.0",
+  "documentId": "00000000-0000-4000-8000-000000000074",
+  "presentationId": "00000000-0000-4000-8000-000000000075",
+  "title": "Quarterly review",
+  "locale": "en",
+  "baseDirection": "ltr",
+  "aspectRatio": {
+    "width": 16,
+    "height": 9
+  },
+  "theme": {
+    "themeRef": "bayanly-default",
+    "colorTokens": [
+      {
+        "name": "primary",
+        "value": "#2563EB"
+      }
+    ],
+    "defaultBackground": "#FFFFFF"
+  },
+  "fontPolicy": {
+    "families": [
+      {
+        "id": "body",
+        "family": "Inter",
+        "fallbacks": [
+          "Arial",
+          "sans-serif"
+        ]
+      },
+      {
+        "id": "arabic-ui",
+        "family": "Noto Sans Arabic",
+        "fallbacks": [
+          "Tahoma",
+          "Arial"
+        ]
+      }
+    ],
+    "defaultBodyRef": "body",
+    "defaultHeadingRef": "body",
+    "allowSystemFallback": true
+  },
+  "metadata": {
+    "authoringIntent": "generated",
+    "sourceApplicationVersion": "0.9.3-beta"
+  },
+  "slides": [
+    {
+      "id": "00000000-0000-4000-8000-000000000076",
+      "order": 0,
+      "semanticRole": "title",
+      "layoutIntent": "free",
+      "elements": [
+        {
+          "id": "00000000-0000-4000-8000-000000000077",
+          "type": "text",
+          "geometry": {
+            "x": 80,
+            "y": 80,
+            "width": 1120,
+            "height": 560,
+            "anchor": "top-start"
+          },
+          "zOrder": 0,
+          "paragraphs": [
+            {
+              "id": "00000000-0000-4000-8000-000000000078",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000079",
+                  "text": "Evidence-backed paragraph 1: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-00000000007a",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-00000000007b",
+                  "text": "Evidence-backed paragraph 2: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-00000000007c",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-00000000007d",
+                  "text": "Evidence-backed paragraph 3: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-00000000007e",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-00000000007f",
+                  "text": "Evidence-backed paragraph 4: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000080",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000081",
+                  "text": "Evidence-backed paragraph 5: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000082",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000083",
+                  "text": "Evidence-backed paragraph 6: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000084",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000085",
+                  "text": "Evidence-backed paragraph 7: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000086",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000087",
+                  "text": "Evidence-backed paragraph 8: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000088",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000089",
+                  "text": "Evidence-backed paragraph 9: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-00000000008a",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-00000000008b",
+                  "text": "Evidence-backed paragraph 10: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-00000000008c",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-00000000008d",
+                  "text": "Evidence-backed paragraph 11: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-00000000008e",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-00000000008f",
+                  "text": "Evidence-backed paragraph 12: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000090",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000091",
+                  "text": "Evidence-backed paragraph 13: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000092",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000093",
+                  "text": "Evidence-backed paragraph 14: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000094",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000095",
+                  "text": "Evidence-backed paragraph 15: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000096",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000097",
+                  "text": "Evidence-backed paragraph 16: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000098",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000099",
+                  "text": "Evidence-backed paragraph 17: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-00000000009a",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-00000000009b",
+                  "text": "Evidence-backed paragraph 18: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-00000000009c",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-00000000009d",
+                  "text": "Evidence-backed paragraph 19: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-00000000009e",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-00000000009f",
+                  "text": "Evidence-backed paragraph 20: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000a0",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000a1",
+                  "text": "Evidence-backed paragraph 21: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000a2",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000a3",
+                  "text": "Evidence-backed paragraph 22: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000a4",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000a5",
+                  "text": "Evidence-backed paragraph 23: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000a6",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000a7",
+                  "text": "Evidence-backed paragraph 24: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000a8",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000a9",
+                  "text": "Evidence-backed paragraph 25: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000aa",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000ab",
+                  "text": "Evidence-backed paragraph 26: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000ac",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000ad",
+                  "text": "Evidence-backed paragraph 27: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000ae",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000af",
+                  "text": "Evidence-backed paragraph 28: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000b0",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000b1",
+                  "text": "Evidence-backed paragraph 29: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000b2",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000b3",
+                  "text": "Evidence-backed paragraph 30: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000b4",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000b5",
+                  "text": "Evidence-backed paragraph 31: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000b6",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000b7",
+                  "text": "Evidence-backed paragraph 32: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000b8",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000b9",
+                  "text": "Evidence-backed paragraph 33: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000ba",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000bb",
+                  "text": "Evidence-backed paragraph 34: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000bc",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000bd",
+                  "text": "Evidence-backed paragraph 35: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000be",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000bf",
+                  "text": "Evidence-backed paragraph 36: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000c0",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000c1",
+                  "text": "Evidence-backed paragraph 37: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000c2",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000c3",
+                  "text": "Evidence-backed paragraph 38: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000c4",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000c5",
+                  "text": "Evidence-backed paragraph 39: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            },
+            {
+              "id": "00000000-0000-4000-8000-0000000000c6",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000c7",
+                  "text": "Evidence-backed paragraph 40: deterministic canonical text.",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "assets": [],
+  "exportHints": {
+    "preferredAspect": "16:9",
+    "editablePreference": "preferred",
+    "includeNotes": false,
+    "rendererFallback": "legacy"
+  },
+  "compatibility": {
+    "sourceVersion": "canonical-v1",
+    "requiresLegacyRenderer": false,
+    "warnings": [],
+    "unsupportedFeatures": []
+  }
+}

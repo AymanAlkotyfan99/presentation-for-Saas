@@ -4,48 +4,48 @@ import UploadPage from "./components/UploadPage";
 import Header from "@/app/(presentation-generator)/(dashboard)/dashboard/components/Header";
 import { Metadata } from "next";
 import { DISPLAY_PRODUCT, PRODUCT_DESCRIPTION, publicSiteUrl } from "@/lib/product-metadata";
+import { messagesForLocale, requestLocale } from "@/i18n/server";
 
 const createUrl = new URL("/create", publicSiteUrl());
 
-export const metadata: Metadata = {
-  title: `${DISPLAY_PRODUCT.name} | AI presentation generator`,
-  description: PRODUCT_DESCRIPTION,
-  alternates: {
-    canonical: createUrl,
-  },
-  keywords: [
-    "presentation generator",
-    "AI presentations",
-    "data visualization",
-    "automatic presentation maker",
-    "professional slides",
-    "data-driven presentations",
-    "document to presentation",
-    "presentation automation",
-    "smart presentation tool",
-    "business presentations",
-  ],
-  openGraph: {
-    title: `Create a presentation | ${DISPLAY_PRODUCT.shortName}`,
-    description: PRODUCT_DESCRIPTION,
-    type: "website",
-    url: createUrl,
-    siteName: DISPLAY_PRODUCT.name,
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `Create a presentation | ${DISPLAY_PRODUCT.shortName}`,
-    description: PRODUCT_DESCRIPTION,
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const messages = messagesForLocale(await requestLocale());
+  const localizedTitle = `${messages.generation.title} | ${DISPLAY_PRODUCT.shortName}`;
+  const localizedDescription = messages.generation.heroDescription || PRODUCT_DESCRIPTION;
+  return {
+    title: localizedTitle,
+    description: localizedDescription,
+    alternates: { canonical: createUrl },
+    keywords: [
+      "presentation generator",
+      "AI presentations",
+      "data visualization",
+      "document to presentation",
+      "presentation automation",
+    ],
+    openGraph: {
+      title: localizedTitle,
+      description: localizedDescription,
+      type: "website",
+      url: createUrl,
+      siteName: DISPLAY_PRODUCT.name,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: localizedTitle,
+      description: localizedDescription,
+    },
+  };
+}
 
-const page = () => {
+const page = async () => {
+  const messages = messagesForLocale(await requestLocale());
   return (
     <div className="relative min-h-screen">
       <Header />
       <div className="mb-8 flex flex-col items-center justify-center min-[1800px]:mb-10 min-[2200px]:mb-12">
         <h1 className="relative font-syne text-[64px] font-semibold leading-[112%] text-[#101323] min-[1800px]:text-[76px] min-[2200px]:text-[88px]">
-          Generate
+          {messages.generation.heroTitle}
 
           <svg className="absolute left-[-5rem] top-[-4rem] min-[1800px]:left-[-6rem] min-[1800px]:top-[-4.75rem] min-[1800px]:h-4 min-[1800px]:w-4 min-[2200px]:left-[-7rem] min-[2200px]:top-[-5.5rem] min-[2200px]:h-5 min-[2200px]:w-5" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 13 13" fill="none">
             <path d="M9.73497 5.85272C8.05237 5.69492 6.72098 4.39958 6.55904 2.76316L6.28582 0L6.0126 2.76316C5.85066 4.39985 4.51927 5.6952 2.83667 5.85272L0 6.11849L2.83667 6.38426C4.51927 6.54206 5.85066 7.8374 6.0126 9.47382L6.28582 12.237L6.55904 9.47382C6.72098 7.83713 8.05237 6.54178 9.73497 6.38426L12.5716 6.11849L9.73497 5.85272Z" fill="#09CCFE" />
@@ -58,7 +58,7 @@ const page = () => {
           </svg>
 
         </h1>
-        <p className="font-syne text-xl text-[#101323CC] min-[1800px]:text-2xl min-[2200px]:text-[28px]">Turn prompts or documents into presentations with AI</p>
+        <p className="font-syne text-xl text-[#101323CC] min-[1800px]:text-2xl min-[2200px]:text-[28px]">{messages.generation.heroDescription}</p>
       </div>
 
       <UploadPage />

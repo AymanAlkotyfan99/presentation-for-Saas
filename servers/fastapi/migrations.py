@@ -29,6 +29,9 @@ REVISION_ASYNC_TASK_STATUS_NORMALIZED = "b8e2f4a7c9d1"
 REVISION_MULTI_USER_AUTH = "c9f1a2b3d4e5"
 REVISION_USERNAME_PROVIDER_SETTINGS = "d0a2b4c6e8f1"
 REVISION_PRIMARY_ADMIN_SLOT = "e1b3c5d7f9a2"
+REVISION_USER_PREFERRED_LOCALE = "f3a5c7e9b1d2"
+REVISION_CANONICAL_DOCUMENTS = "04b6d8f0a2c4"
+REVISION_CURRENT_HEAD = REVISION_CANONICAL_DOCUMENTS
 
 
 async def migrate_database_on_startup() -> None:
@@ -114,6 +117,17 @@ def _infer_revision_from_schema(
     _head_revision: str,
 ) -> str:
     """Best-effort: map existing SQLite/Postgres schema to our linear migration chain."""
+    if "presentation_documents" in tables:
+        canonical_columns = {
+            column["name"]
+            for column in inspector.get_columns("presentation_documents")
+        }
+        if {"schema_version", "document", "revision", "conversion_status"}.issubset(
+            canonical_columns
+        ):
+            return REVISION_CANONICAL_DOCUMENTS
+    if "user" in tables and _has_column(inspector, "user", "preferred_locale"):
+        return REVISION_USER_PREFERRED_LOCALE
     owned_tables = {
         "presentations",
         "slides",
