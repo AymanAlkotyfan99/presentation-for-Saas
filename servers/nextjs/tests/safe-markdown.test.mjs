@@ -16,7 +16,7 @@ const outfile = path.join(tempDirectory, "safe-markdown.mjs");
 await build({
   absWorkingDir: projectRoot,
   bundle: true,
-  entryPoints: ["lib/safe-markdown.ts"],
+  entryPoints: ["./lib/safe-markdown.ts"],
   format: "esm",
   outfile,
   platform: "node",

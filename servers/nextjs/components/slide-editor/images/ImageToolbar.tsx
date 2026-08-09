@@ -43,6 +43,8 @@ import { ImagePickerModal } from "@/components/slide-editor/images/ImagePickerMo
 import { resolveBackendAssetSource } from "@/utils/api";
 import { ImagesApi } from "@/app/(presentation-generator)/services/api/images";
 import { notify } from "@/components/ui/sonner";
+import { useI18n, useTranslations } from "@/i18n/catalog";
+import { formatNumber as formatLocaleNumber } from "@/lib/locale-format";
 
 type ImagePanel = "fit" | "crop" | "radius" | "opacity" | null;
 type ImageFit = "contain" | "cover" | "fill";
@@ -76,12 +78,6 @@ const FIT_OPTIONS: Array<{ label: string; value: ImageFit }> = [
   { label: "Stretch", value: "fill" },
 ];
 
-const FIT_LABELS: Record<ImageFit, string> = {
-  contain: "Contain",
-  cover: "Fill",
-  fill: "Stretch",
-};
-
 const clampPercent = (value: number | null | undefined) =>
   Math.min(100, Math.max(0, value ?? 50));
 
@@ -96,15 +92,15 @@ const MAX_CROP_SCALE = 6;
 const CROP_HANDLE_SIZE = 12;
 const MAX_UPLOAD_FILE_SIZE = 5 * 1024 * 1024;
 
-const CROP_HANDLES: Array<{ label: string; value: CropHandle }> = [
-  { label: "Top left resize handle", value: "nw" },
-  { label: "Top resize handle", value: "n" },
-  { label: "Top right resize handle", value: "ne" },
-  { label: "Right resize handle", value: "e" },
-  { label: "Bottom right resize handle", value: "se" },
-  { label: "Bottom resize handle", value: "s" },
-  { label: "Bottom left resize handle", value: "sw" },
-  { label: "Left resize handle", value: "w" },
+const CROP_HANDLES: Array<{ value: CropHandle }> = [
+  { value: "nw" },
+  { value: "n" },
+  { value: "ne" },
+  { value: "e" },
+  { value: "se" },
+  { value: "s" },
+  { value: "sw" },
+  { value: "w" },
 ];
 
 function normalizeCropDraft(draft: CropDraft): CropDraft {
@@ -295,6 +291,7 @@ export function ImageToolbar({
   onChange: (index: number, element: ImageSlideElement) => void;
   onCropModeChange?: (active: boolean) => void;
 }) {
+  const t = useTranslations();
   const [openPanel, setOpenPanel] = useState<ImagePanel>(null);
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -519,11 +516,17 @@ export function ImageToolbar({
   const uploadReplacementImage = async (file: File | undefined) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      notify.error("Upload failed", "Please choose a valid image file.");
+      notify.error(
+        t("editor.uploadFailed"),
+        t("editor.validImageRequired"),
+      );
       return;
     }
     if (file.size > MAX_UPLOAD_FILE_SIZE) {
-      notify.error("Upload failed", "Image files must be smaller than 5MB.");
+      notify.error(
+        t("editor.uploadFailed"),
+        t("editor.imageTooLarge", { size: "5 MB" }),
+      );
       return;
     }
 
@@ -532,7 +535,7 @@ export function ImageToolbar({
     try {
       const asset = await ImagesApi.uploadImage(file);
       const url = resolveBackendAssetSource(asset);
-      if (!url) throw new Error("Upload did not return an image URL.");
+      if (!url) throw new Error("UPLOAD_IMAGE_URL_MISSING");
       update({
         data: url,
         name: file.name,
@@ -540,11 +543,11 @@ export function ImageToolbar({
         focus_y: 50,
         crop_scale: null,
       });
-      notify.success("Image uploaded", "The selected image was replaced.");
-    } catch (uploadError: unknown) {
+      notify.success(t("editor.imageUploaded"), t("editor.imageReplaced"));
+    } catch {
       notify.error(
-        "Upload failed",
-        uploadError instanceof Error ? uploadError.message : "Could not upload image.",
+        t("editor.uploadFailed"),
+        t("editor.couldNotUploadImage"),
       );
     } finally {
       setIsUploadingImage(false);
@@ -574,13 +577,33 @@ export function ImageToolbar({
         <div className="relative">
           <button
             type="button"
-            title={`Image type: ${FIT_LABELS[fit]}`}
-            aria-label={`Image type: ${FIT_LABELS[fit]}`}
+            title={t("editor.imageType", {
+              type:
+                fit === "contain"
+                  ? t("editor.fitContain")
+                  : fit === "fill"
+                    ? t("editor.fitStretch")
+                    : t("editor.fitFill"),
+            })}
+            aria-label={t("editor.imageType", {
+              type:
+                fit === "contain"
+                  ? t("editor.fitContain")
+                  : fit === "fill"
+                    ? t("editor.fitStretch")
+                    : t("editor.fitFill"),
+            })}
             aria-expanded={openPanel === "fit"}
             onClick={() => togglePanel("fit")}
             className="flex min-w-[83px] items-center justify-between gap-2 rounded-[10px] border-0 bg-transparent py-[6px] text-[14px] font-medium font-syne leading-4"
           >
-            <span>{FIT_LABELS[fit]}</span>
+            <span>
+              {fit === "contain"
+                ? t("editor.fitContain")
+                : fit === "fill"
+                  ? t("editor.fitStretch")
+                  : t("editor.fitFill")}
+            </span>
             <ChevronDown
               size={14}
               strokeWidth={1.8}
@@ -599,11 +622,15 @@ export function ImageToolbar({
                     update({ fit: option.value });
                   }}
                   className={cn(
-                    "flex w-full items-center rounded-[8px] px-3 py-2 text-left text-[13px] text-[#191919] hover:bg-[#F4F3FF]",
+                    "flex w-full items-center rounded-[8px] px-3 py-2 text-start text-[13px] text-[#191919] hover:bg-[#F4F3FF]",
                     fit === option.value && "bg-[#F4F1FF] text-[#7A5AF8]",
                   )}
                 >
-                  {option.label}
+                  {option.value === "contain"
+                    ? t("editor.fitContain")
+                    : option.value === "fill"
+                      ? t("editor.fitStretch")
+                      : t("editor.fitFill")}
                 </button>
               ))}
             </Panel>
@@ -614,8 +641,8 @@ export function ImageToolbar({
 
         <button
           type="button"
-          title="Upload image"
-          aria-label="Upload image"
+          title={t("editor.uploadImage")}
+          aria-label={t("editor.uploadImage")}
           onClick={() => uploadInputRef.current?.click()}
           disabled={isUploadingImage}
           className="rounded-[2px] border-0 bg-transparent p-1 text-[#05070A] hover:bg-[#F4F3FF] disabled:cursor-wait disabled:opacity-50"
@@ -629,8 +656,8 @@ export function ImageToolbar({
 
         <button
           type="button"
-          title="Replace image"
-          aria-label="Replace image"
+          title={t("editor.replaceImage")}
+          aria-label={t("editor.replaceImage")}
           onClick={() => {
             setOpenPanel(null);
             setImagePickerOpen(true);
@@ -652,8 +679,8 @@ export function ImageToolbar({
         <div className="flex items-center gap-3">
           <button
             type="button"
-            title="Crop image"
-            aria-label="Crop image"
+            title={t("editor.cropImage")}
+            aria-label={t("editor.cropImage")}
             aria-pressed={openPanel === "crop"}
             onClick={() => togglePanel("crop")}
             className={cn(
@@ -666,8 +693,8 @@ export function ImageToolbar({
 
           <button
             type="button"
-            title="Flip horizontally"
-            aria-label="Flip horizontally"
+            title={t("editor.flipHorizontal")}
+            aria-label={t("editor.flipHorizontal")}
             aria-pressed={element.flip_h === true}
             onClick={() => update({ flip_h: !(element.flip_h ?? false) })}
             className={cn(
@@ -680,8 +707,8 @@ export function ImageToolbar({
 
           <button
             type="button"
-            title="Flip vertically"
-            aria-label="Flip vertically"
+            title={t("editor.flipVertical")}
+            aria-label={t("editor.flipVertical")}
             aria-pressed={element.flip_v === true}
             onClick={() => update({ flip_v: !(element.flip_v ?? false) })}
             className={cn(
@@ -695,8 +722,8 @@ export function ImageToolbar({
           <div className="relative">
             <button
               type="button"
-              title="Image border radius"
-              aria-label="Image border radius"
+              title={t("editor.imageBorderRadius")}
+              aria-label={t("editor.imageBorderRadius")}
               aria-pressed={openPanel === "radius"}
               onClick={() => togglePanel("radius")}
               className={cn(
@@ -710,13 +737,13 @@ export function ImageToolbar({
               <Panel className="w-[220px] p-3">
                 <label className="block text-[12px] font-medium text-[#4B5563]">
                   <span className="mb-2 flex items-center justify-between">
-                    <span>Border radius</span>
+                    <span>{t("editor.borderRadius")}</span>
                     <span className="font-medium text-[#191919]">
                       {formatRadiusValue(radiusDraft)}
                     </span>
                   </span>
                   <input
-                    aria-label="Image border radius"
+                    aria-label={t("editor.imageBorderRadius")}
                     type="range"
                     min={0}
                     max={maxRadius}
@@ -746,8 +773,8 @@ export function ImageToolbar({
         <div className="relative">
           <button
             type="button"
-            title="Image opacity"
-            aria-label="Image opacity"
+            title={t("editor.imageOpacity")}
+            aria-label={t("editor.imageOpacity")}
             aria-pressed={openPanel === "opacity"}
             onClick={() => togglePanel("opacity")}
             className={cn(
@@ -760,7 +787,7 @@ export function ImageToolbar({
           {openPanel === "opacity" ? (
             <Panel className="flex min-w-[115px] items-center p-2.5">
               <input
-                aria-label="Image opacity"
+                aria-label={t("editor.imageOpacity")}
                 type="range"
                 min={0}
                 max={1}
@@ -903,10 +930,13 @@ function CropOverlay({
   onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void;
   onPointerCancel: (event: ReactPointerEvent<HTMLElement>) => void;
 }) {
+  const { locale, t } = useI18n();
   const transform = [flipH ? "scaleX(-1)" : "", flipV ? "scaleY(-1)" : ""]
     .filter(Boolean)
     .join(" ");
-  const cropLabel = `Crop image. Zoom ${Math.round(cropDraft.scale * 100)} percent.`;
+  const cropLabel = t("editor.cropZoom", {
+    percent: formatLocaleNumber(Math.round(cropDraft.scale * 100), locale),
+  });
 
   return (
     <div
@@ -968,8 +998,8 @@ function CropOverlay({
           <button
             key={handle.value}
             type="button"
-            title={handle.label}
-            aria-label={handle.label}
+            title={t("editor.cropResizeHandle")}
+            aria-label={t("editor.cropResizeHandle")}
             className="pointer-events-auto absolute z-[5] rounded-full border border-[#D6D3E8] bg-white shadow-[0_1px_4px_rgba(17,24,39,0.24)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED]"
             style={cropHandleStyle(handle.value, imageFrame)}
             onPointerCancel={(event) => onPointerCancel(event)}
@@ -1075,6 +1105,7 @@ function CropActions({
   onReset: () => void;
   onClose: () => void;
 }) {
+  const t = useTranslations();
   return (
     <div
       data-template-v2-floating-toolbar="true"
@@ -1091,8 +1122,8 @@ function CropActions({
     >
       <button
         type="button"
-        title="Reset crop"
-        aria-label="Reset crop"
+        title={t("editor.resetCrop")}
+        aria-label={t("editor.resetCrop")}
         onClick={onReset}
         className="rounded-[6px] p-2 text-[#4B5563] hover:bg-[#F4F3FF] hover:text-[#191919]"
       >
@@ -1100,8 +1131,8 @@ function CropActions({
       </button>
       <button
         type="button"
-        title="Apply crop"
-        aria-label="Apply crop"
+        title={t("editor.applyCrop")}
+        aria-label={t("editor.applyCrop")}
         onClick={onDone}
         className="rounded-[6px] bg-[#111827] p-2 text-white hover:bg-[#0B1220]"
       >
@@ -1109,8 +1140,8 @@ function CropActions({
       </button>
       <button
         type="button"
-        title="Close crop controls"
-        aria-label="Close crop controls"
+        title={t("editor.closeCropControls")}
+        aria-label={t("editor.closeCropControls")}
         onClick={onClose}
         className="rounded-[6px] p-2 text-[#4B5563] hover:bg-[#F4F3FF] hover:text-[#191919]"
       >

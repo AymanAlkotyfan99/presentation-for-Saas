@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -21,6 +22,7 @@ class PublicUser(BaseModel):
     username: str
     role: str
     created_at: datetime | None = None
+    preferred_locale: Literal["en", "ar"] | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -51,3 +53,11 @@ class AdminCreateUserRequest(AuthCredentialsRequest):
 
 class AdminResetPasswordRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
+
+
+class LocalePreferenceRequest(BaseModel):
+    preferred_locale: Literal["en", "ar"]
+
+
+class LocalePreferenceResponse(BaseModel):
+    preferred_locale: Literal["en", "ar"] | None

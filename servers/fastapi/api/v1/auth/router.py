@@ -5,7 +5,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import JSONResponse
 
-from api.v1.auth.schemas import LoginCredentialsRequest
+from api.v1.auth.schemas import (
+    LocalePreferenceRequest,
+    LocalePreferenceResponse,
+    LoginCredentialsRequest,
+)
 from api.v1.auth.assets import is_app_data_path_authorized
 from api.v1.auth.rate_limit import LOGIN_RATE_LIMITER, login_rate_limit_key
 from api.v1.auth.principal import resolve_request_principal
@@ -20,6 +24,7 @@ from services.database import get_async_session
 from utils.get_env import is_disable_auth_enabled
 from api.v1.auth.config import SESSION_COOKIE_NAME, SESSION_TTL_SECONDS
 from api.v1.auth.token import TOKEN_ROUTER
+from utils.api_errors import StableAPIError
 
 
 API_V1_AUTH_ROUTER = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
@@ -83,6 +88,7 @@ async def get_status(
             "username": "electron",
             "user_id": None,
             "role": "admin",
+            "preferred_locale": None,
         }
     # A successfully started authenticated deployment is always externally
     # "configured": first-administrator provisioning now happens at startup.
@@ -94,6 +100,7 @@ async def get_status(
         "username": user.username if user else None,
         "user_id": str(user.id) if user else None,
         "role": "admin" if user and user.is_superuser else ("user" if user else None),
+        "preferred_locale": user.preferred_locale if user else None,
     }
 
 
@@ -111,14 +118,14 @@ async def verify_session(
         }
     principal, user = await resolve_request_principal(request, session)
     if principal is None or user is None:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        raise StableAPIError(401, "AUTH_REQUIRED", "Unauthorized")
     original_uri = request.headers.get("x-original-uri")
     if original_uri and not is_app_data_path_authorized(
         original_uri,
         user_id=principal.user_id,
         is_admin=principal.is_admin,
     ):
-        raise HTTPException(status_code=403, detail="Asset access denied")
+        raise StableAPIError(403, "ASSET_ACCESS_DENIED", "Asset access denied")
     return {
         "authenticated": True,
         **serialize_user(user),
@@ -133,7 +140,9 @@ async def login(
     session: AsyncSession = Depends(get_async_session),
 ):
     if not await _account_count(session):
-        raise HTTPException(status_code=503, detail="Authentication unavailable")
+        raise StableAPIError(
+            503, "AUTHENTICATION_UNAVAILABLE", "Authentication unavailable"
+        )
     username = normalize_username(body.username)
     rate_limit_key = login_rate_limit_key(
         _login_client_host(request),
@@ -141,9 +150,10 @@ async def login(
     )
     retry_after = await LOGIN_RATE_LIMITER.retry_after(rate_limit_key)
     if retry_after is not None:
-        raise HTTPException(
-            status_code=429,
-            detail="Too many failed login attempts. Please try again later.",
+        raise StableAPIError(
+            429,
+            "AUTH_RATE_LIMITED",
+            "Too many failed login attempts. Please try again later.",
             headers={"Retry-After": str(retry_after)},
         )
     user = await session.scalar(
@@ -152,14 +162,14 @@ async def login(
     if user is None or not user.is_active:
         PASSWORD_HELPER.hash(body.password)
         await LOGIN_RATE_LIMITER.record_failure(rate_limit_key)
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        raise StableAPIError(401, "AUTH_INVALID_CREDENTIALS", "Unauthorized")
 
     verified, replacement_hash = PASSWORD_HELPER.verify_and_update(
         body.password, user.hashed_password
     )
     if not verified:
         await LOGIN_RATE_LIMITER.record_failure(rate_limit_key)
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        raise StableAPIError(401, "AUTH_INVALID_CREDENTIALS", "Unauthorized")
     if replacement_hash:
         user.hashed_password = replacement_hash
         await session.commit()
@@ -188,3 +198,35 @@ async def logout(request: Request):
         path="/",
     )
     return response
+
+
+@API_V1_AUTH_ROUTER.get(
+    "/preferences/locale", response_model=LocalePreferenceResponse
+)
+async def get_locale_preference(
+    user: User | None = Depends(read_user_from_cookie),
+):
+    if user is None:
+        if is_disable_auth_enabled():
+            return LocalePreferenceResponse(preferred_locale=None)
+        raise StableAPIError(401, "AUTH_REQUIRED", "Unauthorized")
+    return LocalePreferenceResponse(preferred_locale=user.preferred_locale)
+
+
+@API_V1_AUTH_ROUTER.put(
+    "/preferences/locale", response_model=LocalePreferenceResponse
+)
+async def update_locale_preference(
+    body: LocalePreferenceRequest,
+    session: AsyncSession = Depends(get_async_session),
+    user: User | None = Depends(read_user_from_cookie),
+):
+    if user is None:
+        if is_disable_auth_enabled():
+            return LocalePreferenceResponse(preferred_locale=body.preferred_locale)
+        raise StableAPIError(401, "AUTH_REQUIRED", "Unauthorized")
+    user.preferred_locale = body.preferred_locale
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    return LocalePreferenceResponse(preferred_locale=user.preferred_locale)

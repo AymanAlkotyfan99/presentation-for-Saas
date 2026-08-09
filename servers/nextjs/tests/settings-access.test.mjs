@@ -21,7 +21,8 @@ before(async () => {
   const outfile = path.join(tempDirectory, "settings-access.mjs");
 
   await build({
-    entryPoints: [path.join(nextRoot, "utils/settingsAccess.ts")],
+    absWorkingDir: nextRoot,
+    entryPoints: ["./utils/settingsAccess.ts"],
     bundle: true,
     platform: "node",
     format: "esm",

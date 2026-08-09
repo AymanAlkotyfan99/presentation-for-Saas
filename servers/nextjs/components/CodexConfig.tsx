@@ -4,7 +4,6 @@ import {
   Loader2,
   RefreshCw,
   Trash2,
-  UserCheck,
   ArrowRight,
 } from "lucide-react";
 import { notify } from "@/components/ui/sonner";
@@ -21,6 +20,8 @@ import {
   normalizeChatGptAuthMessage,
   requestChatGptReauth,
 } from "@/utils/chatgptAuth";
+import { useI18n } from "@/i18n/catalog";
+import { localizePathname, stripLocalePrefix } from "@/i18n/routing";
 
 interface CodexConfigProps {
   codexModel: string;
@@ -44,6 +45,7 @@ export default function CodexConfig({
   onInputChange,
   onAuthStatusChange,
 }: CodexConfigProps) {
+  const { locale, t } = useI18n();
   const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
   const [accountId, setAccountId] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
@@ -146,8 +148,8 @@ export default function CodexConfig({
               onInputChange(DEFAULT_CODEX_MODEL, "codex_model");
             }
             notify.success(
-              "Signed in to ChatGPT",
-              "Your ChatGPT account is connected and ready to use."
+              t("settings.signedInToChatGpt"),
+              t("settings.chatGptConnected")
             );
           } else if (pollData.status === "failed") {
             trackEvent(MixpanelEvent.Codex_SignIn_Failed, { method: "browser_poll" });
@@ -155,19 +157,19 @@ export default function CodexConfig({
             setAuthStatus("unauthenticated");
             applyProfile({});
             notify.error(
-              "Sign-in failed",
-              "Authentication did not complete. Please try signing in again."
+              t("settings.signInFailed"),
+              t("settings.signInFailedDescription")
             );
           }
         } catch {
           // keep polling on transient errors
         }
       }, 2000);
-    } catch (err) {
+    } catch {
       trackEvent(MixpanelEvent.Codex_SignIn_Failed, { method: "initiate" });
       notify.error(
-        "Sign-in failed",
-        "Could not start the sign-in flow. Please try again."
+        t("settings.signInFailed"),
+        t("settings.signInStartFailedDescription")
       );
       setAuthStatus("unauthenticated");
       applyProfile({});
@@ -198,14 +200,14 @@ export default function CodexConfig({
         onInputChange(DEFAULT_CODEX_MODEL, "codex_model");
       }
       notify.success(
-        "Signed in to ChatGPT",
-        "Your ChatGPT account is connected and ready to use."
+        t("settings.signedInToChatGpt"),
+        t("settings.chatGptConnected")
       );
-    } catch (err: any) {
+    } catch {
       trackEvent(MixpanelEvent.Codex_SignIn_Failed, { method: "manual_exchange" });
       notify.error(
-        "Sign-in failed",
-        err.message || "The verification code could not be accepted. Please try again."
+        t("settings.signInFailed"),
+        t("settings.verificationFailedDescription")
       );
     } finally {
       setIsExchanging(false);
@@ -238,15 +240,16 @@ export default function CodexConfig({
       onInputChange("", "CODEX_EMAIL");
       onInputChange(false, "CODEX_IS_PRO");
       syncStoreAfterCodexSignOut();
-      router.replace(pathname.startsWith("/settings") ? "/settings" : "/");
+      const unprefixedPath = stripLocalePrefix(pathname);
+      router.replace(localizePathname(unprefixedPath === "/settings" ? "/settings" : "/", locale));
       notify.success(
-        "Signed out",
-        "You have been disconnected from ChatGPT."
+        t("settings.signedOut"),
+        t("settings.chatGptDisconnected")
       );
     } catch {
       notify.error(
-        "Sign-out failed",
-        "Could not disconnect from ChatGPT. Please try again."
+        t("settings.signOutFailed"),
+        t("settings.signOutFailedDescription")
       );
     } finally {
       setIsLoggingOut(false);
@@ -283,13 +286,13 @@ export default function CodexConfig({
       const data = await res.json();
       applyProfile(data);
       notify.success(
-        "Session refreshed",
-        "Your ChatGPT connection was renewed successfully."
+        t("settings.sessionRefreshed"),
+        t("settings.sessionRefreshedDescription")
       );
     } catch {
       notify.error(
-        "Session refresh failed",
-        "Your ChatGPT session could not be renewed. Please sign in again."
+        t("settings.sessionRefreshFailed"),
+        t("settings.sessionRefreshFailedDescription")
       );
       setAuthStatus("unauthenticated");
       applyProfile({});
@@ -305,9 +308,9 @@ export default function CodexConfig({
           <Loader2 className="w-10 h-10 text-[#191919] animate-spin" />
         </div>
         <div className="text-start flex-1 min-w-0">
-          <h4 className="text-[#191919] text-lg font-medium">Checking status</h4>
+          <h4 className="text-[#191919] text-lg font-medium">{t("settings.checkingStatus")}</h4>
           <p className="text-[#B3B3B3] text-sm font-normal">
-            Verifying your ChatGPT connection…
+            {t("settings.verifyingChatGpt")}
           </p>
         </div>
       </div>
@@ -323,9 +326,9 @@ export default function CodexConfig({
               <Loader2 className="w-5 h-5 text-[#191919] animate-spin" />
             </div>
             <div className="text-start min-w-0">
-              <h4 className="text-[#191919] text-lg font-medium">Waiting for sign-in</h4>
+              <h4 className="text-[#191919] text-lg font-medium">{t("settings.waitingForSignIn")}</h4>
               <p className="text-[#B3B3B3] text-sm font-normal">
-                Complete sign-in in the browser tab we opened.
+                {t("settings.completeBrowserSignIn")}
               </p>
             </div>
           </div>
@@ -334,18 +337,18 @@ export default function CodexConfig({
             onClick={handleCancelPolling}
             className="shrink-0 text-sm text-[#B3B3B3] hover:text-[#191919] underline underline-offset-2 transition-colors"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
         </div>
 
         <div className="space-y-2 rounded-[8px] border border-[#EDEEEF] p-3">
           <p className="text-[#191919] text-xs font-normal">
-            Paste redirect URL or code if you were not redirected automatically
+            {t("settings.manualSignInHelp")}
           </p>
           <div className="flex gap-2">
             <input
               type="text"
-              placeholder="Paste URL or code…"
+              placeholder={t("settings.pasteUrlOrCode")}
               className="flex-1 min-w-0 px-3 py-2.5 outline-none border border-[#EDEEEF] rounded-[8px]  text-sm text-[#191919] placeholder:text-[#666666] focus:border-[#555555] transition-colors"
               value={manualCode}
               onChange={(e) => setManualCode(e.target.value)}
@@ -359,7 +362,7 @@ export default function CodexConfig({
               {isExchanging ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
-                "Submit"
+                t("settings.submit")
               )}
             </button>
           </div>
@@ -377,12 +380,14 @@ export default function CodexConfig({
 
             <div className="w-[40px] h-[40px] bg-[#333333] rounded-full flex items-center justify-center" >
 
-              <img src="/providers/OpenAI-white.png" alt="openai Logo" className="w-[27px] h-[27px]" />
+              <img src="/providers/OpenAI-white.png" alt="" aria-hidden="true" className="w-[27px] h-[27px]" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 min-w-0">
                 <p className="text-sm font-medium text-[#191919] truncate">
-                  {username || email || (accountId ? `Account ${accountId}` : "ChatGPT Account")}
+                  {username || email || (accountId
+                    ? t("settings.accountWithId", { id: accountId })
+                    : t("settings.chatGptAccount"))}
                 </p>
 
               </div>
@@ -390,16 +395,16 @@ export default function CodexConfig({
                 <p className="text-xs text-[#B3B3B3] truncate">{email}</p>
               )}
               {!email && accountId && (
-                <p className="text-xs text-[#B3B3B3] truncate">ID: {accountId}</p>
+                <p className="text-xs text-[#B3B3B3] truncate" dir="auto">{t("settings.accountId", { id: accountId })}</p>
               )}
-              <p className="text-xs text-[#B3B3B3]">Signed in to ChatGPT</p>
+              <p className="text-xs text-[#B3B3B3]">{t("settings.signedInToChatGpt")}</p>
             </div>
           </div>
           <div className="flex gap-1.5 shrink-0">
             <button
               onClick={handleRefreshToken}
               disabled={isRefreshing}
-              title="Refresh token"
+              title={t("settings.refreshSession")}
               className="flex items-center justify-center px-3.5 py-2.5  border border-[#EDEEEF] rounded-[58px] minid:opacity-40 transition-colors"
             >
               {isRefreshing ? (
@@ -411,7 +416,7 @@ export default function CodexConfig({
             <button
               onClick={handleSignOut}
               disabled={isLoggingOut}
-              title="Sign out"
+              title={t("navigation.logout")}
               className="flex items-center justify-center px-3.5 py-2.5  border border-[#EDEEEF] rounded-[58px]  disabled:opacity-40 transition-colors"
             >
               {isLoggingOut ? (
@@ -436,14 +441,14 @@ export default function CodexConfig({
       <div className="flex items-center gap-2 flex-1">
         <div className="w-[40px] h-[40px] bg-[#333333] rounded-full flex items-center justify-center" >
 
-          <img src="/providers/OpenAI-white.png" alt="openai Logo" className="w-[27px] h-[27px]" />
+          <img src="/providers/OpenAI-white.png" alt="" aria-hidden="true" className="w-[27px] h-[27px]" />
         </div>
         <div className="text-start flex-1">
-          <h4 className="text-[#191919] text-sm font-medium">Sign in with ChatGPT</h4>
-          <p className="text-[#B3B3B3]   text-xs font-normal">Use your ChatGPT account — no API  key required</p>
+          <h4 className="text-[#191919] text-sm font-medium">{t("settings.signInWithChatGpt")}</h4>
+          <p className="text-[#B3B3B3] text-xs font-normal">{t("settings.signInNoApiKey")}</p>
         </div>
       </div>
-      <ArrowRight className="w-[22px] h-[22px] text-[#4C4C4C]" />
+      <ArrowRight className="w-[22px] h-[22px] text-[#4C4C4C] rtl:rotate-180" />
     </button>
   );
 }

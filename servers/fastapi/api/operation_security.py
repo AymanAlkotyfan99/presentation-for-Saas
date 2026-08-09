@@ -543,6 +543,15 @@ def default_operation_policies() -> dict[str, OperationPolicy]:
             lease=600,
             disable_envs=("DISABLE_FILE_PROCESSING",),
         ),
+        "canonical_document_conversion": _policy(
+            "canonical_document_conversion",
+            rate=20,
+            burst=5,
+            per_subject=2,
+            global_limit=50,
+            lease=120,
+            disable_envs=("DISABLE_CANONICAL_CONVERSION",),
+        ),
         "export": _policy(
             "export",
             rate=10,
@@ -911,6 +920,7 @@ DEFAULT_OPERATION_ROUTE_RULES = (
     _rule("image_search", {"GET"}, r"/api/v1/ppt/images/search"),
     _rule("file_upload", {"POST"}, r"/api/v1/ppt/files/upload"),
     _rule("document_parsing", {"POST"}, r"/api/v1/ppt/files/(?:decompose|update)"),
+    _rule("canonical_document_conversion", {"POST", "PUT"}, r"/api/v1/ppt/presentations/[^/]+/document(?:/(?:migration-preview|convert))?"),
     _rule("export", {"POST"}, r"/api/v1/ppt/presentation/(?:generate(?:/async)?|edit|derive)"),
     _rule("webhook_registration", {"POST", "DELETE"}, r"/api/v1/webhook/(?:subscribe|unsubscribe)"),
     _rule("admin", {"POST", "PUT", "PATCH", "DELETE"}, r"/api/v1/admin/.*"),

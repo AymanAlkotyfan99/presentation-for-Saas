@@ -14,6 +14,8 @@ import {
   LayoutsBadge,
 } from "./TemplatePreviewComponents";
 import { TemplateTab } from "../hooks/useTemplateSummaries";
+import { useI18n, useTranslations } from "@/i18n/catalog";
+import { formatPercent } from "@/lib/locale-format";
 
 export function TemplateThumbnailPreview({
   thumbnail,
@@ -24,6 +26,7 @@ export function TemplateThumbnailPreview({
   templateName: string;
   selectionPage?: boolean;
 }) {
+  const t = useTranslations();
   const resolvedThumbnail = thumbnail ? resolveBackendAssetUrl(thumbnail) : "";
 
   if (!resolvedThumbnail) {
@@ -47,7 +50,7 @@ export function TemplateThumbnailPreview({
       )}
     >
       <div
-        aria-label={`${templateName} thumbnail`}
+        aria-label={t("templates.thumbnail", { name: templateName })}
         className={cn(
           "h-full w-full rounded-[12px] border border-[#EDEEEF] bg-white bg-contain bg-center bg-no-repeat",
           !selectionPage && "shadow-sm"
@@ -72,6 +75,7 @@ export const TemplateListCard = memo(function TemplateListCard({
   showArrow?: boolean;
   selectionPage?: boolean;
 }) {
+  const t = useTranslations();
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (event.currentTarget.getAttribute("aria-disabled") === "true") {
@@ -88,16 +92,10 @@ export const TemplateListCard = memo(function TemplateListCard({
 
   const rawStatus = template.generation_status ?? template.status ?? null;
   const status = rawStatus?.toLowerCase().replace(/[_-]+/g, " ") ?? null;
-  const isGeneratingStatus =
-    status === "generating" ||
-    status === "processing" ||
-    status === "pending" ||
-    status === "queued" ||
-    status === "running" ||
-    status === "in progress";
-  const statusLabel =
-    status && !isGeneratingStatus
-      ? status.replace(/\b\w/g, (char) => char.toUpperCase())
+  const statusLabel = status === "complete" || status === "completed"
+    ? t("common.done")
+    : status === "failed"
+      ? t("errors.unknown")
       : null;
 
   return (
@@ -105,7 +103,7 @@ export const TemplateListCard = memo(function TemplateListCard({
       role="button"
       tabIndex={0}
       aria-pressed={isSelected}
-      aria-label={`${showArrow ? "Open" : "Select"} ${template.name} template`}
+      aria-label={t(showArrow ? "templates.openTemplate" : "templates.selectTemplate", { name: template.name })}
       className={cn(
         "group relative overflow-hidden border bg-white shadow-none outline-none transition-all duration-200",
         selectionPage ? "rounded-[12px]" : "rounded-[22px]",
@@ -129,7 +127,7 @@ export const TemplateListCard = memo(function TemplateListCard({
         )}
       />
       {isSelected && (
-        <span className="absolute right-4 top-3.5 z-50 inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#7A5AF8] text-white shadow-sm">
+        <span className="absolute end-4 top-3.5 z-50 inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#7A5AF8] text-white shadow-sm">
           <CheckCircle2 className="h-4 w-4" />
         </span>
       )}
@@ -162,7 +160,7 @@ export const TemplateListCard = memo(function TemplateListCard({
                   )
             )}
           >
-            {template.name}
+            <span dir="auto">{template.name}</span>
           </h3>
           {template.description && (
             <p
@@ -176,7 +174,7 @@ export const TemplateListCard = memo(function TemplateListCard({
                     )
               )}
             >
-              {template.description}
+              <span dir="auto">{template.description}</span>
             </p>
           )}
           {statusLabel && (
@@ -210,7 +208,8 @@ export const ProcessingTemplateListCard = memo(
   }: {
     task: TemplateCreateTaskResponse;
   }) {
-    const templateName = task.data?.name?.trim() || "New template";
+    const { locale, t } = useI18n();
+    const templateName = task.data?.name?.trim() || t("templates.newTemplate");
     const createdLayouts = task.data?.created_layouts ?? 0;
     const remainingLayouts = task.data?.remaining_layouts ?? 0;
     const totalLayouts = createdLayouts + remainingLayouts;
@@ -228,14 +227,14 @@ export const ProcessingTemplateListCard = memo(
     );
     const progressLabel =
       totalLayouts > 0
-        ? `${createdLayouts} of ${totalLayouts} layouts`
-        : "Preparing layouts";
+        ? t("templates.layoutsProgress", { created: createdLayouts, total: totalLayouts })
+        : t("templates.preparingLayouts");
 
     return (
       <Card
         role="group"
         aria-disabled="true"
-        aria-label={`${templateName} template is processing`}
+        aria-label={t("templates.processing", { name: templateName })}
         className={cn(
           "relative overflow-hidden rounded-[22px] border border-[#E8E9EC] bg-white",
           "cursor-not-allowed opacity-90 shadow-sm"
@@ -254,12 +253,12 @@ export const ProcessingTemplateListCard = memo(
           />
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute bottom-5 right-5 top-5 z-20 rounded-r-xl bg-[#F8F7FF]/70 transition-[width] duration-500 ease-out"
+            className="pointer-events-none absolute bottom-5 end-5 top-5 z-20 rounded-e-xl bg-[#F8F7FF]/70 transition-[width] duration-500 ease-out"
             style={{ width: overlayWidth }}
           />
-          <div className="absolute right-8 top-8 z-30 inline-flex items-center gap-1.5 rounded-full border border-white/80 bg-white/90 px-2.5 py-1.5 text-xs font-bold text-[#5146E5] shadow-sm backdrop-blur">
+          <div className="absolute end-8 top-8 z-30 inline-flex items-center gap-1.5 rounded-full border border-white/80 bg-white/90 px-2.5 py-1.5 text-xs font-bold text-[#5146E5] shadow-sm backdrop-blur">
             <span className="h-1.5 w-1.5 rounded-full bg-[#7A5AF8]" />
-            {progressPercent}%
+            {formatPercent(progressPercent / 100, locale)}
           </div>
           <div className="absolute inset-x-5 bottom-5 z-30 h-1.5 overflow-hidden rounded-full bg-white/70">
             <div
@@ -314,6 +313,7 @@ export function TemplateTabSwitcher({
   tab: TemplateTab;
   onTabChange: (tab: TemplateTab) => void;
 }) {
+  const t = useTranslations();
   return (
     <div className="p-1 rounded-[40px] bg-[#ffffff] w-fit border border-[#EDEEEF] flex items-center justify-center">
       <button
@@ -325,7 +325,7 @@ export function TemplateTabSwitcher({
           color: tab === "custom" ? "#5146E5" : "#3A3A3A",
         }}
       >
-        Custom
+        {t("templates.custom")}
       </button>
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -347,25 +347,27 @@ export function TemplateTabSwitcher({
           color: tab === "default" ? "#5146E5" : "#3A3A3A",
         }}
       >
-        Built-in
+        {t("templates.builtIn")}
       </button>
     </div>
   );
 }
 
-export function TemplateListLoadingState({ message = "Loading templates..." }: { message?: string }) {
+export function TemplateListLoadingState({ message }: { message?: string }) {
+  const t = useTranslations();
   return (
     <div className="flex items-center justify-center py-12 font-syne">
       <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-      <span className="ml-3 text-gray-600">{message}</span>
+      <span className="ms-3 text-gray-600">{message ?? t("templates.loading")}</span>
     </div>
   );
 }
 
-export function TemplateListEmptyState({ message = "No templates available." }: { message?: string }) {
+export function TemplateListEmptyState({ message }: { message?: string }) {
+  const t = useTranslations();
   return (
     <div className="flex items-center justify-center py-12 font-syne text-gray-600">
-      {message}
+      {message ?? t("templates.empty")}
     </div>
   );
 }

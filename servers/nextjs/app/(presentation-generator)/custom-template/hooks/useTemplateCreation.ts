@@ -18,6 +18,7 @@ import {
     categorizeFileExtension,
     sanitizeAnalyticsError,
 } from "@/utils/analytics";
+import { useTranslations } from "@/i18n/catalog";
 
 const TEMPLATE_V2_LAYOUT_BATCH_SIZE = 1;
 const MAX_PROCESSING_PROGRESS_PERCENT = 95;
@@ -117,6 +118,7 @@ function errorMessageFromUnknown(error: unknown, fallback: string): string {
 }
 
 export const useTemplateCreation = () => {
+    const t = useTranslations();
     const [state, setState] = useState<TemplateCreationState>(initialState);
     const [uploadedFonts, setUploadedFonts] = useState<UploadedFont[]>([]);
     const [slides, setSlides] = useState<ProcessedSlide[]>([]);
@@ -181,17 +183,17 @@ export const useTemplateCreation = () => {
                 file_extension: fileExtension,
                 error_category: sanitizeAnalyticsError(error, "Font check failed"),
             });
-            notify.error("Font check failed", errorMessage);
+            notify.error(t("customTemplates.fontCheckFailed"), t("errors.unknown"));
             return null;
         }
-    }, [updateState]);
+    }, [t, updateState]);
 
 
     const uploadFont = useCallback((fontName: string, file: File): string | null => {
         // Check if font is already added
         const existingFont = uploadedFonts.find((f) => f.fontName === fontName);
         if (existingFont) {
-            notify.warning("Font already added", `Font "${fontName}" is already in your upload list.`);
+            notify.warning(t("customTemplates.fontAlreadyAdded"), t("customTemplates.fontAlreadyAddedDescription", { font: fontName }));
             return fontName;
         }
 
@@ -200,14 +202,14 @@ export const useTemplateCreation = () => {
         const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf("."));
 
         if (!validExtensions.includes(fileExtension)) {
-            notify.error("Invalid font file", "Please upload .ttf, .otf, .woff, .woff2, or .eot files.");
+            notify.error(t("customTemplates.invalidFontFile"), t("customTemplates.invalidFontFileDescription"));
             return null;
         }
 
         // Validate file size (10MB limit)
         const maxSize = 10 * 1024 * 1024;
         if (file.size > maxSize) {
-            notify.error("File too large", "Font file size must be less than 10MB.");
+            notify.error(t("customTemplates.fileTooLarge"), t("customTemplates.fontTooLargeDescription"));
             return null;
         }
 
@@ -220,15 +222,15 @@ export const useTemplateCreation = () => {
         };
 
         setUploadedFonts(prev => [...prev, newFont]);
-        notify.success("Font added", `Font "${fontName}" was added successfully.`);
+        notify.success(t("customTemplates.fontAdded"), t("customTemplates.fontAddedDescription", { font: fontName }));
         return fontName;
-    }, [uploadedFonts]);
+    }, [t, uploadedFonts]);
 
     // Remove a font
     const removeFont = useCallback((fontName: string) => {
         setUploadedFonts(prev => prev.filter(font => font.fontName !== fontName));
-        notify.info("Font removed", "The font was removed from your upload list.");
-    }, []);
+        notify.info(t("settings.fontRemoved"), t("settings.fontRemovedDescription"));
+    }, [t]);
 
     // Get all unsupported fonts that need upload
     const getUnsupportedFonts = useCallback((): string[] => {
@@ -313,7 +315,7 @@ export const useTemplateCreation = () => {
                 duration_ms: Date.now() - startedAt,
             });
 
-            notify.success("Document prepared", "Template generation is starting now.");
+            notify.success(t("customTemplates.documentPrepared"), t("customTemplates.documentPreparedDescription"));
             return data;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : "Document preparation failed";
@@ -326,10 +328,10 @@ export const useTemplateCreation = () => {
                     "Document preparation failed"
                 ),
             });
-            notify.error("Document preparation failed", errorMessage);
+            notify.error(t("customTemplates.documentPreparationFailed"), t("errors.unknown"));
             return null;
         }
-    }, [getUnsupportedFonts, uploadedFonts, updateState]);
+    }, [getUnsupportedFonts, t, uploadedFonts, updateState]);
 
     const saveTemplateV2Layouts = useCallback(async (
         templateId: string,
@@ -666,18 +668,18 @@ export const useTemplateCreation = () => {
 
             if (failedCount > 0) {
                 notify.warning(
-                    "Some slides could not be generated",
-                    `${processedCount} of ${generatedSlides.length} slides were generated.`
+                    t("customTemplates.someSlidesFailed"),
+                    t("customTemplates.slidesGeneratedCount", { processed: processedCount, total: generatedSlides.length })
                 );
             } else if (blocksError) {
                 notify.warning(
-                    "Template generated",
-                    `Slides were saved, but template blocks were not generated. ${blocksError}`
+                    t("customTemplates.templateGenerated"),
+                    t("customTemplates.blocksNotGenerated")
                 );
             } else {
                 notify.success(
-                    "Template generated",
-                    "The template was generated and saved successfully."
+                    t("customTemplates.templateGenerated"),
+                    t("customTemplates.templateGeneratedDescription")
                 );
             }
 
@@ -704,13 +706,14 @@ export const useTemplateCreation = () => {
                     error: errorMessage,
                 }))
             );
-            notify.error("Generation failed", errorMessage);
+            notify.error(t("customTemplates.generationFailed"), t("errors.unknown"));
             return null;
         }
     }, [
         createAndSaveTemplateV2Layouts,
         generateTemplateV2Blocks,
         state.templateId,
+        t,
         updateState,
     ]);
 
@@ -721,7 +724,7 @@ export const useTemplateCreation = () => {
     ): Promise<string | null> => {
         const previewData = previewDataOverride ?? state.previewData;
         if (!previewData) {
-            notify.error("No preview data", "Prepare the document before continuing.");
+            notify.error(t("customTemplates.noPreviewData"), t("customTemplates.prepareDocumentFirst"));
             return null;
         }
 
@@ -736,12 +739,13 @@ export const useTemplateCreation = () => {
     }, [
         generateTemplateV2,
         state.previewData,
+        t,
     ]);
 
     // Reconstruct a single slide (no auto-advance)
     const retrySlide = useCallback((slideIndex: number) => {
         if (!state.templateId) {
-            notify.error("Template unavailable", "Initialize the template before trying again.");
+            notify.error(t("customTemplates.templateUnavailable"), t("customTemplates.initializeTemplateFirst"));
             return;
         }
 
@@ -795,8 +799,8 @@ export const useTemplateCreation = () => {
                     duration_ms: Date.now() - startedAt,
                 });
                 notify.success(
-                    "Slide regenerated",
-                    `Slide ${slideIndex + 1} was regenerated successfully.`
+                    t("customTemplates.slideRegenerated"),
+                    t("customTemplates.slideRegeneratedDescription", { number: slideIndex + 1 })
                 );
             } catch (error) {
                 const errorMessage = error instanceof Error
@@ -824,12 +828,13 @@ export const useTemplateCreation = () => {
                         "Template layout generation failed"
                     ),
                 });
-                notify.error(`Slide ${slideIndex + 1} failed`, errorMessage);
+                notify.error(t("customTemplates.slideFailed", { number: slideIndex + 1 }), t("errors.unknown"));
             }
         })();
     }, [
         createAndSaveTemplateV2Layouts,
         state.templateId,
+        t,
         updateState,
     ]);
 

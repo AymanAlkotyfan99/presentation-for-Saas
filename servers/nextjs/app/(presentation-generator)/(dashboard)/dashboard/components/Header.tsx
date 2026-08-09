@@ -7,6 +7,9 @@ import { usePathname } from "next/navigation";
 import { trackEvent, MixpanelEvent } from "@/utils/mixpanel";
 import { ArrowLeft } from "lucide-react";
 import { BRAND_ASSETS, DISPLAY_PRODUCT } from "@/lib/product-metadata";
+import { LocaleSwitcher } from "@/components/LocaleSwitcher";
+import { localizePathname, stripLocalePrefix } from "@/i18n/routing";
+import { useI18n } from "@/i18n/catalog";
 
 const PATHS_WITH_HEADER_BACK = [
   "/upload",
@@ -16,23 +19,28 @@ const PATHS_WITH_HEADER_BACK = [
 ] as const;
 
 function pathMatches(pathname: string | null, base: string) {
-  return pathname === base || pathname?.startsWith(`${base}/`) === true;
+  const normalized = stripLocalePrefix(pathname || "/");
+  return normalized === base || normalized.startsWith(`${base}/`);
 }
 
 const Header = () => {
   const pathname = usePathname();
+  const { locale, t } = useI18n();
   const showHeaderBack = PATHS_WITH_HEADER_BACK.some((p) => pathMatches(pathname, p));
 
   const backToUpload =
     pathMatches(pathname, "/outline") || pathMatches(pathname, "/documents-preview");
   const backToTemplates = pathMatches(pathname, "/template-preview");
 
-  const backHref = backToUpload ? "/upload" : backToTemplates ? "/templates" : "/dashboard";
+  const backHref = localizePathname(
+    backToUpload ? "/upload" : backToTemplates ? "/templates" : "/dashboard",
+    locale,
+  );
   const backLabel = backToUpload
-    ? "BACK"
+    ? t("common.back")
     : backToTemplates
-      ? "BACK"
-      : "BACK";
+      ? t("common.back")
+      : t("common.back");
 
   return (
     <div className="w-full   sticky top-0 z-50 py-7 "
@@ -44,7 +52,7 @@ const Header = () => {
       <Wrapper className="px-5 sm:px-10 lg:px-20">
         <div className="flex items-center justify-between py-1">
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" onClick={() => trackEvent(MixpanelEvent.Navigation, { from: pathname, to: "/dashboard" })}>
+            <Link href={localizePathname("/dashboard", locale)} onClick={() => trackEvent(MixpanelEvent.Navigation, { from: pathname, to: "/dashboard" })}>
               <img
                 src={BRAND_ASSETS.compactIcon}
                 alt={`${DISPLAY_PRODUCT.shortName} logo`}
@@ -52,7 +60,8 @@ const Header = () => {
               />
             </Link>
           </div>
-          <div className="flex items-center">
+          <div className="flex items-center gap-4">
+            <LocaleSwitcher compact />
             {showHeaderBack ? (
               <Link
                 href={backHref}
@@ -61,7 +70,7 @@ const Header = () => {
                   trackEvent(MixpanelEvent.Navigation, { from: pathname, to: backHref })
                 }
               >
-                <ArrowLeft className="w-4 h-4 shrink-0 text-[#333333]" aria-hidden />
+                <ArrowLeft className="rtl-flip w-4 h-4 shrink-0 text-[#333333]" aria-hidden />
                 <span>{backLabel}</span>
               </Link>
             ) : null}

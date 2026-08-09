@@ -2,7 +2,7 @@ import datetime
 import uuid
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Uuid, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Integer, String, Uuid, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlmodel import SQLModel
 
@@ -17,6 +17,12 @@ class User(UserBase):
     """Username-only account model used by the FastAPI Users manager."""
 
     __tablename__ = "user"
+    __table_args__ = (
+        CheckConstraint(
+            "preferred_locale IS NULL OR preferred_locale IN ('en', 'ar')",
+            name="ck_user_preferred_locale",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid, primary_key=True, default=uuid.uuid4
@@ -42,4 +48,7 @@ class User(UserBase):
     )
     auth_version: Mapped[int] = mapped_column(
         Integer, nullable=False, default=1, server_default=text("1")
+    )
+    preferred_locale: Mapped[Optional[str]] = mapped_column(
+        String(8), nullable=True, default=None
     )

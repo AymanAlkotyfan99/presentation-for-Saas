@@ -36,6 +36,7 @@ from utils.architecture_flags import (
     LegacyV1ReadDisabledError,
     LegacyV1WriteDisabledError,
 )
+from utils.api_errors import StableAPIError
 
 
 init_sandbox_safe_mimetypes()
@@ -67,6 +68,15 @@ def _maybe_init_sentry() -> None:
 _maybe_init_sentry()
 
 app = FastAPI(lifespan=app_lifespan)
+
+
+@app.exception_handler(StableAPIError)
+async def stable_api_error(_request: Request, exc: StableAPIError):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=exc.response_body(),
+        headers=exc.headers,
+    )
 
 
 @app.exception_handler(LegacyV1ReadDisabledError)

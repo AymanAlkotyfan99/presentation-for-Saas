@@ -5,6 +5,8 @@ import { store } from '@/store/store'
 import { Provider } from 'react-redux'
 import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime'
 import { Toaster } from '@/components/ui/sonner'
+import { I18nProvider } from '@/i18n/catalog'
+import englishMessages from '@/messages/en.json'
 
 // Import global styles
 import '@/app/globals.css'
@@ -32,10 +34,12 @@ Cypress.Commands.add('mount', (component, options = {}) => {
   const router = createRouter()
   const RouterWrapper = ({ children }: RouterWrapperProps) => (
     <AppRouterContext.Provider value={router}>
-      <Provider store={store}>
-        {children}
-        <Toaster position="top-center" />
-      </Provider>
+      <I18nProvider locale="en" messages={englishMessages}>
+        <Provider store={store}>
+          {children}
+          <Toaster position="top-center" />
+        </Provider>
+      </I18nProvider>
     </AppRouterContext.Provider>
   )
 
@@ -189,9 +193,9 @@ describe('<UploadPage />', () => {
   describe('Validation', () => {
     it('should show error when no prompt or documents provided', () => {
       // Click next without entering prompt or uploading files
-      cy.contains('button', 'Get Started').click()
+      cy.contains('button', 'Generate presentation').click()
       // Check for error toast
-      checkToast('Input required')
+      checkToast('This field is required.')
     })
   })
 
@@ -201,13 +205,13 @@ describe('<UploadPage />', () => {
       cy.get('[data-testid="prompt-input"]').type('Create a presentation about AI')
 
       // Click generate
-      cy.contains('button', 'Get Started').click()
+      cy.contains('button', 'Generate presentation').click()
 
       // Wait for API call with longer timeout
       cy.wait('@createPresentation', { timeout: 10000 })
 
       // Verify navigation to outline page
-      cy.get('@router.push').should('be.calledWith', '/outline')
+      cy.get('@router.push').should('be.calledWith', '/en/outline')
     })
 
     it('should proceed to outline page with uploaded document', () => {
@@ -238,7 +242,7 @@ describe('<UploadPage />', () => {
       }).as('decomposeDoc')
 
       // Click generate
-      cy.contains('button', 'Get Started').click()
+      cy.contains('button', 'Generate presentation').click()
 
       // Wait for upload, decompose, and outline creation API calls
       cy.wait('@uploadDoc', { timeout: 10000 })
@@ -253,7 +257,7 @@ describe('<UploadPage />', () => {
         .and('deep.equal', ['/tmp/decomposed/example.txt'])
 
       // Verify navigation to outline page
-      cy.get('@router.push').should('be.calledWith', '/outline')
+      cy.get('@router.push').should('be.calledWith', '/en/outline')
     })
   })
 
@@ -267,10 +271,10 @@ describe('<UploadPage />', () => {
 
       // Enter prompt and try to generate
       cy.get('[data-testid="prompt-input"]').type('Test presentation')
-      cy.contains('button', 'Get Started').click()
+      cy.contains('button', 'Generate presentation').click()
 
       // Check for error toast
-      checkToast('Generation failed')
+      checkToast('Presentation generation failed.')
     })
   })
 })

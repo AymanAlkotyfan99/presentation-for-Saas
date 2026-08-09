@@ -3,6 +3,7 @@
 import type React from "react"
 import { BadgeCheck, Loader2, ShieldAlert, TriangleAlert } from "lucide-react"
 import { Toaster as Sonner, toast as sonnerToast, type ExternalToast } from "sonner"
+import { useTranslations } from "@/i18n/catalog"
 
 type NotifyOptions = Pick<
   ExternalToast,
@@ -58,13 +59,14 @@ export const notify = {
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
 const Toaster = ({ icons, ...props }: ToasterProps) => {
+  const t = useTranslations()
   const defaultIcons: NonNullable<ToasterProps["icons"]> = {
     success: <BadgeCheck aria-hidden="true" />,
     error: <ShieldAlert aria-hidden="true" />,
     info: <NeutralToastIcon />,
     warning: <TriangleAlert aria-hidden="true" />,
     loading: <Loader2 aria-hidden="true" className="animate-spin" />,
-    close: <span aria-hidden="true">Got it!</span>,
+    close: <span aria-hidden="true">{t("common.gotIt")}</span>,
   }
 
   return (

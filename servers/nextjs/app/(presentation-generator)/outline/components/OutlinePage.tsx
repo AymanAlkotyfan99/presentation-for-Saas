@@ -23,6 +23,8 @@ import {
 } from "@/utils/presentationLimits";
 import { sanitizeAnalyticsError } from "@/utils/analytics";
 import { MixpanelEvent, trackEvent } from "@/utils/mixpanel";
+import { useI18n } from "@/i18n/catalog";
+import { localizePathname } from "@/i18n/routing";
 
 import Chat from "../../presentation/components/Chat";
 import {
@@ -111,6 +113,7 @@ const scrollToPageTop = () => {
 };
 
 const OutlinePage: React.FC = () => {
+  const { locale, t } = useI18n();
   const dispatch = useDispatch();
   const router = useRouter();
   const { presentation_id, outlines } = useSelector(
@@ -152,7 +155,7 @@ const OutlinePage: React.FC = () => {
   const outlineStreamFinished =
     !isTemplateStage &&
     !outlineControlsBusy &&
-    (outlines.length > 0 || streamState.statusMessage === "Outline ready");
+    (outlines.length > 0 || streamState.statusMessage === t("outline.ready"));
 
   useEffect(() => {
     if (savedConfig) {
@@ -216,7 +219,7 @@ const OutlinePage: React.FC = () => {
     }
 
     if (!hasSelectedTemplate) {
-      toast.error("Please select a template first");
+      toast.error(t("outline.templateRequired"));
       return;
     }
 
@@ -225,17 +228,17 @@ const OutlinePage: React.FC = () => {
     }
 
     if (!draftConfig.language) {
-      toast.error("Please select language");
+      toast.error(t("outline.languageRequired"));
       return;
     }
 
     if (documentPaths.length > 0 && draftConfig.language === LanguageType.Auto) {
-      toast.error("Please choose a language before regenerating from documents");
+      toast.error(t("outline.documentLanguageRequired"));
       return;
     }
 
     if (!draftConfig.prompt.trim() && documentPaths.length === 0) {
-      toast.error("No Prompt or Document Provided");
+      toast.error(t("outline.sourceRequired"));
       return;
     }
 
@@ -288,11 +291,8 @@ const OutlinePage: React.FC = () => {
           "Failed to regenerate outline"
         ),
       });
-      toast.error("Outline Error", {
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to regenerate outline.",
+      toast.error(t("outline.regenerateFailedTitle"), {
+        description: t("outline.regenerateFailed"),
       });
     } finally {
       setIsRegeneratingOutline(false);
@@ -307,6 +307,7 @@ const OutlinePage: React.FC = () => {
     outlineControlsBusy,
     presentation_id,
     selectedTemplateId,
+    t,
   ]);
 
   const handleUpdateOutline = (index: number, newContent: string) => {
@@ -350,8 +351,8 @@ const OutlinePage: React.FC = () => {
     return (
       <div className="min-h-screen bg-[#FEFEFF]">
         <OutlineStandardHeader
-          title="Outline Generation"
-          onBack={() => router.push("/dashboard")}
+          title={t("outline.outlineGeneration")}
+          onBack={() => router.push(localizePathname("/dashboard", locale))}
         />
         <EmptyStateView />
       </div>
@@ -373,10 +374,10 @@ const OutlinePage: React.FC = () => {
       />
 
       <OutlineStandardHeader
-        title={isTemplateStage ? "Select Template" : "Outline Generation"}
+        title={isTemplateStage ? t("outline.selectTemplateTitle") : t("outline.outlineGeneration")}
         onBack={() => {
           if (isTemplateStage) {
-            router.push("/dashboard");
+            router.push(localizePathname("/dashboard", locale));
             return;
           }
           handleReturnToTemplates();
@@ -393,7 +394,7 @@ const OutlinePage: React.FC = () => {
         </main>
       ) : (
         <>
-          <div className="lg:mr-[369px]">
+          <div className="lg:me-[369px]">
             <main className="mx-auto w-[calc(100%-2.5rem)] max-w-[967px] pb-28 pt-10 sm:w-[calc(100%-5rem)]">
               <OutlinePromptBar
                 config={draftConfig}
@@ -421,10 +422,10 @@ const OutlinePage: React.FC = () => {
           </div>
 
           {isOutlineAssistantVisible && (
-            <aside className="mx-auto mb-28 mt-8 flex h-[600px] w-[calc(100%-2.5rem)] overflow-hidden border border-[#EDEEEF] bg-[#FEFEFF] sm:w-[calc(100%-5rem)] lg:fixed lg:bottom-0 lg:right-0 lg:top-[68px] lg:z-40 lg:mx-0 lg:mb-0 lg:mt-0 lg:h-auto lg:w-[369px] lg:border-0">
+            <aside className="mx-auto mb-28 mt-8 flex h-[600px] w-[calc(100%-2.5rem)] overflow-hidden border border-[#EDEEEF] bg-[#FEFEFF] sm:w-[calc(100%-5rem)] lg:fixed lg:bottom-0 lg:end-0 lg:top-[68px] lg:z-40 lg:mx-0 lg:mb-0 lg:mt-0 lg:h-auto lg:w-[369px] lg:border-0">
               <nav
                 className="flex w-[70px] shrink-0 flex-col items-center gap-5 px-1.5 py-2"
-                aria-label="Outline tools"
+                aria-label={t("outline.outlineTools")}
               >
                 <div className="flex w-full flex-col items-center rounded-[10px] bg-[#F4F3FF]/60 py-7">
                   <div className="flex rounded-[10px] border border-[#EDEEEF] bg-white p-1.5 shadow-[0_6.6px_6.6px_rgba(124,81,248,0.14)]">
@@ -460,7 +461,7 @@ const OutlinePage: React.FC = () => {
             </aside>
           )}
 
-          <div className="pointer-events-none fixed bottom-6 left-5 right-5 z-50 flex justify-center sm:left-10 sm:right-10 lg:left-0 lg:right-[369px]">
+          <div className="pointer-events-none fixed bottom-6 start-5 end-5 z-50 flex justify-center sm:start-10 sm:end-10 lg:start-0 lg:end-[369px]">
             <div className="pointer-events-auto">
               <GenerateButton
                 loadingState={loadingState}

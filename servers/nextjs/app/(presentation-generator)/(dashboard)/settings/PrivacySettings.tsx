@@ -3,9 +3,10 @@ import React, { useEffect, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { setTelemetryEnabled } from "@/utils/mixpanel";
 import { Loader2 } from "lucide-react";
-import { DISPLAY_PRODUCT } from "@/lib/product-metadata";
+import { useTranslations } from "@/i18n/catalog";
 
 const PrivacySettings = () => {
+  const t = useTranslations();
   const [trackingEnabled, setTrackingEnabled] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -48,7 +49,7 @@ const PrivacySettings = () => {
   if (trackingEnabled === null) {
     return (
       <div className="w-full bg-[#F9F8F8] p-7 rounded-[20px] flex items-center justify-center min-h-[200px]">
-        <Loader2 className="w-5 h-5 animate-spin text-[#5146E5]" />
+        <Loader2 className="w-5 h-5 animate-spin text-[#5146E5]" aria-label={t("common.loading")} />
       </div>
     );
   }
@@ -57,13 +58,10 @@ const PrivacySettings = () => {
     <div className="w-full space-y-6">
       <div className="bg-[#F9F8F8] p-7 rounded-[20px]">
         <h4 className="text-sm font-semibold text-[#191919] mb-1">
-          Usage analytics
+          {t("settings.usageAnalytics")}
         </h4>
         <p className="text-xs text-[#6B7280] mb-6 leading-relaxed max-w-lg">
-          Share limited product-usage events to help improve {DISPLAY_PRODUCT.shortName}.
-          Presentation content is not intentionally included, but the analytics
-          provider may process network/device metadata and a persistent
-          pseudonymous identifier.
+          {t("settings.privacyDescription")}
         </p>
 
         <div className="flex items-center justify-between gap-4 rounded-[10px] bg-white border border-[#EDEEEF] p-4">
@@ -72,12 +70,12 @@ const PrivacySettings = () => {
               htmlFor="tracking-toggle"
               className="text-sm font-medium text-[#191919] cursor-pointer select-none block"
             >
-              Share product usage analytics
+              {t("settings.shareAnalytics")}
             </label>
             <p className="text-xs text-[#9CA3AF] mt-0.5">
               {trackingEnabled
-                ? "Product usage analytics are enabled."
-                : "Product usage analytics are disabled."}
+                ? t("settings.analyticsEnabled")
+                : t("settings.analyticsDisabled")}
             </p>
           </div>
           <div className="flex items-center gap-2">

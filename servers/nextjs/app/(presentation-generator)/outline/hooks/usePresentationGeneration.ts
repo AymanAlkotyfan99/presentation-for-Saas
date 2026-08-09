@@ -13,6 +13,7 @@ import {
   MAX_NUMBER_OF_SLIDES,
 } from "@/utils/presentationLimits";
 import { store } from "@/store/store";
+import { useTranslations } from "@/i18n/catalog";
 
 const DEFAULT_LOADING_STATE: LoadingState = {
   message: "",
@@ -25,6 +26,7 @@ export const usePresentationGeneration = (
   presentationId: string | null,
   selectedTemplateId: string | null
 ) => {
+  const t = useTranslations();
   const dispatch = useDispatch();
   const router = useRouter();
   const pathname = usePathname();
@@ -36,31 +38,31 @@ export const usePresentationGeneration = (
     (currentOutlines: { content: string }[] | null) => {
       if (!currentOutlines || currentOutlines.length === 0) {
         notify.warning(
-          "Outlines not ready",
-          "Please wait for your outlines to finish generating before continuing."
+          t("outline.outlinesNotReadyTitle"),
+          t("outline.outlinesNotReady")
         );
         return false;
       }
 
       if (!selectedTemplateId) {
         notify.warning(
-          "Template not selected",
-          "Choose a template before generating your presentation."
+          t("outline.templateNotSelectedTitle"),
+          t("outline.templateNotSelected")
         );
         return false;
       }
 
       if (currentOutlines.length > MAX_NUMBER_OF_SLIDES) {
         notify.warning(
-          "Slide limit reached",
-          `Use ${MAX_NUMBER_OF_SLIDES} or fewer outline slides before generating.`
+          t("outline.slideLimitTitle"),
+          t("outline.limitBeforeGeneration", { count: MAX_NUMBER_OF_SLIDES })
         );
         return false;
       }
 
       return true;
     },
-    [selectedTemplateId]
+    [selectedTemplateId, t]
   );
 
   const clearTheme = () => {
@@ -97,7 +99,7 @@ export const usePresentationGeneration = (
     });
 
     setLoadingState({
-      message: "Generating presentation data...",
+      message: t("outline.generatingPresentationData"),
       isLoading: true,
       showProgress: true,
       duration: 30,
@@ -122,7 +124,7 @@ export const usePresentationGeneration = (
           `/presentation?id=${presentationId}&stream=true&type=standard`
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error In Presentation Generation(prepare).", error);
       trackEvent(MixpanelEvent.TemplateV2_Prepare_Failed, {
         presentation_id: presentationId,
@@ -134,8 +136,8 @@ export const usePresentationGeneration = (
         ),
       });
       notify.error(
-        "Generation error",
-        error.message || "Error in presentation generation."
+        t("outline.generationErrorTitle"),
+        t("outline.generationError")
       );
     } finally {
       setLoadingState(DEFAULT_LOADING_STATE);
@@ -147,6 +149,7 @@ export const usePresentationGeneration = (
     router,
     selectedTemplateId,
     pathname,
+    t,
   ]);
 
   return { loadingState, handleSubmit };

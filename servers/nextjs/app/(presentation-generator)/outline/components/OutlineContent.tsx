@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { MAX_NUMBER_OF_SLIDES } from "@/utils/presentationLimits";
 import { useStableOutlineIds } from "../../components/useStableOutlineIds";
 import { OutlineItem } from "./OutlineItem";
+import { useTranslations } from "@/i18n/catalog";
 
 interface OutlineContentProps {
   outlines: { content: string }[] | null;
@@ -48,6 +49,7 @@ const OutlineContent: React.FC<OutlineContentProps> = ({
   onAddSlide,
   onUpdateOutline,
 }) => {
+  const t = useTranslations();
   const hasReachedSlideLimit =
     (outlines?.length ?? 0) >= MAX_NUMBER_OF_SLIDES;
   const sensors = useSensors(
@@ -166,7 +168,7 @@ const OutlineContent: React.FC<OutlineContentProps> = ({
                 aria-disabled={hasReachedSlideLimit}
                 title={
                   hasReachedSlideLimit
-                    ? `Maximum ${MAX_NUMBER_OF_SLIDES} slides`
+                    ? t("outline.maximumSlides", { count: MAX_NUMBER_OF_SLIDES })
                     : undefined
                 }
                 variant="outline"
@@ -177,8 +179,8 @@ const OutlineContent: React.FC<OutlineContentProps> = ({
                 )}
               >
                 {hasReachedSlideLimit
-                  ? `Maximum ${MAX_NUMBER_OF_SLIDES} slides reached`
-                  : "+ Add New Slide"}
+                  ? t("outline.maximumSlidesReached", { count: MAX_NUMBER_OF_SLIDES })
+                  : `+ ${t("outline.addNewSlide")}`}
               </Button>
             </div>
           )}
@@ -188,13 +190,13 @@ const OutlineContent: React.FC<OutlineContentProps> = ({
       {!isStreaming && !isLoading && outlines && outlines.length === 0 && (
         <div className="rounded-lg border-2 border-dashed border-gray-200 bg-white py-12 text-center">
           <FileText className="mx-auto mb-4 h-12 w-12 text-gray-400" />
-          <p className="mb-4 text-gray-600">No outlines available</p>
+          <p className="mb-4 text-gray-600">{t("outline.noOutlines")}</p>
           <Button
             variant="outline"
             onClick={onAddSlide}
             className="border-blue-200 text-blue-600"
           >
-            + Add First Slide
+            + {t("outline.addFirstSlide")}
           </Button>
         </div>
       )}

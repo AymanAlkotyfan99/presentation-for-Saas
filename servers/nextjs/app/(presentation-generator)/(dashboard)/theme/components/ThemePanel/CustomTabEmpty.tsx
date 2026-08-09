@@ -1,14 +1,17 @@
 "use client";
-import { ArrowRight, Plus, Sparkle, Sparkles } from 'lucide-react'
+import { ArrowRight, Plus, Sparkles } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import React from 'react'
+import { useI18n } from '@/i18n/catalog'
+import { localizePathname } from '@/i18n/routing'
 
 const CustomTabEmpty = () => {
+    const { locale, t } = useI18n()
     const router = useRouter()
     return (
         <div
             onClick={() => {
-                router.push('/theme?tab=new-theme')
+                router.push(`${localizePathname('/theme', locale)}?tab=new-theme`)
             }}
             className='w-[305px] rounded-xl border border-[#EDEEEF] cursor-pointer'>
             <div className='relative h-[250px] flex justify-center items-center '>
@@ -29,8 +32,8 @@ const CustomTabEmpty = () => {
                     <Sparkles className='w-6 h-6 text-white' />
                 </div>
                 <div>
-                    <h4 className='text-[#191919] text-sm font-semibold '>Build Theme</h4>
-                    <p className='flex text-[#808080] text-sm  font-medium items-center gap-2'>From colors <ArrowRight className='w-3 h-3' /> fonts </p>
+                    <h4 className='text-sm font-semibold text-[#191919]'>{t('theme.buildTheme')}</h4>
+                    <p className='flex items-center gap-2 text-sm font-medium text-[#808080]'>{t('theme.fromColorsToFonts')} <ArrowRight className='h-3 w-3 rtl:rotate-180' /></p>
                 </div>
 
             </div>

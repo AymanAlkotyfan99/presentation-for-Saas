@@ -1,9 +1,13 @@
+"use client";
+
 import { ArrowRight, PartyPopper } from 'lucide-react'
 import { usePathname, useRouter } from 'next/navigation'
 import React, { useCallback, useEffect, useState } from 'react'
 import { trackEvent, MixpanelEvent, setTelemetryEnabled } from "@/utils/mixpanel";
 import { Switch } from '../ui/switch';
 import confetti from 'canvas-confetti';
+import { useI18n } from '@/i18n/catalog';
+import { localizePathname } from '@/i18n/routing';
 
 const CONFETTI_COLORS = ['#ff00c5', '#f3ff00', '#9500d0', '#00d2f2', '#00ea9b', '#ff7f36'];
 
@@ -23,6 +27,7 @@ function fireRealisticConfetti() {
 }
 
 const FinalStep = () => {
+    const { locale, t } = useI18n();
     const router = useRouter()
     const pathname = usePathname()
     const [trackingEnabled, setTrackingEnabled] = useState<boolean | null>(null);
@@ -72,25 +77,25 @@ const FinalStep = () => {
 
     const handleGoToDashboard = () => {
         trackEvent(MixpanelEvent.Navigation, { from: pathname, to: "/dashboard" });
-        router.push('/dashboard')
+        router.push(localizePathname('/dashboard', locale))
     }
     const handleGoToUpload = () => {
         trackEvent(MixpanelEvent.Navigation, { from: pathname, to: "/upload" });
-        router.push('/upload')
+        router.push(localizePathname('/upload', locale))
     }
     return (
-        <div className='fixed top-0 left-0 w-full h-full flex flex-col items-center justify-center'>
+        <div className='fixed inset-0 flex h-full w-full flex-col items-center justify-center'>
             <div className='flex flex-col items-center justify-center'>
 
-                <img src="/final_onboarding.png" alt="presenton" className='w-[118px] h-[98px]  object-contain' />
-                <h1 className='text-black text-[30px] font-normal font-unbounded py-2.5'>Welcome on board!</h1>
-                <p className='text-[#000000CC] text-xl font-normal font-syne'>You’re all set. Let’s create your first presentation.</p>
+                <img src="/final_onboarding.png" alt="" aria-hidden="true" className='h-[98px] w-[118px] object-contain' />
+                <h1 className='py-2.5 font-unbounded text-[30px] font-normal text-black'>{t("onboarding.welcomeComplete")}</h1>
+                <p className='font-syne text-xl font-normal text-[#000000CC]'>{t("onboarding.ready")}</p>
 
                 {trackingEnabled !== null && (
                     <div className='flex items-center gap-3 mt-8 px-5 py-3.5 rounded-[10px] border border-[#EDEEEF] bg-white'>
                         <div>
-                            <p className='text-sm font-medium text-[#191919] font-syne'>Usage analytics</p>
-                            <p className='text-[11px] text-[#9CA3AF] font-syne leading-tight mt-0.5'>Share limited product-usage events and basic network/device metadata with Mixpanel. This may include a device identifier; presentation content, filenames, and titles are excluded.</p>
+                            <p className='font-syne text-sm font-medium text-[#191919]'>{t("onboarding.usageAnalytics")}</p>
+                            <p className='mt-0.5 font-syne text-[11px] leading-tight text-[#9CA3AF]'>{t("onboarding.usageAnalyticsDescription")}</p>
                         </div>
                         <Switch
                             checked={trackingEnabled}
@@ -100,12 +105,12 @@ const FinalStep = () => {
                     </div>
                 )}
 
-                <button onClick={handleGoToUpload} className='bg-[#7C51F8] px-[23px] mt-8 py-[15px]  rounded-[70px] text-white text-lg font-syne font-semibold'>My First Presentation 🚀</button>
+                <button onClick={handleGoToUpload} className='mt-8 rounded-[70px] bg-[#7C51F8] px-[23px] py-[15px] font-syne text-lg font-semibold text-white'>{t("onboarding.firstPresentation")}</button>
                 <button onClick={fireRealisticConfetti} className='mt-3 flex items-center gap-1.5 text-sm text-[#7A5AF8] font-syne font-medium hover:underline'>
-                    <PartyPopper className='w-4 h-4' /> Celebrate again!
+                    <PartyPopper className='h-4 w-4' /> {t("onboarding.celebrateAgain")}
                 </button>
             </div>
-            <button onClick={handleGoToDashboard} className='absolute uppercase bottom-20 text-[#7A5AF8] flex items-center gap-2 right-10  text-xs font-normal font-syne'>Go to your dashboard <ArrowRight className='w-4 h-4 text-[#7A5AF8]' /></button>
+            <button onClick={handleGoToDashboard} className='absolute bottom-20 end-10 flex items-center gap-2 font-syne text-xs font-normal uppercase text-[#7A5AF8]'>{t("onboarding.goToDashboard")} <ArrowRight className='h-4 w-4 text-[#7A5AF8] rtl:rotate-180' /></button>
         </div>
     )
 }

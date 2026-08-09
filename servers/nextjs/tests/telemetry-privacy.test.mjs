@@ -198,6 +198,10 @@ test("onboarding telemetry consent fails closed and is accurately described", ()
     new URL("../components/OnBoarding/FinalStep.tsx", import.meta.url),
     "utf8",
   );
+  const englishCatalog = JSON.parse(
+    readFileSync(new URL("../messages/en.json", import.meta.url), "utf8"),
+  );
+  const disclosure = englishCatalog.onboarding.usageAnalyticsDescription;
   assert.match(finalStepSource, /data\?\.telemetryEnabled\s*===\s*true/);
   assert.equal(
     finalStepSource.match(/setTrackingEnabled\(false\);\s*setTelemetryEnabled\(false\);/g)
@@ -205,8 +209,8 @@ test("onboarding telemetry consent fails closed and is accurately described", ()
     2,
   );
   assert.doesNotMatch(finalStepSource, /prev\s*\?\?\s*true/);
-  assert.doesNotMatch(finalStepSource, /sharing anonymous usage data/i);
-  assert.match(finalStepSource, /limited product-usage events/i);
-  assert.match(finalStepSource, /network\/device metadata/i);
-  assert.match(finalStepSource, /device identifier/i);
+  assert.doesNotMatch(disclosure, /sharing anonymous usage data/i);
+  assert.match(disclosure, /limited product-usage events/i);
+  assert.match(disclosure, /network or device metadata/i);
+  assert.match(disclosure, /device identifier/i);
 });

@@ -6,6 +6,7 @@ import {
   shortcutKeyLabel,
   type EditorShortcut,
 } from "@/components/slide-editor/shortcuts/editorShortcuts";
+import { useTranslations } from "@/i18n/catalog";
 
 export function useAppleShortcutPlatform() {
   return useSyncExternalStore(
@@ -37,11 +38,12 @@ export function ShortcutKeys({
   compact?: boolean;
   shortcut: EditorShortcut;
 }) {
+  const t = useTranslations();
   const chords = compact ? shortcut.chords.slice(0, 1) : shortcut.chords;
 
   return (
     <span
-      aria-label={`${shortcut.label} shortcut`}
+      aria-label={t("editor.shortcutAria", { action: shortcut.label })}
       className={cn("inline-flex shrink-0 items-center gap-1.5", className)}
     >
       {chords.map((chord, chordIndex) => (
@@ -51,7 +53,7 @@ export function ShortcutKeys({
         >
           {chordIndex > 0 ? (
             <span className="px-0.5 text-[10px] font-medium text-[#98A0B3]">
-              or
+              {t("common.or")}
             </span>
           ) : null}
           {chord.map((key) => (

@@ -11,6 +11,7 @@ import {
 
 import { Textarea } from "@/components/ui/textarea";
 import { renderSafeMarkdown } from "@/lib/safe-markdown";
+import { useTranslations } from "@/i18n/catalog";
 
 interface OutlineItemProps {
   slideOutline: {
@@ -36,6 +37,7 @@ export function OutlineItem({
   isStableStreaming = false,
   onUpdate,
 }: OutlineItemProps) {
+  const t = useTranslations();
   useEffect(() => {
     if (isStreaming) {
       const outlineItem = document.getElementById(`outline-item-${index}`);
@@ -150,7 +152,7 @@ export function OutlineItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative mb-5 rounded-[12px] border bg-white px-5 py-8 font-syne transition-all duration-500 hover:shadow-[0_10px_24px_0_rgba(15,23,42,0.12)] sm:py-10 sm:pl-[30px] sm:pr-[66px] ${
+      className={`group relative mb-5 rounded-[12px] border bg-white px-5 py-8 font-syne transition-all duration-500 hover:shadow-[0_10px_24px_0_rgba(15,23,42,0.12)] sm:py-10 sm:ps-[30px] sm:pe-[66px] ${
         isEditingMarkdown
           ? "border-[#BDB4FE] shadow-[0_6.6px_13.2px_0_rgba(0,0,0,0.10)]"
           : "border-transparent shadow-[0_6.6px_6.6px_rgba(0,0,0,0.10)]"
@@ -160,7 +162,7 @@ export function OutlineItem({
         <div
           {...attributes}
           {...listeners}
-          aria-label={`Move slide ${index}`}
+          aria-label={t("outline.moveSlide", { number: index })}
           className="relative flex touch-none select-none items-center justify-center cursor-grab active:cursor-grabbing"
         >
           <Grip aria-hidden="true" className="h-6 w-6 text-[#191919]" />
@@ -171,22 +173,24 @@ export function OutlineItem({
           className="flex min-w-0 basis-full flex-col gap-[10px]"
         >
           <p className="flex h-[22px] w-fit items-center rounded-[80px] border border-[#EDEEEF] bg-white px-2.5 font-unbounded text-[10px] font-light tracking-[-0.1px] text-black">
-            Slide: {index}
+            {t("outline.slideLabel", { number: index })}
           </p>
 
           {isStreaming ? (
             isActiveStreaming ? (
               <div
                 className={outlineMarkdownClassName}
+                dir="auto"
                 dangerouslySetInnerHTML={{ __html: renderedHtml || "" }}
               />
             ) : stableHtml ? (
               <div
                 className={outlineMarkdownClassName}
+                dir="auto"
                 dangerouslySetInnerHTML={{ __html: stableHtml }}
               />
             ) : (
-              <p className="flex-1 text-base font-normal text-[#666666]">
+              <p className="flex-1 text-base font-normal text-[#666666]" dir="auto">
                 {slideOutline.content || ""}
               </p>
             )
@@ -198,14 +202,15 @@ export function OutlineItem({
               onBlur={handleMarkdownBlur}
               onKeyDown={handleMarkdownKeyDown}
               spellCheck={false}
-              placeholder="Enter markdown content here..."
+              placeholder={t("outline.markdownPlaceholder")}
+              dir="auto"
               className="min-h-[140px] resize-y rounded-[8px] border-[#D8D8DF] bg-[#FBFBFC] px-3 py-3 font-mono text-[13px] leading-6 text-[#191919] shadow-none focus-visible:border-[#7A5AF8] focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/20"
             />
           ) : (
             <div
               role="button"
               tabIndex={0}
-              aria-label={`Edit slide ${index} markdown`}
+              aria-label={t("outline.editSlideMarkdown", { number: index })}
               onClick={handleStartMarkdownEdit}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
@@ -213,7 +218,8 @@ export function OutlineItem({
                   handleStartMarkdownEdit();
                 }
               }}
-              className={`${outlineMarkdownClassName} min-h-[60px] w-full cursor-text rounded-[8px] px-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/25`}
+              className={`${outlineMarkdownClassName} min-h-[60px] w-full cursor-text rounded-[8px] px-0 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/25`}
+              dir="auto"
               dangerouslySetInnerHTML={{ __html: previewHtml }}
             />
           )}

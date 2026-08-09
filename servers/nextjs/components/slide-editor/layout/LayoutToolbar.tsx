@@ -37,6 +37,8 @@ import {
   preventInvalidNumberInput,
   sanitizeNumericInput,
 } from "@/components/slide-editor/toolbar/numericInput";
+import { useI18n, useTranslations } from "@/i18n/catalog";
+import { formatNumber } from "@/lib/locale-format";
 
 type RawRecord = Record<string, unknown>;
 type LayoutElementType =
@@ -148,6 +150,7 @@ function GapControl({
   element: TemplateV2LayoutElement;
   onChange: (changes: RawRecord) => void;
 }) {
+  const t = useTranslations();
   const value = readGapValue(element);
   const numericInputOptions = { allowDecimal: true, min: 0 };
   const commit = (nextValue: number) => {
@@ -157,12 +160,12 @@ function GapControl({
 
   return (
     <label className="flex  items-center gap-2.5 px-1 text-[14px] font-medium font-manrope text-[#191919]">
-      <span>Gap</span>
+      <span>{t("editor.gap")}</span>
       <span className="flex gap-2  items-center rounded-md bg-white">
         <input
           type="text"
           inputMode={numericInputMode(numericInputOptions)}
-          aria-label="Gap"
+          aria-label={t("editor.gap")}
           value={formatGapValue(value)}
           onKeyDown={(event) => {
             if (preventInvalidNumberInput(event, numericInputOptions)) return;
@@ -184,8 +187,8 @@ function GapControl({
         <span className="flex   flex-col items-center justify-center">
           <button
             type="button"
-            title="Increase gap"
-            aria-label="Increase gap"
+            title={t("editor.increaseGap")}
+            aria-label={t("editor.increaseGap")}
             onClick={() => commit(value + 1)}
             className="grid  place-items-center rounded-sm text-[#05070A] hover:bg-[#F8F8FA]"
           >
@@ -193,8 +196,8 @@ function GapControl({
           </button>
           <button
             type="button"
-            title="Decrease gap"
-            aria-label="Decrease gap"
+            title={t("editor.decreaseGap")}
+            aria-label={t("editor.decreaseGap")}
             onClick={() => commit(value - 1)}
             className="grid   place-items-center rounded-sm text-[#05070A] hover:bg-[#F8F8FA]"
           >
@@ -212,6 +215,7 @@ function ItemsControl({
   onToggle,
   openPanel,
 }: LayoutControlsProps) {
+  const { locale, t } = useI18n();
   const { canAdd, canRemove, children } = layoutItemStats(element);
   const addItem = () => {
     if (!canAdd) return;
@@ -230,8 +234,8 @@ function ItemsControl({
     <div className="relative">
       <button
         type="button"
-        title="Items"
-        aria-label="Items"
+        title={t("editor.items")}
+        aria-label={t("editor.items")}
         aria-expanded={open}
         onClick={() => onToggle("items")}
         className={cn(
@@ -248,13 +252,13 @@ function ItemsControl({
             disabled={!canAdd}
             onClick={addItem}
             className={cn(
-              "flex  w-full items-center gap-2 px-4 py-2.5 text-left text-[14px] font-medium font-manrope text-[#191919] hover:bg-[#F8F8FA]",
+              "flex  w-full items-center gap-2 px-4 py-2.5 text-start text-[14px] font-medium font-manrope text-[#191919] hover:bg-[#F8F8FA]",
               !canAdd &&
               "cursor-not-allowed text-[#A0A3AD] hover:bg-transparent",
             )}
           >
             <Plus size={16} strokeWidth={1} aria-hidden />
-            <span>Add Item</span>
+            <span>{t("editor.addItem")}</span>
           </button>
           <div className="h-px my-1 bg-[#E7E8EC]" aria-hidden />
           <button
@@ -262,15 +266,15 @@ function ItemsControl({
             disabled={!canRemove}
             onClick={removeItem}
             className={cn(
-              "flex  w-full items-center gap-2 px-4 py-2.5 text-left text-[14px] font-medium font-manrope text-[#191919] hover:bg-[#F8F8FA]",
+              "flex  w-full items-center gap-2 px-4 py-2.5 text-start text-[14px] font-medium font-manrope text-[#191919] hover:bg-[#F8F8FA]",
               !canRemove &&
               "cursor-not-allowed text-[#A0A3AD] hover:bg-transparent",
             )}
           >
             <Trash2 size={16} strokeWidth={1} aria-hidden />
-            <span>Last Item</span>
-            <span className="ml-auto text-[11px] text-[#8A8D96]">
-              {children.length}
+            <span>{t("editor.lastItem")}</span>
+            <span className="ms-auto text-[11px] text-[#8A8D96]">
+              {formatNumber(children.length, locale)}
             </span>
           </button>
         </Panel>
@@ -307,6 +311,7 @@ export function TemplateV2LayoutToolbar({
   componentActions,
   ungroupAction: flowUngroupAction,
 }: TemplateV2LayoutToolbarProps) {
+  const t = useTranslations();
   const [openPanel, setOpenPanel] = useState<PanelId>(null);
   const layoutType = element ? normalizedLayoutType(element) : null;
   const hasFlowControls = Boolean(
@@ -359,10 +364,10 @@ export function TemplateV2LayoutToolbar({
           <>
             <div
               className="inline-flex h-7 items-center gap-1 rounded-[6px] px-2 hover:bg-[#F6F6F9] cursor-pointer text-[14px] font-manrope font-medium leading-4 text-[#191919]"
-              title="Ungroup"
+              title={t("editor.ungroup")}
               onClick={ungroupAction.onUngroup}
             >
-              <span>Ungroup</span>
+              <span>{t("editor.ungroup")}</span>
             </div>
             <ToolbarDivider />
           </>

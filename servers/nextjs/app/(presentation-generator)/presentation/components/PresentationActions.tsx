@@ -65,6 +65,7 @@ import Chat from "./Chat";
 import TemplateService from "../../services/api/template";
 import { TemplateV2HtmlSlidePreview } from "../../components/TemplateV2HtmlSlidePreview";
 import { isTemplateFreePresentation } from "../../_shared/blank-slide";
+import { useTranslations } from "@/i18n/catalog";
 
 type PresentationActionsProps = React.ComponentProps<typeof Chat> & {
   editingDisabled?: boolean;
@@ -178,6 +179,52 @@ const insertActions: ActionItem[] = [
   { id: "elements", label: "Elements", icon: Shapes },
 ];
 
+const ACTION_MESSAGE_KEYS: Record<ActionId, string> = {
+  ai: "presentation.assistant",
+  blocks: "editor.blocks",
+  texts: "editor.texts",
+  charts: "editor.charts",
+  tables: "editor.tables",
+  images: "editor.images",
+  elements: "editor.elements",
+};
+
+const PALETTE_MESSAGE_KEYS: Record<string, string> = {
+  "title-block": "editor.titleBlock",
+  subtitle: "editor.subtitle",
+  "bullet-list": "editor.bulletList",
+  "numbered-list": "editor.numberedList",
+  "list-item": "editor.listItem",
+  quote: "editor.quote",
+  "body-text": "editor.bodyText",
+  bar: "editor.barChart",
+  horizontal_bar: "editor.horizontalBar",
+  stacked_bar: "editor.stackedBar",
+  horizontal_stacked_bar: "editor.horizontalStackedBar",
+  line: "editor.lineChart",
+  pie: "editor.pieChart",
+  area: "editor.areaChart",
+  donut: "editor.donutChart",
+  scatter: "editor.scatterChart",
+  radar: "editor.radarChart",
+  polar_area: "editor.polarArea",
+  progress_bar: "editor.progressBar",
+  gauge: "editor.gaugeChart",
+  "simple-table": "editor.simpleTable",
+  image: "editor.image",
+  "image-text": "editor.imageText",
+  "image-grid": "editor.imageGrid",
+  "vector-rectangle": "editor.rectangle",
+  "vector-circle": "editor.circle",
+  "vector-ellipse": "editor.ellipse",
+  "vector-triangle": "editor.triangle",
+  "vector-diamond": "editor.diamond",
+  "vector-pentagon": "editor.pentagon",
+  "vector-hexagon": "editor.hexagon",
+  "vector-arrow": "editor.arrow",
+  "vector-line": "editor.line",
+};
+
 export const textItems = [
   { id: "title-block", label: "Title Block", icon: AlignCenter },
   { id: "subtitle", label: "Subtitle", icon: AlignCenter },
@@ -246,6 +293,7 @@ const NavButton = ({
   active: boolean;
   onClick: () => void;
 }) => {
+  const t = useTranslations();
   const Icon = item.icon;
 
   return (
@@ -273,7 +321,7 @@ const NavButton = ({
           aria-hidden
         />
       </span>
-      <span className="">{item.label}</span>
+      <span>{t(ACTION_MESSAGE_KEYS[item.id])}</span>
     </button>
   );
 };
@@ -324,19 +372,23 @@ const PaletteGrid = ({
   disabled?: boolean;
   items: PaletteItem[];
   onSelect?: (item: PaletteItem) => void;
-}) => (
-  <div className="grid grid-cols-3  gap-[clamp(6px,0.65vw,8px)]">
-    {items.map((item) => (
-      <PaletteCard
-        key={item.label}
-        label={item.label}
-        icon={item.icon}
-        disabled={disabled}
-        onClick={onSelect && !disabled ? () => onSelect(item) : undefined}
-      />
-    ))}
-  </div>
-);
+}) => {
+  const t = useTranslations();
+
+  return (
+    <div className="grid grid-cols-3 gap-[clamp(6px,0.65vw,8px)]">
+      {items.map((item) => (
+        <PaletteCard
+          key={item.id ?? item.label}
+          label={item.id && PALETTE_MESSAGE_KEYS[item.id] ? t(PALETTE_MESSAGE_KEYS[item.id]) : item.label}
+          icon={item.icon}
+          disabled={disabled}
+          onClick={onSelect && !disabled ? () => onSelect(item) : undefined}
+        />
+      ))}
+    </div>
+  );
+};
 
 export const InsertPanel = ({
   disabled = false,
@@ -748,23 +800,24 @@ function BlockVariantButton({
   disabled?: boolean;
   onInsertBlock: (block: TemplateBlock) => void;
 }) {
+  const t = useTranslations();
   return (
     <button
       type="button"
       data-block-variant
       disabled={disabled}
       className={cn(
-        "template-block-variant group relative w-full overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-[#F9FAFB] p-2 text-left transition hover:border-[#D6BBFB] hover:bg-[#FAF9FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/40",
+        "template-block-variant group relative w-full overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-[#F9FAFB] p-2 text-start transition hover:border-[#D6BBFB] hover:bg-[#FAF9FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/40",
         disabled && "cursor-not-allowed opacity-50 hover:border-[#E5E7EB] hover:bg-[#F9FAFB]",
       )}
       onClick={() => {
         if (!disabled) onInsertBlock(block);
       }}
-      aria-label={`Insert ${block.title}`}
+      aria-label={t("editor.insertBlock", { name: block.title })}
     >
       <div className="relative">
         <BlockThumbnail block={block} />
-        <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-white text-[#111827] shadow-[0_4px_12px_rgba(16,24,40,0.16)]">
+        <span className="absolute end-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-white text-[#111827] shadow-[0_4px_12px_rgba(16,24,40,0.16)]">
           <GripVertical className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
         </span>
       </div>
@@ -781,6 +834,7 @@ function BlockGroupCard({
   group: TemplateBlockGroup;
   onInsertBlock: (block: TemplateBlock) => void;
 }) {
+  const t = useTranslations();
   const [expanded, setExpanded] = useState(false);
   const [hasExpanded, setHasExpanded] = useState(false);
   const firstVariant = group.variants[0];
@@ -794,7 +848,7 @@ function BlockGroupCard({
 
   return (
     <section className="rounded-[14px] border border-[#E5E7EB] bg-white p-3 transition-shadow hover:shadow-[0_8px_24px_rgba(16,24,40,0.08)]">
-      <h4 className="mb-4 truncate text-center text-[clamp(14px,1vw,16px)] font-medium leading-5 text-[#171717]">
+      <h4 className="mb-4 truncate text-center text-[clamp(14px,1vw,16px)] font-medium leading-5 text-[#171717]" dir="auto">
         {group.title}
       </h4>
 
@@ -833,12 +887,12 @@ function BlockGroupCard({
       {variantCount > 1 ? (
         <button
           type="button"
-          className="mt-3 flex w-full items-center justify-between gap-3 border-t border-[#E5E7EB] pt-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/40"
+          className="mt-3 flex w-full items-center justify-between gap-3 border-t border-[#E5E7EB] pt-3 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/40"
           aria-expanded={expanded}
           onClick={toggleExpanded}
         >
           <span className="shrink-0 rounded-full border border-[#D6BBFB] bg-[#FAF8FF] px-3 py-1.5 text-[11px] font-medium leading-4 text-[#7F00FF]">
-            {variantCount} Layouts
+            {t("editor.layouts", { count: variantCount })}
           </span>
           <ChevronDown
             className={cn(
@@ -865,6 +919,7 @@ export const BlocksPanel = ({
   presentationData?: unknown;
   onInsertBlock: (block: TemplateBlock) => void;
 }) => {
+  const t = useTranslations();
   const [blockPrompt, setBlockPrompt] = useState("");
   const [{ blocks, error, loading }, dispatchBlockState] = useReducer(
     blocksPanelReducer,
@@ -920,7 +975,7 @@ export const BlocksPanel = ({
         if (cancelled) return;
         dispatchBlockState({
           type: "failed",
-          message: "Could not load template components.",
+          message: t("editor.componentsLoadFailed"),
         });
         trackEvent(MixpanelEvent.Editor_Template_Blocks_Load_Failed, {
           presentation_id: presentationId,
@@ -931,7 +986,7 @@ export const BlocksPanel = ({
     return () => {
       cancelled = true;
     };
-  }, [cacheKey, presentationData, presentationId]);
+  }, [cacheKey, presentationData, presentationId, t]);
 
   return (
     <div className="h-full overflow-y-auto px-[clamp(14px,1.4vw,20px)] pb-[clamp(24px,2.2vw,32px)] pt-[clamp(24px,2.2vw,32px)] hide-scrollbar">
@@ -953,14 +1008,14 @@ export const BlocksPanel = ({
         }
       `}</style>
       <h3 className="mb-3 text-[clamp(13px,0.95vw,15px)] font-semibold leading-5 text-[#101323]">
-        Blocks
+        {t("editor.blocks")}
       </h3>
 
-      <div className="mb-7 flex h-[clamp(46px,3.6vw,52px)] items-center rounded-[10px] border border-[#EDEEF0] bg-white pl-[clamp(10px,0.9vw,12px)] pr-[clamp(6px,0.6vw,8px)] shadow-[0_10px_26px_rgba(17,24,39,0.08)]">
+      <div className="mb-7 flex h-[clamp(46px,3.6vw,52px)] items-center rounded-[10px] border border-[#EDEEF0] bg-white ps-[clamp(10px,0.9vw,12px)] pe-[clamp(6px,0.6vw,8px)] shadow-[0_10px_26px_rgba(17,24,39,0.08)]">
         <input
           value={blockPrompt}
           onChange={(event) => setBlockPrompt(event.target.value)}
-          placeholder="Search blocks"
+          placeholder={t("editor.searchBlocks")}
           className="min-w-0 flex-1 bg-transparent text-[clamp(10px,0.75vw,12px)] text-[#101323] outline-none placeholder:text-[#9CA3AF]"
         />
         <button
@@ -971,7 +1026,7 @@ export const BlocksPanel = ({
             background:
               "linear-gradient(270deg, #D5CAFC 2.4%, #E3D2EB 35%, #FDE4C2 100%)",
           }}
-          aria-label="Create block"
+          aria-label={t("editor.createBlock")}
         >
           <Search
             className="h-[clamp(12px,0.9vw,14px)] w-[clamp(12px,0.9vw,14px)] text-[#101323]"
@@ -980,12 +1035,12 @@ export const BlocksPanel = ({
         </button>
       </div>
 
-      <SectionLabel>Content</SectionLabel>
+      <SectionLabel>{t("editor.content")}</SectionLabel>
 
       <div className="space-y-3">
         {loading && (
           <p className="rounded-[8px] border border-[#E5E7EB] bg-[#F9FAFB] p-4 text-[11px] leading-4 text-[#667085]">
-            Loading template components...
+            {t("editor.loadingComponents")}
           </p>
         )}
         {!loading && error && (
@@ -995,7 +1050,7 @@ export const BlocksPanel = ({
         )}
         {!loading && !error && visibleBlocks.length === 0 && (
           <p className="rounded-[8px] border border-dashed border-[#D0D5DD] bg-[#F9FAFB] p-4 text-[11px] leading-4 text-[#667085]">
-            No template components found.
+            {t("editor.noComponents")}
           </p>
         )}
         {!loading &&
@@ -1123,6 +1178,7 @@ function ActionsSidebar({
   blocksUnavailable?: boolean;
   onActionSelect: (action: ActionId) => void;
 }) {
+  const t = useTranslations();
   return (
     <aside className="flex h-full w-[70px] shrink-0 flex-col items-center gap-5 px-[6px] py-2">
       <div
@@ -1134,16 +1190,16 @@ function ActionsSidebar({
         <PrimaryActionButton
           active={activeAction === "ai"}
           icon={<AiSparklesIcon />}
-          label="AI"
+          label={t("presentation.assistant")}
           onClick={() => onActionSelect("ai")}
         />
         <div className="h-px w-[30px] bg-[#EDEEEF]" />
         <PrimaryActionButton
           active={activeAction === "blocks"}
           disabled={blocksUnavailable}
-          disabledReason="Blocks require a presentation template"
+          disabledReason={t("editor.blocksRequireTemplate")}
           icon={<BlocksIcon />}
-          label="Blocks"
+          label={t("editor.blocks")}
           onClick={() => onActionSelect("blocks")}
         />
       </div>
@@ -1193,6 +1249,7 @@ function ActionsPanel({
   presentationData?: unknown;
   presentationId: string;
 }) {
+  const t = useTranslations();
   return (
     <div className="min-w-0 flex-1 bg-white">
       <div className={cn("h-full", activeAction === "ai" ? "block" : "hidden")}>
@@ -1214,18 +1271,18 @@ function ActionsPanel({
       {activeAction === "texts" && (
         <InsertPanel
           disabled={editingDisabled}
-          title="Texts"
-          groups={[{ label: "Add", items: textItems }]}
+          title={t("editor.texts")}
+          groups={[{ label: t("editor.add"), items: textItems }]}
           onItemSelect={onTextItemSelect}
         />
       )}
       {activeAction === "charts" && (
         <InsertPanel
           disabled={editingDisabled}
-          title="Charts"
+          title={t("editor.charts")}
           groups={[
-            { label: "Chart Type", items: chartTypeItems },
-            { label: "Infographics", items: infographicItems },
+            { label: t("editor.charts"), items: chartTypeItems },
+            { label: t("editor.elements"), items: infographicItems },
           ]}
           onItemSelect={onChartItemSelect}
         />
@@ -1233,24 +1290,24 @@ function ActionsPanel({
       {activeAction === "tables" && (
         <InsertPanel
           disabled={editingDisabled}
-          title="Tables"
-          groups={[{ label: "Table Type", items: tableTypeItems }]}
+          title={t("editor.tables")}
+          groups={[{ label: t("editor.tables"), items: tableTypeItems }]}
           onItemSelect={onTableItemSelect}
         />
       )}
       {activeAction === "images" && (
         <InsertPanel
           disabled={editingDisabled}
-          title="Images"
-          groups={[{ label: "Add", items: imageItems }]}
+          title={t("editor.images")}
+          groups={[{ label: t("editor.add"), items: imageItems }]}
           onItemSelect={onImageItemSelect}
         />
       )}
       {activeAction === "elements" && (
         <InsertPanel
           disabled={editingDisabled}
-          title="Elements"
-          groups={[{ label: "Add", items: elementItems }]}
+          title={t("editor.elements")}
+          groups={[{ label: t("editor.add"), items: elementItems }]}
           onItemSelect={onElementItemSelect}
         />
       )}
@@ -1281,6 +1338,7 @@ function templateV2TargetKey(
 }
 
 const PresentationActions = (props: PresentationActionsProps) => {
+  const t = useTranslations();
   const { editingDisabled = false, presentationData, ...chatProps } = props;
   const blocksUnavailable = isTemplateFreePresentation(presentationData);
   const [{ activeAction }, dispatchUiState] = useReducer(
@@ -1361,7 +1419,7 @@ const PresentationActions = (props: PresentationActionsProps) => {
     if (editingDisabled) return false;
     if (typeof window === "undefined") return false;
     if (typeof props.currentSlide !== "number") {
-      notify.warning("Select a slide", "Choose a slide before adding content.");
+      notify.warning(t("editor.selectSlide"), t("editor.selectSlide"));
       return false;
     }
     if (
@@ -1383,8 +1441,8 @@ const PresentationActions = (props: PresentationActionsProps) => {
 
     if (!detail.handled) {
       notify.warning(
-        "Insert unavailable",
-        "Content can be added only to slides imported through the slide editor.",
+        t("editor.insertUnavailable"),
+        t("editor.insertUnavailable"),
       );
       return false;
     }
@@ -1503,8 +1561,8 @@ const PresentationActions = (props: PresentationActionsProps) => {
     const element = adaptTemplateV2ComponentToElement(block.raw, block.index);
     if (!element) {
       notify.warning(
-        "Component unavailable",
-        "This template component cannot be inserted yet.",
+        t("editor.componentUnavailable"),
+        t("editor.componentUnavailable"),
       );
       return;
     }
@@ -1535,7 +1593,7 @@ const PresentationActions = (props: PresentationActionsProps) => {
   return (
     <div
       data-inline-edit-ignore="true"
-      className="flex h-full w-full overflow-hidden bg-white pl-[6px] text-[clamp(12px,0.82vw,14px)]"
+      className="flex h-full w-full overflow-hidden bg-white ps-[6px] text-[clamp(12px,0.82vw,14px)]"
     >
       <ActionsSidebar
         activeAction={activeAction}

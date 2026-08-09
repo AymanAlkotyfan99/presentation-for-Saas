@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useTranslations } from "@/i18n/catalog";
 
 export type ComponentActionsMenuActions = {
   canUngroup: boolean;
@@ -27,27 +28,27 @@ export type ComponentActionsMenuActions = {
 
 const COMPONENT_LAYER_ACTIONS: Array<{
   action: ComponentLayerAction;
-  label: string;
+  labelKey: string;
   shortcut: string;
 }> = [
   {
     action: "bring-to-front",
-    label: "Bring to Front",
+    labelKey: "editor.bringToFront",
     shortcut: "Shift+Alt+K",
   },
   {
     action: "bring-forward",
-    label: "Bring Forward",
+    labelKey: "editor.bringForward",
     shortcut: "Alt+K",
   },
   {
     action: "send-backward",
-    label: "Send Backward",
+    labelKey: "editor.sendBackward",
     shortcut: "Alt+J",
   },
   {
     action: "send-to-back",
-    label: "Send Back",
+    labelKey: "editor.sendToBack",
     shortcut: "Shift+Alt+J",
   },
 ];
@@ -61,6 +62,7 @@ export function ComponentActionsMenu({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
+  const t = useTranslations();
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const menuOpen = open ?? uncontrolledOpen;
   const setMenuOpen = onOpenChange ?? setUncontrolledOpen;
@@ -70,8 +72,8 @@ export function ComponentActionsMenu({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          title="More"
-          aria-label="More"
+          title={t("editor.more")}
+          aria-label={t("editor.more")}
           className={cn(
             "grid h-8 w-8 place-items-center rounded-[4px] border-0 bg-transparent font-manrope text-black hover:bg-[#F6F6F9]",
             menuOpen && "bg-[#F6F6F9]",
@@ -98,10 +100,10 @@ export function ComponentActionsMenu({
         <ComponentActionsMenuItem
           strong
           icon={Copy}
-          label="Duplicate"
+          label={t("common.duplicate")}
           onClick={actions.onDuplicate}
         />
-        {COMPONENT_LAYER_ACTIONS.map(({ action, label, shortcut }) => {
+        {COMPONENT_LAYER_ACTIONS.map(({ action, labelKey, shortcut }) => {
           const disabled = !canApplyComponentLayerAction(
             actions.componentIndex,
             actions.componentCount,
@@ -111,7 +113,7 @@ export function ComponentActionsMenu({
             <ComponentActionsMenuItem
               key={action}
               disabled={disabled}
-              label={label}
+              label={t(labelKey)}
               shortcut={shortcut}
               onClick={() => actions.onLayerAction(action)}
             />
@@ -121,7 +123,7 @@ export function ComponentActionsMenu({
         <ComponentActionsMenuItem
           strong
           icon={Trash2}
-          label="Delete Component"
+          label={t("common.delete")}
           onClick={actions.onDelete}
         />
       </DropdownMenuContent>
@@ -134,15 +136,16 @@ export function ComponentUngroupButton({
 }: {
   actions: ComponentActionsMenuActions;
 }) {
+  const t = useTranslations();
   if (!actions.canUngroup) return null;
   return (
     <button
       type="button"
-      title="Ungroup"
+      title={t("editor.ungroup")}
       onClick={actions.onUngroup}
       className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-[6px] px-2 font-manrope text-[14px] font-medium leading-4 text-[#191919] hover:bg-[#F6F6F9]"
     >
-      <span>Ungroup</span>
+      <span>{t("editor.ungroup")}</span>
     </button>
   );
 }
@@ -168,7 +171,7 @@ function ComponentActionsMenuItem({
       onSelect={onClick}
       style={{ cursor: disabled ? "not-allowed" : "pointer" }}
       className={cn(
-        "flex w-full cursor-default items-center gap-2 rounded-none px-4 py-2.5 text-left font-syne text-[14px] font-normal leading-normal tracking-[0.14px] text-[#191919] outline-none hover:bg-[#F6F6F9] focus:bg-[#F6F6F9] focus:text-[#191919]",
+        "flex w-full cursor-default items-center gap-2 rounded-none px-4 py-2.5 text-start font-syne text-[14px] font-normal leading-normal tracking-[0.14px] text-[#191919] outline-none hover:bg-[#F6F6F9] focus:bg-[#F6F6F9] focus:text-[#191919]",
         strong && "text-black",
         disabled &&
           "cursor-not-allowed text-[#A0A3AD] hover:bg-transparent focus:bg-transparent data-[disabled]:opacity-100",
@@ -179,7 +182,7 @@ function ComponentActionsMenuItem({
       {shortcut ? (
         <span
           className={cn(
-            "ml-auto inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-[6px] bg-[#F6F6F9] px-1.5 py-1 font-manrope text-[12px] font-normal leading-none tracking-[0.14px] text-[#808080]",
+            "ms-auto inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-[6px] bg-[#F6F6F9] px-1.5 py-1 font-manrope text-[12px] font-normal leading-none tracking-[0.14px] text-[#808080]",
             disabled && "bg-[#F7F7FA] text-[#B0B3BB]",
           )}
         >

@@ -7,8 +7,11 @@ import OnBoardingSlidebar from "./OnBoarding/OnBoardingSlidebar";
 import OnBoardingHeader from "./OnBoarding/OnBoardingHeader";
 import PresentonMode from "./OnBoarding/PresentonMode";
 import FinalStep from "./OnBoarding/FinalStep";
+import { useI18n } from "@/i18n/catalog";
+import { localizePathname } from "@/i18n/routing";
 
 export default function Home() {
+  const { locale } = useI18n();
   const router = useRouter();
   const [step, setStep] = useState<number>(2)
   const [providerStep, setProviderStep] = useState<number>(1)
@@ -18,9 +21,9 @@ export default function Home() {
 
   useEffect(() => {
     if (!canChangeKeys) {
-      router.push("/upload");
+      router.push(localizePathname("/upload", locale));
     }
-  }, [canChangeKeys, router]);
+  }, [canChangeKeys, locale, router]);
 
   if (!canChangeKeys) {
     return null;

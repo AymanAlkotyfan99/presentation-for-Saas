@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "1.0.0",
+  "documentId": "00000000-0000-4000-8000-0000000000c8",
+  "presentationId": "00000000-0000-4000-8000-0000000000c9",
+  "title": "Quarterly review",
+  "locale": "en",
+  "baseDirection": "ltr",
+  "aspectRatio": {
+    "width": 16,
+    "height": 9
+  },
+  "theme": {
+    "themeRef": "bayanly-default",
+    "colorTokens": [
+      {
+        "name": "primary",
+        "value": "#2563EB"
+      }
+    ],
+    "defaultBackground": "#FFFFFF"
+  },
+  "fontPolicy": {
+    "families": [
+      {
+        "id": "body",
+        "family": "Inter",
+        "fallbacks": [
+          "Arial",
+          "sans-serif"
+        ]
+      },
+      {
+        "id": "arabic-ui",
+        "family": "Noto Sans Arabic",
+        "fallbacks": [
+          "Tahoma",
+          "Arial"
+        ]
+      }
+    ],
+    "defaultBodyRef": "body",
+    "defaultHeadingRef": "body",
+    "allowSystemFallback": true
+  },
+  "metadata": {
+    "authoringIntent": "generated",
+    "sourceApplicationVersion": "0.9.3-beta"
+  },
+  "slides": [
+    {
+      "id": "00000000-0000-4000-8000-0000000000ca",
+      "order": 0,
+      "semanticRole": "title",
+      "layoutIntent": "free",
+      "elements": [
+        {
+          "id": "00000000-0000-4000-8000-0000000000cc",
+          "type": "image",
+          "geometry": {
+            "x": 80,
+            "y": 80,
+            "width": 1120,
+            "height": 560,
+            "anchor": "top-start"
+          },
+          "zOrder": 0,
+          "assetId": "00000000-0000-4000-8000-0000000f423f",
+          "fit": "cover",
+          "crop": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1,
+            "focalX": 0.5,
+            "focalY": 0.5
+          },
+          "altText": "Illustrative market chart"
+        }
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "assetId": "00000000-0000-4000-8000-0000000000cb",
+      "kind": "image",
+      "mimeType": "image/png",
+      "sourceType": "uploaded",
+      "role": "content",
+      "metadata": {
+        "width": 1600,
+        "height": 900
+      }
+    }
+  ],
+  "exportHints": {
+    "preferredAspect": "16:9",
+    "editablePreference": "preferred",
+    "includeNotes": false,
+    "rendererFallback": "legacy"
+  },
+  "compatibility": {
+    "sourceVersion": "canonical-v1",
+    "requiresLegacyRenderer": false,
+    "warnings": [],
+    "unsupportedFeatures": []
+  }
+}

@@ -26,6 +26,10 @@ Generated runtime source is checked in only when it is deterministic and has
 an explicit generator plus `--check` mode. Runtime code must never generate
 `.ts`, `.tsx`, `.js`, or `.jsx` files inside application source directories.
 Build output, coverage, logs, SBOM output, and test reports remain untracked.
+The canonical schema and generated TypeScript document binding are owned by
+the presentations domain. Their generator/check mode is the synchronization
+boundary; routes and editors use adapters instead of copying the schema into
+renderer-specific types.
 
 ## Public interfaces and route ownership
 
@@ -40,7 +44,7 @@ moving a route must not bypass that context.
 | `/api/v1/auth/*` | identity-access | session lifecycle and access tokens | login/logout/status/verify public as configured; token operations session |
 | `/api/v1/admin/*` | identity-access | users and provider settings administration | session + superuser |
 | `/api/v1/async-tasks/*` | task-orchestration | task list/status | session + owner scope |
-| `/api/v1/ppt/presentation/*`, `/outlines/*`, `/slide/*` | presentations | presentation CRUD, generation, editing, export preparation | session + owner scope |
+| `/api/v1/ppt/presentation/*`, `/presentations/*/document`, `/outlines/*`, `/slide/*` | presentations | presentation CRUD, canonical preview/read/write/convert, generation, editing, export preparation | session + owner scope; canonical flags/cohort |
 | `/api/v1/ppt/template/*` | templates | template preview, creation, layouts, blocks, CRUD | session + owner scope; defaults read-only |
 | `/api/v1/ppt/chat/*` | presentation-chat | conversations, history, message stream | session + owner/resource scope |
 | `/api/v1/ppt/theme*` | themes | theme list/create/update/delete/generate | session + owner scope |

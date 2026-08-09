@@ -1,0 +1,114 @@
+{
+  "schemaVersion": "1.0.0",
+  "documentId": "00000000-0000-4000-8000-0000000000ed",
+  "presentationId": "00000000-0000-4000-8000-0000000000ee",
+  "title": "Quarterly review",
+  "locale": "en",
+  "baseDirection": "ltr",
+  "aspectRatio": {
+    "width": 16,
+    "height": 9
+  },
+  "theme": {
+    "themeRef": "bayanly-default",
+    "colorTokens": [
+      {
+        "name": "primary",
+        "value": "#2563EB"
+      }
+    ],
+    "defaultBackground": "#FFFFFF"
+  },
+  "fontPolicy": {
+    "families": [
+      {
+        "id": "body",
+        "family": "Inter",
+        "fallbacks": [
+          "Arial",
+          "sans-serif"
+        ]
+      },
+      {
+        "id": "arabic-ui",
+        "family": "Noto Sans Arabic",
+        "fallbacks": [
+          "Tahoma",
+          "Arial"
+        ]
+      }
+    ],
+    "defaultBodyRef": "body",
+    "defaultHeadingRef": "body",
+    "allowSystemFallback": true
+  },
+  "metadata": {
+    "authoringIntent": "generated",
+    "sourceApplicationVersion": "0.9.3-beta"
+  },
+  "slides": [
+    {
+      "id": "00000000-0000-4000-8000-0000000000ef",
+      "order": 0,
+      "semanticRole": "title",
+      "layoutIntent": "free",
+      "elements": [
+        {
+          "id": "00000000-0000-4000-8000-0000000000f0",
+          "type": "text",
+          "geometry": {
+            "x": 80,
+            "y": 80,
+            "width": 1120,
+            "height": 560,
+            "anchor": "top-start"
+          },
+          "zOrder": 0,
+          "paragraphs": [
+            {
+              "id": "00000000-0000-4000-8000-0000000000f1",
+              "direction": "ltr",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-0000000000f2",
+                  "text": "Converted V1 content",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            }
+          ],
+          "verticalAlignment": "top",
+          "overflow": "shrink"
+        }
+      ],
+      "compatibility": {
+        "legacySlideId": "legacy-slide-1",
+        "legacyLayoutGroup": "basic",
+        "legacyLayout": "title",
+        "requiresLegacyRenderer": false,
+        "warnings": []
+      }
+    }
+  ],
+  "assets": [],
+  "exportHints": {
+    "preferredAspect": "16:9",
+    "editablePreference": "preferred",
+    "includeNotes": false,
+    "rendererFallback": "legacy"
+  },
+  "compatibility": {
+    "sourceVersion": "v1-standard",
+    "legacyPresentationVersion": "v1-standard",
+    "legacyLayoutRef": "legacy-basic",
+    "requiresLegacyRenderer": false,
+    "warnings": [
+      "legacy-content-converted"
+    ],
+    "unsupportedFeatures": []
+  }
+}

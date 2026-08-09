@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { PRODUCT_IDENTITY } from "@/lib/product-identity";
 import { BRAND_ASSETS, DISPLAY_PRODUCT } from "@/lib/product-metadata";
+import { useI18n } from "@/i18n/catalog";
+import { localizePathname, stripLocalePrefix } from "@/i18n/routing";
 
 
 
@@ -22,50 +24,52 @@ export const BelongingNavItems = [
 ]
 
 const DashboardSidebar = () => {
+    const { locale, t } = useI18n();
     const pathname = usePathname();
+    const routePath = stripLocalePrefix(pathname);
 
     return (
         <aside
-            className="sticky top-0 flex h-screen w-[114px] shrink-0 flex-col justify-between border-r border-[#E1E1E5] bg-[#F6F6F9] px-4 py-8 backdrop-blur"
-            aria-label="Dashboard sidebar"
+            className="sticky top-0 flex h-screen w-[114px] shrink-0 flex-col justify-between border-e border-[#E1E1E5] bg-[#F6F6F9] px-4 py-8 backdrop-blur"
+            aria-label={t("navigation.sidebar")}
         >
             <div>
 
-                <Link href={`/dashboard`} className="flex items-center  pb-6 border-b border-[#E1E1E5]   gap-2    ">
+                <Link href={localizePathname("/dashboard", locale)} className="flex items-center gap-2 border-b border-[#E1E1E5] pb-6">
                     <div className="rounded-full cursor-pointer p-1 flex justify-center items-center mx-auto" style={{ backgroundColor: PRODUCT_IDENTITY.colors.primary }}>
                         <img src={BRAND_ASSETS.compactIcon} alt={`${DISPLAY_PRODUCT.shortName} logo`} className="h-[40px] object-contain w-full rounded-full" />
                     </div>
                 </Link>
-                <nav className="pt-6 font-syne" aria-label="Dashboard sections">
+                <nav className="pt-6 font-syne" aria-label={t("navigation.sections")}>
                     <div className="  space-y-6">
 
                         {/* Dashboard */}
                         <Link
                             prefetch={false}
-                            href={`/dashboard`}
+                            href={localizePathname("/dashboard", locale)}
                             className={[
                                 "flex flex-col tex-center items-center gap-2  transition-colors",
-                                pathname === "/dashboard" ? "" : "ring-transparent",
+                                routePath === "/dashboard" ? "" : "ring-transparent",
                             ].join(" ")}
-                            aria-label="Dashboard"
-                            title="Dashboard"
+                            aria-label={t("navigation.dashboard")}
+                            title={t("navigation.dashboard")}
                         >
-                            <LayoutDashboard className={["h-4 w-4", pathname === "/dashboard" ? "text-[#5146E5]" : "text-slate-600"].join(" ")} />
-                            <span className="text-[11px] text-slate-800">Dashboard</span>
+                            <LayoutDashboard className={["h-4 w-4", routePath === "/dashboard" ? "text-[#5146E5]" : "text-slate-600"].join(" ")} />
+                            <span className="text-[11px] text-slate-800">{t("navigation.dashboard")}</span>
                         </Link>
                         <Link
                             prefetch={false}
-                            href={`/templates`}
+                            href={localizePathname("/templates", locale)}
                             className={[
                                 "flex flex-col tex-center items-center gap-2  transition-colors",
-                                pathname === "/templates" ? "" : "ring-transparent",
+                                routePath === "/templates" ? "" : "ring-transparent",
                             ].join(" ")}
-                            aria-label="Templates"
-                            title="Templates"
+                            aria-label={t("navigation.templates")}
+                            title={t("navigation.templates")}
                         >
                             <div className="flex flex-col cursor-pointer tex-center items-center gap-2  transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={`${pathname === "/templates" ? "#5146E5" : "#475569"}`} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M4 14h6" /><path d="M4 2h10" /><rect x="4" y="18" width="16" height="4" rx="1" /><rect x="4" y="6" width="16" height="4" rx="1" /></svg>
-                                <span className="text-[11px] text-slate-800">Templates</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={`${routePath === "/templates" ? "#5146E5" : "#475569"}`} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M4 14h6" /><path d="M4 2h10" /><rect x="4" y="18" width="16" height="4" rx="1" /><rect x="4" y="6" width="16" height="4" rx="1" /></svg>
+                                <span className="text-[11px] text-slate-800">{t("navigation.templates")}</span>
                             </div>
                         </Link>
                         {/* <Link
@@ -89,12 +93,11 @@ const DashboardSidebar = () => {
 
             <div className="border-t border-[#E1E1E5] pt-5 font-syne">
                 <Link
-                    href="https://docs.presenton.ai/help"
-                    target="_blank"
+                    href={`mailto:${DISPLAY_PRODUCT.supportEmail}`}
                     className="flex flex-col items-center gap-2 transition-colors"
                 >
                     <HelpCircle className="h-4 w-4" />
-                    <span className="text-[11px] text-slate-800">Help</span>
+                    <span className="text-[11px] text-slate-800">{t("navigation.help")}</span>
                 </Link>
             </div>
 

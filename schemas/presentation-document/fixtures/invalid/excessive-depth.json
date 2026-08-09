@@ -1,0 +1,229 @@
+{
+  "schemaVersion": "1.0.0",
+  "documentId": "00000000-0000-4000-8000-000000000244",
+  "presentationId": "00000000-0000-4000-8000-000000000245",
+  "title": "Quarterly review",
+  "locale": "en",
+  "baseDirection": "ltr",
+  "aspectRatio": {
+    "width": 16,
+    "height": 9
+  },
+  "theme": {
+    "themeRef": "bayanly-default",
+    "colorTokens": [
+      {
+        "name": "primary",
+        "value": "#2563EB"
+      }
+    ],
+    "defaultBackground": "#FFFFFF"
+  },
+  "fontPolicy": {
+    "families": [
+      {
+        "id": "body",
+        "family": "Inter",
+        "fallbacks": [
+          "Arial",
+          "sans-serif"
+        ]
+      },
+      {
+        "id": "arabic-ui",
+        "family": "Noto Sans Arabic",
+        "fallbacks": [
+          "Tahoma",
+          "Arial"
+        ]
+      }
+    ],
+    "defaultBodyRef": "body",
+    "defaultHeadingRef": "body",
+    "allowSystemFallback": true
+  },
+  "metadata": {
+    "authoringIntent": "generated",
+    "sourceApplicationVersion": "0.9.3-beta"
+  },
+  "slides": [
+    {
+      "id": "00000000-0000-4000-8000-000000000246",
+      "order": 0,
+      "semanticRole": "title",
+      "layoutIntent": "free",
+      "elements": [
+        {
+          "id": "00000000-0000-4000-8000-000000000252",
+          "type": "group",
+          "geometry": {
+            "x": 80,
+            "y": 80,
+            "width": 1120,
+            "height": 560,
+            "anchor": "top-start"
+          },
+          "zOrder": 0,
+          "children": [
+            {
+              "id": "00000000-0000-4000-8000-000000000251",
+              "type": "group",
+              "geometry": {
+                "x": 80,
+                "y": 80,
+                "width": 1120,
+                "height": 560,
+                "anchor": "top-start"
+              },
+              "zOrder": 0,
+              "children": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000250",
+                  "type": "group",
+                  "geometry": {
+                    "x": 80,
+                    "y": 80,
+                    "width": 1120,
+                    "height": 560,
+                    "anchor": "top-start"
+                  },
+                  "zOrder": 0,
+                  "children": [
+                    {
+                      "id": "00000000-0000-4000-8000-00000000024f",
+                      "type": "group",
+                      "geometry": {
+                        "x": 80,
+                        "y": 80,
+                        "width": 1120,
+                        "height": 560,
+                        "anchor": "top-start"
+                      },
+                      "zOrder": 0,
+                      "children": [
+                        {
+                          "id": "00000000-0000-4000-8000-00000000024e",
+                          "type": "group",
+                          "geometry": {
+                            "x": 80,
+                            "y": 80,
+                            "width": 1120,
+                            "height": 560,
+                            "anchor": "top-start"
+                          },
+                          "zOrder": 0,
+                          "children": [
+                            {
+                              "id": "00000000-0000-4000-8000-00000000024d",
+                              "type": "group",
+                              "geometry": {
+                                "x": 80,
+                                "y": 80,
+                                "width": 1120,
+                                "height": 560,
+                                "anchor": "top-start"
+                              },
+                              "zOrder": 0,
+                              "children": [
+                                {
+                                  "id": "00000000-0000-4000-8000-00000000024c",
+                                  "type": "group",
+                                  "geometry": {
+                                    "x": 80,
+                                    "y": 80,
+                                    "width": 1120,
+                                    "height": 560,
+                                    "anchor": "top-start"
+                                  },
+                                  "zOrder": 0,
+                                  "children": [
+                                    {
+                                      "id": "00000000-0000-4000-8000-00000000024b",
+                                      "type": "group",
+                                      "geometry": {
+                                        "x": 80,
+                                        "y": 80,
+                                        "width": 1120,
+                                        "height": 560,
+                                        "anchor": "top-start"
+                                      },
+                                      "zOrder": 0,
+                                      "children": [
+                                        {
+                                          "id": "00000000-0000-4000-8000-00000000024a",
+                                          "type": "group",
+                                          "geometry": {
+                                            "x": 80,
+                                            "y": 80,
+                                            "width": 1120,
+                                            "height": 560,
+                                            "anchor": "top-start"
+                                          },
+                                          "zOrder": 0,
+                                          "children": [
+                                            {
+                                              "id": "00000000-0000-4000-8000-000000000247",
+                                              "type": "text",
+                                              "geometry": {
+                                                "x": 80,
+                                                "y": 80,
+                                                "width": 1120,
+                                                "height": 560,
+                                                "anchor": "top-start"
+                                              },
+                                              "zOrder": 0,
+                                              "paragraphs": [
+                                                {
+                                                  "id": "00000000-0000-4000-8000-000000000248",
+                                                  "direction": "ltr",
+                                                  "logicalAlignment": "start",
+                                                  "runs": [
+                                                    {
+                                                      "id": "00000000-0000-4000-8000-000000000249",
+                                                      "text": "Too deep",
+                                                      "language": "en",
+                                                      "fontFamilyRef": "body",
+                                                      "fontSize": 32,
+                                                      "color": "#111827"
+                                                    }
+                                                  ]
+                                                }
+                                              ],
+                                              "verticalAlignment": "top",
+                                              "overflow": "shrink"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "assets": [],
+  "exportHints": {
+    "preferredAspect": "16:9",
+    "editablePreference": "preferred",
+    "includeNotes": false,
+    "rendererFallback": "legacy"
+  },
+  "compatibility": {
+    "sourceVersion": "canonical-v1",
+    "requiresLegacyRenderer": false,
+    "warnings": [],
+    "unsupportedFeatures": []
+  }
+}

@@ -2,6 +2,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "../types/index";
 import { ChevronRight } from "lucide-react";
+import { useTranslations } from "@/i18n/catalog";
 
 interface GenerateButtonProps {
   loadingState: LoadingState;
@@ -16,6 +17,7 @@ const GenerateButton: React.FC<GenerateButtonProps> = ({
   selectedTemplateId,
   onSubmit,
 }) => {
+  const t = useTranslations();
   const isDisabled =
     loadingState.isLoading ||
     streamState.isLoading ||
@@ -24,9 +26,9 @@ const GenerateButton: React.FC<GenerateButtonProps> = ({
 
   const getButtonText = () => {
     if (loadingState.isLoading) return loadingState.message;
-    if (streamState.isLoading || streamState.isStreaming) return "Loading...";
-    if (!selectedTemplateId) return "Select a Template";
-    return "Continue";
+    if (streamState.isLoading || streamState.isStreaming) return t("outline.loading");
+    if (!selectedTemplateId) return t("outline.selectTemplate");
+    return t("outline.continue");
   };
 
   return (
@@ -44,7 +46,7 @@ const GenerateButton: React.FC<GenerateButtonProps> = ({
       <ChevronRight
         aria-hidden="true"
         strokeWidth={1.7}
-        className="h-[18px] w-[18px]"
+        className="h-[18px] w-[18px] rtl:rotate-180"
       />
     </Button>
   );

@@ -5,6 +5,8 @@ import { Plus, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { trackEvent, MixpanelEvent } from "@/utils/mixpanel";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/i18n/catalog";
+import { localizePathname } from "@/i18n/routing";
 
 const CreateCustomTemplate = ({
   selectionPage = false,
@@ -13,12 +15,13 @@ const CreateCustomTemplate = ({
   selectionPage?: boolean;
   onClick?: () => void;
 }) => {
+    const { locale, t } = useI18n();
     const router = useRouter();
 
     const handleOpenTemplateBuilder = () => {
         trackEvent(MixpanelEvent.Templates_Build_Template_Clicked);
         onClick?.();
-        router.push("/custom-template");
+        router.push(localizePathname("/custom-template", locale));
     };
 
     return (
@@ -96,7 +99,7 @@ const CreateCustomTemplate = ({
                 </div>
                 <div className="flex min-w-0 flex-col gap-1">
                     <h4 className="text-sm font-semibold tracking-[0.14px] text-[#191919]">
-                      {selectionPage ? "Build Templates" : "Build Template"}
+                      {selectionPage ? t("templates.buildTemplates") : t("templates.buildTemplate")}
                     </h4>
                     <p
                       className={cn(
@@ -107,8 +110,8 @@ const CreateCustomTemplate = ({
                       )}
                     >
                       {selectionPage
-                        ? "Build Your Template"
-                        : "Build Your Own Template"}
+                        ? t("templates.buildYours")
+                        : t("templates.buildOwn")}
                     </p>
                 </div>
             </div>

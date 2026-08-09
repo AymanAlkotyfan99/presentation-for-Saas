@@ -28,6 +28,7 @@ import Image from 'next/image';
 import OllamaConfig from '../OllamaConfig';
 import { PRODUCT_IDENTITY } from '@/lib/product-identity';
 import { DISPLAY_PRODUCT } from '@/lib/product-metadata';
+import { useTranslations } from '@/i18n/catalog';
 
 const MANUAL_MODEL_PROVIDERS = new Set(["vertex", "azure", "bedrock"]);
 const LOCAL_PROVIDERS = ["ollama", "lmstudio"];
@@ -60,6 +61,7 @@ const PresentonMode = ({
     setStep: (step: number) => void,
     setProviderStep: (step: number) => void,
 }) => {
+    const t = useTranslations();
     const pathname = usePathname();
     const userConfigState = useSelector((state: RootState) => state.userConfig);
     const [openProviderSelect, setOpenProviderSelect] = useState(false);
@@ -408,22 +410,20 @@ const PresentonMode = ({
                     }));
                 }
             } else {
-                const message = await getApiErrorMessage(
+                await getApiErrorMessage(
                     response,
                     `The server could not list ${LLM_PROVIDERS[llmConfig.LLM!]?.label} models. Check your API key or endpoint and try again.`
                 );
                 console.error('Failed to fetch models');
                 setAvailableModels([]);
                 setModelsChecked(true);
-                notify.error("Could not load models", message);
+                notify.error(t("onboarding.loadModelsFailed"), t("onboarding.loadModelsFailedDescription"));
             }
         } catch (error) {
             console.error('Error fetching models:', error);
             notify.error(
-                llmConfig.LLM === "ollama" ? "Could not connect to Ollama" : "Could not load models",
-                error instanceof Error
-                    ? error.message
-                    : "The server could not list models. Check your API key or endpoint and try again."
+                llmConfig.LLM === "ollama" ? t("onboarding.ollamaConnectionFailed") : t("onboarding.loadModelsFailed"),
+                t("onboarding.loadModelsFailedDescription")
             );
             setAvailableModels([]);
             setModelsChecked(true);
@@ -440,7 +440,7 @@ const PresentonMode = ({
             return (
                 <div className="w-full ">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                        DALL·E 3 Image Quality
+                        {t("onboarding.qualityLabel", { provider: "DALL·E 3" })}
                     </label>
                     <div className="">
                         <Select value={llmConfig.DALL_E_3_QUALITY || 'standard'} onValueChange={(value) => {
@@ -454,7 +454,7 @@ const PresentonMode = ({
                             }));
                         }}>
                             <SelectTrigger className="w-full h-12 px-4 py-4 outline-none border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors hover:border-gray-400 justify-between">
-                                <SelectValue placeholder="Select a quality" />
+                                <SelectValue placeholder={t("onboarding.selectQuality")} />
                             </SelectTrigger>
                             <SelectContent>
                                 {DALLE_3_QUALITY_OPTIONS.map((option) => (
@@ -472,7 +472,7 @@ const PresentonMode = ({
             return (
                 <div className="w-full">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                        GPT Image 1.5 Quality
+                        {t("onboarding.qualityLabel", { provider: "GPT Image 1.5" })}
                     </label>
                     <div className="">
                         <Select
@@ -491,7 +491,7 @@ const PresentonMode = ({
                             <SelectTrigger
 
                                 className="w-full h-12 px-4 py-4 outline-none border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors hover:border-gray-400 justify-between">
-                                <SelectValue placeholder="Select a quality" />
+                                <SelectValue placeholder={t("onboarding.selectQuality")} />
                             </SelectTrigger>
                             <SelectContent>
                                 {GPT_IMAGE_1_5_QUALITY_OPTIONS.map((option) => (
@@ -517,9 +517,9 @@ const PresentonMode = ({
             <div className="col-span-full rounded-[10px] border border-[#EDEEEF] bg-[#FBFBFD] p-4 shadow-[0_12px_28px_rgba(16,19,35,0.04)]">
                 <div className="mb-4 flex items-start justify-between gap-3">
                     <div>
-                        <p className="text-sm font-semibold text-[#191919]">{provider.label} setup</p>
+                        <p className="text-sm font-semibold text-[#191919]">{t("onboarding.providerSetup", { provider: provider.label })}</p>
                         <p className="mt-1 text-xs leading-5 text-gray-500">
-                            Configure the selected image provider before continuing.
+                            {t("onboarding.providerSetupDescription")}
                         </p>
                     </div>
                     {provider.getApiKeyUrl && (
@@ -528,7 +528,7 @@ const PresentonMode = ({
                             target="_blank"
                             className="flex shrink-0 items-center gap-1 rounded-full border border-[#EDEEEF] bg-white px-3 py-1.5 text-xs font-medium text-[#666666] transition-colors hover:border-[#D9D6FE] hover:text-[#7A5AF8]"
                         >
-                            Get API Key <ArrowUpRight className="h-3.5 w-3.5" />
+                            {t("onboarding.getApiKey")} <ArrowUpRight className="h-3.5 w-3.5" />
                         </a>
                     )}
                 </div>
@@ -563,7 +563,7 @@ const PresentonMode = ({
                         <>
                             <div>
                                 <label className="mb-2 block text-sm font-medium text-gray-700">
-                                    ComfyUI Server URL
+                                    {t("onboarding.comfyUrl")}
                                 </label>
                                 <input
                                     type="text"
@@ -580,10 +580,10 @@ const PresentonMode = ({
                             </div>
                             <div>
                                 <label className="mb-2 block text-sm font-medium text-gray-700">
-                                    Workflow JSON
+                                    {t("onboarding.workflowJson")}
                                 </label>
                                 <textarea
-                                    placeholder='Paste your ComfyUI workflow JSON here (export via "Export (API)" in ComfyUI)'
+                                    placeholder={t("onboarding.workflowPlaceholder")}
                                     className="w-full rounded-lg border border-gray-300 px-4 py-2.5 font-mono text-xs outline-none transition-colors focus:border-[#7A5AF8] focus:ring-2 focus:ring-[#7A5AF8]/20"
                                     rows={3}
                                     value={llmConfig.COMFYUI_WORKFLOW || ""}
@@ -600,7 +600,7 @@ const PresentonMode = ({
                         <>
                             <div>
                                 <label className="mb-2 block text-sm font-medium text-gray-700">
-                                    Open WebUI URL
+                                    {t("onboarding.openWebUiUrl")}
                                 </label>
                                 <input
                                     type="text"
@@ -617,13 +617,13 @@ const PresentonMode = ({
                             </div>
                             <div>
                                 <label className="mb-2 block text-sm font-medium text-gray-700">
-                                    API Key (optional)
+                                    {t("onboarding.apiKeyOptional")}
                                 </label>
                                 <div className="relative">
                                     <input
                                         type={showApiKey ? "text" : "password"}
-                                        placeholder="API key"
-                                        className="h-12 w-full rounded-lg border border-gray-300 px-4 py-2.5 pr-12 outline-none transition-colors focus:border-[#7A5AF8] focus:ring-2 focus:ring-[#7A5AF8]/20"
+                                        placeholder={t("onboarding.apiKey")}
+                                        className="h-12 w-full rounded-lg border border-gray-300 px-4 py-2.5 pe-12 outline-none transition-colors focus:border-[#7A5AF8] focus:ring-2 focus:ring-[#7A5AF8]/20"
                                         value={llmConfig.OPEN_WEBUI_IMAGE_API_KEY || ""}
                                         onChange={(e) => {
                                             setLlmConfig(prev => ({
@@ -635,7 +635,7 @@ const PresentonMode = ({
                                     <button
                                         type="button"
                                         onClick={() => setShowApiKey((prev) => !prev)}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer bg-white px-2 py-1"
+                                        className="absolute end-2 top-1/2 -translate-y-1/2 cursor-pointer bg-white px-2 py-1"
                                     >
                                         {showApiKey ? <Eye className="h-4 w-4 text-gray-500" /> : <EyeOff className="h-4 w-4 text-gray-500" />}
                                     </button>
@@ -650,8 +650,10 @@ const PresentonMode = ({
                             <div className="relative">
                                 <input
                                     type={showApiKey ? "text" : "password"}
-                                    placeholder={`Enter your ${provider.apiKeyFieldLabel}`}
-                                    className="h-12 w-full rounded-lg border border-gray-300 px-4 py-2.5 pr-12 outline-none transition-colors focus:border-[#7A5AF8] focus:ring-2 focus:ring-[#7A5AF8]/20"
+                                    placeholder={t("onboarding.enterField", {
+                                        field: provider.apiKeyFieldLabel ?? t("onboarding.apiKey"),
+                                    })}
+                                    className="h-12 w-full rounded-lg border border-gray-300 px-4 py-2.5 pe-12 outline-none transition-colors focus:border-[#7A5AF8] focus:ring-2 focus:ring-[#7A5AF8]/20"
                                     value={getFieldValue(provider.apiKeyField)}
                                     onChange={(e) => {
                                         setLlmConfig((prev) => ({
@@ -663,7 +665,7 @@ const PresentonMode = ({
                                 <button
                                     type="button"
                                     onClick={() => setShowApiKey((prev) => !prev)}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer bg-white px-2 py-1"
+                                    className="absolute end-2 top-1/2 -translate-y-1/2 cursor-pointer bg-white px-2 py-1"
                                 >
                                     {showApiKey ? <Eye className="h-4 w-4 text-gray-500" /> : <EyeOff className="h-4 w-4 text-gray-500" />}
                                 </button>
@@ -703,7 +705,7 @@ const PresentonMode = ({
                         provider: "codex",
                         validation_error: "Please sign in to ChatGPT to continue.",
                     });
-                    notify.error("Sign in required", "Please sign in to ChatGPT to continue.");
+                    notify.error(t("onboarding.signInRequired"), t("onboarding.signInRequiredDescription"));
                     return;
                 }
             }
@@ -715,7 +717,7 @@ const PresentonMode = ({
                     web_search_provider: llmConfig.WEB_SEARCH_PROVIDER || "auto",
                     validation_error: validationError,
                 });
-                notify.warning("Cannot save yet", validationError);
+                notify.warning(t("onboarding.cannotSave"), t("errors.validation"));
                 return;
             }
             setSavingConfig(true);
@@ -765,7 +767,7 @@ const PresentonMode = ({
                 web_search_provider: llmConfig.WEB_GROUNDING ? (llmConfig.WEB_SEARCH_PROVIDER || "auto") : "disabled",
             });
 
-            notify.success("Configuration saved", "Your configuration was saved successfully.");
+            notify.success(t("onboarding.configurationSaved"), t("onboarding.configurationSavedDescription"));
             trackEvent(MixpanelEvent.Onboarding_Step_Continued, {
                 from_step: "web_search",
                 to_step: "finish",
@@ -775,8 +777,8 @@ const PresentonMode = ({
             });
             setStep(3)
             // router.push("/upload");
-        } catch (error) {
-            notify.error("Could not save configuration", error instanceof Error ? error.message : "Failed to save configuration");
+        } catch {
+            notify.error(t("onboarding.configurationFailed"), t("errors.unknown"));
 
         }
         finally {
@@ -788,7 +790,7 @@ const PresentonMode = ({
         if (llmConfig.LLM === 'codex') {
             const isAuthenticated = await checkCurrentAuthStatus();
             if (!isAuthenticated) {
-                notify.error("Sign in required", "Please sign in to ChatGPT to continue.");
+                notify.error(t("onboarding.signInRequired"), t("onboarding.signInRequiredDescription"));
                 return false;
             }
         }
@@ -803,7 +805,7 @@ const PresentonMode = ({
                 provider: llmConfig.LLM || "",
                 validation_error: validationError,
             });
-            notify.warning("Cannot continue yet", validationError);
+            notify.warning(t("onboarding.cannotContinue"), t("errors.validation"));
             return false;
         }
         return true;
@@ -832,7 +834,7 @@ const PresentonMode = ({
                     image_provider: llmConfig.IMAGE_PROVIDER || "",
                     validation_error: validationError,
                 });
-                notify.warning("Cannot continue yet", validationError);
+                notify.warning(t("onboarding.cannotContinue"), t("errors.validation"));
                 return;
             }
             trackEvent(MixpanelEvent.Onboarding_Step_Continued, {
@@ -869,7 +871,7 @@ const PresentonMode = ({
         return (
             <div className="col-span-full rounded-[10px] border border-[#EDEEEF] bg-[#FBFBFD] p-4 shadow-[0_12px_28px_rgba(16,19,35,0.04)]">
                 <div className="mb-4">
-                    <p className="text-sm font-semibold text-[#191919]">{selectedWebProvider.label} setup</p>
+                    <p className="text-sm font-semibold text-[#191919]">{t("onboarding.providerSetup", { provider: selectedWebProvider.label })}</p>
                     <p className="mt-1 text-xs leading-5 text-gray-500">
                         {selectedWebProvider.description}
                     </p>
@@ -878,7 +880,7 @@ const PresentonMode = ({
                 <div className="space-y-4">
                     {selectedWebProvider.value === "auto" && (
                         <div className="rounded-lg border border-[#D9D6FE] bg-[#F4F3FF] p-3 text-xs leading-5 text-[#5146E5]">
-                            {DISPLAY_PRODUCT.shortName} will use model-native web grounding when available. If the selected text model does not support it, web search stays off until you choose an external provider.
+                            {t("onboarding.automaticWebSearch")}
                         </div>
                     )}
 
@@ -907,13 +909,15 @@ const PresentonMode = ({
                                     type={showApiKey ? "text" : "password"}
                                     value={getFieldValue(selectedWebProvider.apiKeyField)}
                                     onChange={(event) => setLlmConfig(prev => ({ ...prev, [selectedWebProvider.apiKeyField!]: event.target.value }))}
-                                    className="h-12 w-full rounded-lg border border-gray-300 px-4 pr-12 outline-none transition-colors focus:border-[#7A5AF8] focus:ring-2 focus:ring-[#7A5AF8]/20"
-                                    placeholder={`Enter your ${selectedWebProvider.apiKeyLabel}`}
+                                    className="h-12 w-full rounded-lg border border-gray-300 px-4 pe-12 outline-none transition-colors focus:border-[#7A5AF8] focus:ring-2 focus:ring-[#7A5AF8]/20"
+                                    placeholder={t("onboarding.enterField", {
+                                        field: selectedWebProvider.apiKeyLabel ?? t("onboarding.apiKey"),
+                                    })}
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowApiKey(prev => !prev)}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer bg-white px-2 py-1"
+                                    className="absolute end-2 top-1/2 -translate-y-1/2 cursor-pointer bg-white px-2 py-1"
                                 >
                                     {showApiKey ? <Eye className="h-4 w-4 text-gray-500" /> : <EyeOff className="h-4 w-4 text-gray-500" />}
                                 </button>
@@ -924,7 +928,7 @@ const PresentonMode = ({
                     {selectedWebProvider.value !== "auto" && (
                         <div>
                             <label className="mb-2 block text-sm font-medium text-gray-700">
-                                Maximum results
+                                {t("onboarding.maximumResults")}
                             </label>
                             <input
                                 type="number"
@@ -1025,19 +1029,23 @@ const PresentonMode = ({
             <div className=''>
 
                 <h2 className='mb-4 text-black text-[26px] font-normal font-unbounded '>
-                    {providerStep === 1 ? "Choose your text provider" : providerStep === 2 ? "Choose your image provider" : "Configure web search"}
+                    {providerStep === 1
+                        ? t("onboarding.chooseTextProvider")
+                        : providerStep === 2
+                            ? t("onboarding.chooseImageProvider")
+                            : t("onboarding.configureWebSearch")}
                 </h2>
                 <p className='text-[#000000CC] text-xl font-normal font-syne'>
                     {providerStep === 1
-                        ? "Start with ChatGPT, run a local model, or connect another AI provider."
+                        ? t("onboarding.textProviderIntro")
                         : providerStep === 2
-                            ? `Choose how ${DISPLAY_PRODUCT.shortName} creates visuals, or continue without image generation.`
-                            : "Add current web context to presentations, or continue with web search disabled."}
+                            ? t("onboarding.imageProviderIntro")
+                            : t("onboarding.webSearchIntro")}
                 </p>
             </div>
             <div className='flex items-center gap-2 bg-[#F0F3F9B2] rounded-[8px]  px-6 py-2.5 my-[54px]'>
                 <Info className='w-4 h-4 fill-[#003399] stroke-white' />
-                <p className='text-sm text-[#5F6062] font-medium'>{DISPLAY_PRODUCT.shortName} runs on this deployment. Generation data may be sent to the providers you select, and keys and settings are stored on the deployment host.</p>
+                <p className='text-sm text-[#5F6062] font-medium'>{t("onboarding.deploymentPrivacy")}</p>
             </div>
 
             {providerStep === 1 && <>
@@ -1055,9 +1063,9 @@ const PresentonMode = ({
                     </div>
                     <div className='w-full'>
 
-                        <h3 className="text-xl font-normal text-[#191919] pb-1.5">Text Generation Settings</h3>
+                        <h3 className="text-xl font-normal text-[#191919] pb-1.5">{t("onboarding.textSettings")}</h3>
                         <p className=" text-sm  text-gray-500">
-                            Choosing where text content comes from
+                            {t("onboarding.textSettingsDescription")}
                         </p>
                     </div>
                 </div>
@@ -1069,23 +1077,23 @@ const PresentonMode = ({
                     <TabsList className="grid h-14 w-full grid-cols-3 rounded-[10px] border border-[#EDEEEF] bg-[#F6F6F9] p-1 shadow-inner shadow-black/[0.02]">
                         <TabsTrigger value="chatgpt" className="h-12 gap-2 rounded-[8px] border border-transparent px-4 text-sm font-semibold text-[#5F6062] transition-all hover:text-[#191919] data-[state=active]:border-[#D9D6FE] data-[state=active]:bg-white data-[state=active]:text-[#191919] data-[state=active]:shadow-[0_8px_24px_rgba(16,19,35,0.08)]">
                             <Image src="/providers/openai.png" alt="" width={16} height={16} className="object-contain" />
-                            ChatGPT
+                            {t("onboarding.chatGpt")}
                         </TabsTrigger>
                         <TabsTrigger value="local" className="h-12 gap-2 rounded-[8px] border border-transparent px-4 text-sm font-semibold text-[#5F6062] transition-all hover:text-[#191919] data-[state=active]:border-[#D9D6FE] data-[state=active]:bg-white data-[state=active]:text-[#191919] data-[state=active]:shadow-[0_8px_24px_rgba(16,19,35,0.08)]">
                             <Laptop className="h-4 w-4" />
-                            Local
+                            {t("onboarding.local")}
                         </TabsTrigger>
                         <TabsTrigger value="other" className="h-12 gap-2 rounded-[8px] border border-transparent px-4 text-sm font-semibold text-[#5F6062] transition-all hover:text-[#191919] data-[state=active]:border-[#D9D6FE] data-[state=active]:bg-white data-[state=active]:text-[#191919] data-[state=active]:shadow-[0_8px_24px_rgba(16,19,35,0.08)]">
                             <Blocks className="h-4 w-4" />
-                            AI Providers
+                            {t("onboarding.aiProviders")}
                         </TabsTrigger>
                     </TabsList>
                     <p className="mt-3 text-xs leading-relaxed text-gray-500">
                         {textProviderTab === "chatgpt"
-                            ? "Connect your ChatGPT account and choose a supported model."
+                            ? t("onboarding.chatGptDescription")
                             : textProviderTab === "local"
-                                ? "Run models on your machine with Ollama or LM Studio."
-                                : "Connect hosted AI providers using an API key or custom endpoint."}
+                                ? t("onboarding.localDescription")
+                                : t("onboarding.hostedDescription")}
                     </p>
                     <TabsContent value="chatgpt" className="mt-6">
                         <CodexConfig
@@ -1101,7 +1109,7 @@ const PresentonMode = ({
                         />
                         {chatGptAuthenticated && (llmConfig.LLM === "codex" || llmConfig.LLM === "chatgpt") && (
                             <div className="mt-5">
-                                <label className="mb-2 block text-sm font-medium text-gray-700">ChatGPT model</label>
+                                <label className="mb-2 block text-sm font-medium text-gray-700">{t("onboarding.chatModel")}</label>
                                 <Select
                                     value={llmConfig.CODEX_MODEL || ""}
                                     onValueChange={(value) => {
@@ -1114,7 +1122,7 @@ const PresentonMode = ({
                                     }}
                                 >
                                     <SelectTrigger className="h-12 w-full rounded-lg border-gray-300">
-                                        <SelectValue placeholder="Select a model" />
+                                        <SelectValue placeholder={t("onboarding.selectModel")} />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {CODEX_MODELS.map((model) => (
@@ -1135,7 +1143,7 @@ const PresentonMode = ({
                                         key={value}
                                         onClick={() => handleProviderChange(value)}
                                         className={cn(
-                                            "flex items-center gap-3 rounded-xl border p-4 text-left transition-colors hover:bg-[#F7F6F9]",
+                                            "flex items-center gap-3 rounded-xl border p-4 text-start transition-colors hover:bg-[#F7F6F9]",
                                             llmConfig.LLM === value ? "border-[#7A5AF8] bg-[#F4F3FF]" : "border-[#EDEEEF]"
                                         )}
                                     >
@@ -1156,7 +1164,7 @@ const PresentonMode = ({
                     <div className="flex w-full flex-col justify-start">
 
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Select Text Provider
+                            {t("onboarding.selectProvider")}
                         </label>
                         <Popover
                             open={openProviderSelect}
@@ -1174,7 +1182,7 @@ const PresentonMode = ({
                                             {llmConfig.LLM && OTHER_PROVIDER_VALUES.has(llmConfig.LLM)
                                                 ? LLM_PROVIDERS[llmConfig.LLM]
                                                     ?.label || llmConfig.LLM
-                                                : "Select text provider"}
+                                                : t("onboarding.selectTextProvider")}
                                         </span>
                                     </div>
                                     <ChevronUp className="w-4 h-4 text-gray-500" />
@@ -1186,9 +1194,9 @@ const PresentonMode = ({
 
                             >
                                 <Command>
-                                    <CommandInput placeholder="Search provider..." />
+                                    <CommandInput placeholder={t("onboarding.searchProvider")} />
                                     <CommandList className='hide-scrollbar'>
-                                        <CommandEmpty>No provider found.</CommandEmpty>
+                                        <CommandEmpty>{t("onboarding.noProvider")}</CommandEmpty>
                                         <CommandGroup >
                                             {OTHER_PROVIDERS.map(
                                                 (provider, index) => (
@@ -1265,7 +1273,7 @@ const PresentonMode = ({
                                         <label className="block text-sm font-medium capitalize text-gray-700 ">
                                             {providerApiKeyLabel}
                                         </label>
-                                        {llmConfig.LLM && LLM_PROVIDERS[llmConfig.LLM!]?.getApiKeyUrl && <a href={LLM_PROVIDERS[llmConfig.LLM!]?.getApiKeyUrl || ""} target='_blank' className='text-[#666666] text-xs font-normal flex items-center gap-1'>Get API Key <ArrowUpRight className='w-3.5 h-3.5' /></a>}
+                                        {llmConfig.LLM && LLM_PROVIDERS[llmConfig.LLM!]?.getApiKeyUrl && <a href={LLM_PROVIDERS[llmConfig.LLM!]?.getApiKeyUrl || ""} target='_blank' className='text-[#666666] text-xs font-normal flex items-center gap-1'>{t("onboarding.getApiKey")} <ArrowUpRight className='w-3.5 h-3.5' /></a>}
                                     </div>
 
                                     <div className="relative">
@@ -1277,7 +1285,7 @@ const PresentonMode = ({
                                                 [currentApiKeyField]: e.target.value
                                             }))}
                                             className="w-full px-2 py-3 outline-none border  border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-                                            placeholder={`Enter your ${providerApiKeyLabel}`}
+                                            placeholder={t("onboarding.enterField", { field: providerApiKeyLabel })}
                                         />
                                         <button
                                             type="button"
@@ -1298,7 +1306,7 @@ const PresentonMode = ({
                                         CUSTOM_LLM_URL: e.target.value
                                     }))}
                                     className="w-full mt-2 px-2 py-3 outline-none border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-                                    placeholder="OpenAI-compatible URL"
+                                    placeholder={t("settings.compatibleUrl")}
                                 />
                             )}
                             {llmConfig.LLM === 'deepseek' && (
@@ -1312,7 +1320,7 @@ const PresentonMode = ({
                                             type="button"
                                             className="flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-gray-200 bg-[#F9F9FA] px-3 py-2.5 text-left text-sm font-medium text-gray-800 transition-colors hover:bg-gray-100"
                                         >
-                                            <span>Advanced settings</span>
+                                            <span>{t("onboarding.advancedSettings")}</span>
                                             <ChevronDown
                                                 className={cn(
                                                     "h-4 w-4 shrink-0 text-gray-600 transition-transform duration-200",
@@ -1496,7 +1504,7 @@ const PresentonMode = ({
                                                         currentModel
                                                             ? availableModels.find(model => model === currentModel) || currentModel
                                                             :
-                                                            "Select a model"
+                                                            t("onboarding.selectModel")
                                                     }
                                                 </span>
 
@@ -1509,9 +1517,9 @@ const PresentonMode = ({
                                             style={{ width: "var(--radix-popover-trigger-width)" }}
                                         >
                                             <Command>
-                                                <CommandInput placeholder="Search models..." />
+                                                <CommandInput placeholder={t("onboarding.searchModels")} />
                                                 <CommandList>
-                                                    <CommandEmpty>No model found.</CommandEmpty>
+                                                    <CommandEmpty>{t("onboarding.noModel")}</CommandEmpty>
                                                     <CommandGroup>
                                                         {availableModels.map((model, index) => (
                                                             <CommandItem
@@ -1566,7 +1574,7 @@ const PresentonMode = ({
             {providerStep === 2 && <>
             {/* Image Provider */}
             <div className={`p-3 border border-[#EDEEEF] rounded-[11px] relative mt-5 bg-white ${llmConfig.DISABLE_IMAGE_GENERATION ? "bg-[#F9FAFB]" : ""}`}>
-                <ToolTip content="Enable/Disable Image Generation" className='flex justify-end items-center absolute top-3 right-3'>
+                <ToolTip content={t("onboarding.enableImageGeneration")} className='absolute end-3 top-3 flex items-center justify-end'>
                     <div className='flex justify-end items-center'>
                         <Switch
                             checked={!llmConfig.DISABLE_IMAGE_GENERATION}
@@ -1589,13 +1597,13 @@ const PresentonMode = ({
                     <div className='w-[74px] h-[74px] px-[13.5px] py-[14.2px] rounded-[4px] flex items-center justify-center'
                         style={{ backgroundColor: '#F4F3FF' }}
                     >
-                        <img src="/image-markup.svg" className='w-full h-full object-cover' alt='image-markup' />
+                        <img src="/image-markup.svg" className='h-full w-full object-cover' alt="" aria-hidden="true" />
                     </div>
                     <div>
 
-                        <h3 className="text-xl font-normal text-[#191919] ">Image Generation Settings</h3>
+                        <h3 className="text-xl font-normal text-[#191919] ">{t("onboarding.imageSettings")}</h3>
                         <p className=" text-sm  text-gray-500">
-                            Choosing where images come from
+                            {t("onboarding.imageSettingsDescription")}
                         </p>
                     </div>
                 </div>
@@ -1604,7 +1612,7 @@ const PresentonMode = ({
                         {/* Image Provider Selection */}
                         <div className="w-full">
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Select Image Provider
+                                {t("onboarding.selectImageProvider")}
                             </label>
                             <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-3">
                                 {imageProviderRows.map((row, rowIndex) => (
@@ -1654,7 +1662,7 @@ const PresentonMode = ({
 
             {providerStep === 3 && (
                 <div className={`relative rounded-[11px] border border-[#EDEEEF] p-3 ${llmConfig.WEB_GROUNDING ? "bg-white" : "bg-[#F9FAFB]"}`}>
-                    <ToolTip content="Enable/Disable Web Search" className='absolute right-3 top-3 flex items-center justify-end'>
+                    <ToolTip content={t("onboarding.enableWebSearch")} className='absolute end-3 top-3 flex items-center justify-end'>
                         <div className='flex items-center justify-end'>
                             <Switch
                                 checked={!!llmConfig.WEB_GROUNDING}
@@ -1677,13 +1685,13 @@ const PresentonMode = ({
                             <Search className="h-9 w-9 text-[#5146E5]" />
                         </div>
                         <div>
-                            <h3 className="text-xl font-normal text-[#191919]">Web Search Settings</h3>
-                            <p className="text-sm text-gray-500">Bring current information into generated presentations</p>
+                            <h3 className="text-xl font-normal text-[#191919]">{t("onboarding.webSearchSettings")}</h3>
+                            <p className="text-sm text-gray-500">{t("onboarding.webSearchDescription")}</p>
                         </div>
                     </div>
                     {llmConfig.WEB_GROUNDING && <div className="space-y-4">
                             <div>
-                                <label className="mb-2 block text-sm font-medium text-gray-700">Select Web Search Provider</label>
+                                <label className="mb-2 block text-sm font-medium text-gray-700">{t("onboarding.selectWebSearchProvider")}</label>
                                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                                     {webSearchProviderRows.map((row, rowIndex) => (
                                         <React.Fragment key={`web-search-provider-row-${rowIndex}`}>
@@ -1732,12 +1740,12 @@ const PresentonMode = ({
                 </div>
             )}
 
-            <div className='fixed bottom-16 mr-8  max-w-[1440px]  right-16 flex justify-end items-center gap-2.5 '>
+            <div className='fixed bottom-16 end-16 me-8 flex max-w-[1440px] items-center justify-end gap-2.5'>
                 {providerStep > 1 && (
                     <button
                         onClick={handleBack}
                         className='border border-[#EDEEEF] rounded-[53px] px-4 py-1 h-[36px]'>
-                        <ChevronLeft className='w-4 h-4 text-gray-500' />
+                        <ChevronLeft className='h-4 w-4 text-gray-500 rtl:rotate-180' />
                     </button>
                 )}
                 <button
@@ -1746,10 +1754,10 @@ const PresentonMode = ({
                     onClick={handleContinue}
                     className='border font-syne border-[#EDEEEF] bg-[#7C51F8]  rounded-[58px] px-5 py-2.5 text-white text-xs  font-semibold'>
                     {providerStep === 1
-                        ? "Continue to image provider"
+                        ? t("onboarding.continueImage")
                         : providerStep === 2
-                            ? llmConfig.DISABLE_IMAGE_GENERATION ? "Disable image generation & Continue" : "Continue to web search"
-                            : llmConfig.WEB_GROUNDING ? "Save & Finish" : "Disable web search & Finish"}
+                            ? llmConfig.DISABLE_IMAGE_GENERATION ? t("onboarding.disableImageContinue") : t("onboarding.continueWebSearch")
+                            : llmConfig.WEB_GROUNDING ? t("onboarding.saveFinish") : t("onboarding.disableWebFinish")}
                 </button>
             </div>
         </div>

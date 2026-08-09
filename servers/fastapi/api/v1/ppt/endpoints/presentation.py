@@ -105,6 +105,7 @@ from modules.presentations import (
     duplicate_presentation_record,
     load_presentation_with_slides,
     list_presentation_rows,
+    record_shadow_parity_if_enabled,
 )
 from templates.v2.schema import get_template_schema
 from templates.default_templates import resolve_default_template_id
@@ -1352,6 +1353,7 @@ async def get_presentation(
         ) if presentation else []
     if not presentation:
         raise HTTPException(404, "Presentation not found")
+    await record_shadow_parity_if_enabled(sql_session, presentation, slides)
     return PresentationWithSlides(
         **_presentation_response_data(presentation),
         slides=slides,

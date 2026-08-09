@@ -13,12 +13,17 @@ import { BRAND_ASSETS } from "@/lib/product-metadata";
 import { notify } from "@/components/ui/sonner";
 import { sanitizeAnalyticsError } from "@/utils/analytics";
 import { MixpanelEvent, trackEvent } from "@/utils/mixpanel";
+import { useTranslations } from "@/i18n/catalog";
+import { apiErrorLocalization } from "@/utils/apiErrorMessages";
+import { LOCALE_COOKIE_NAME, type SupportedLocale } from "@/i18n/config";
+import { recordLocalizationSignal } from "@/i18n/observability";
 
 type AuthStatus = {
   configured: boolean;
   authenticated: boolean;
   username: string | null;
   role?: "admin" | "user" | null;
+  preferred_locale?: SupportedLocale | null;
 };
 
 const initialStatus: AuthStatus = {
@@ -29,6 +34,7 @@ const initialStatus: AuthStatus = {
 };
 
 export default function AuthGate() {
+  const t = useTranslations();
   const [status, setStatus] = useState<AuthStatus>(initialStatus);
   const [isLoading, setIsLoading] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
@@ -89,14 +95,14 @@ export default function AuthGate() {
         trackEvent(MixpanelEvent.Auth_Unauthorized_Redirect, {
           configured: true,
         });
-        notify.error("Unauthorized", "Sign in to view this page.", {
+        notify.error(t("auth.required"), t("auth.required"), {
           id: "auth-unauthorized-redirect",
           duration: 5000,
         });
       }
       window.history.replaceState({}, "", window.location.pathname);
     }
-  }, [isLoading, status.authenticated, status.configured]);
+  }, [isLoading, status.authenticated, status.configured, t]);
 
   const refreshStatus = async () => {
     setIsLoading(true);
@@ -113,11 +119,22 @@ export default function AuthGate() {
       }
 
       const data = (await response.json()) as AuthStatus;
+      if (
+        data.authenticated &&
+        (data.preferred_locale === "en" || data.preferred_locale === "ar")
+      ) {
+        document.cookie = `${LOCALE_COOKIE_NAME}=${data.preferred_locale}; Path=/; Max-Age=31536000; SameSite=Lax`;
+        recordLocalizationSignal("locale_selected", {
+          locale: data.preferred_locale,
+          source: "account",
+        });
+      }
       trackEvent(MixpanelEvent.Auth_Status_Checked, {
         configured: Boolean(data.configured),
         authenticated: Boolean(data.authenticated),
         auth_disabled: false,
         role: data.role ?? null,
+        preferred_locale: data.preferred_locale ?? null,
       });
       setStatus({
         configured: Boolean(data.configured),
@@ -137,8 +154,8 @@ export default function AuthGate() {
         ),
       });
       notify.error(
-        "Could not load login",
-        "We could not connect to the login service. Please refresh and try again."
+        t("auth.unavailable"),
+        t("errors.network")
       );
     } finally {
       setIsLoading(false);
@@ -175,8 +192,8 @@ export default function AuthGate() {
         reason: "username_too_short",
       });
       notify.warning(
-        "Username too short",
-        "Your username must be at least 3 characters."
+        t("validation.required"),
+        t("auth.usernameTooShort")
       );
       return;
     }
@@ -187,8 +204,8 @@ export default function AuthGate() {
         reason: "password_too_short",
       });
       notify.warning(
-        "Password too short",
-        "Your password must be at least 6 characters."
+        t("validation.required"),
+        t("auth.passwordTooShort")
       );
       return;
     }
@@ -217,21 +234,25 @@ export default function AuthGate() {
       const payload = await response.json();
       if (!response.ok) {
         const detail = formatFastApiDetail(payload?.detail);
+        const localized = apiErrorLocalization(payload);
+        const safeMessage = localized
+          ? t(localized.key, localized.params)
+          : t("errors.unknown");
         trackEvent(MixpanelEvent.Auth_SignIn_Failed, {
           status_code: response.status,
           error_message: sanitizeAnalyticsError(detail, "Sign-in failed"),
         });
         if (response.status === 401) {
           notify.error(
-            "Sign-in failed",
+            t("auth.unauthorized"),
             detail === UNAUTHORIZED_DETAIL
-              ? "The username or password is incorrect. Please try again."
-              : detail
+              ? t("auth.unauthorized")
+              : safeMessage
           );
         } else {
           notify.error(
-            "Sign-in failed",
-            detail || "Something went wrong. Please try again."
+            t("errors.unknown"),
+            safeMessage
           );
         }
         return;
@@ -249,8 +270,8 @@ export default function AuthGate() {
       });
       setPassword("");
       notify.success(
-        "Signed in",
-        "Welcome back. Loading your workspace."
+        t("auth.submit"),
+        t("auth.signedIn")
       );
     } catch (submitError) {
       console.error(submitError);
@@ -262,8 +283,8 @@ export default function AuthGate() {
         ),
       });
       notify.error(
-        "Login unavailable",
-        "The login service is unavailable right now. Please try again in a moment."
+        t("auth.unavailable"),
+        t("auth.unavailable")
       );
     } finally {
       setIsSubmitting(false);
@@ -276,7 +297,7 @@ export default function AuthGate() {
     status.authenticated ||
     !hasMetSplashDuration
   ) {
-    return <PresentonSplashLoader message="Preparing your workspace..." />;
+    return <PresentonSplashLoader message={t("auth.checking")} />;
   }
 
   return (
@@ -295,23 +316,23 @@ export default function AuthGate() {
             </div>
             <div>
               <p className="font-syne text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7A5AF8]">
-                Secure instance
+                {t("auth.secureInstance")}
               </p>
               <h1 className="mt-1 font-unbounded text-xl font-normal leading-tight tracking-[-0.03em] text-black sm:text-[22px]">
-                Sign in to continue
+                {t("auth.title")}
               </h1>
             </div>
           </div>
         </div>
 
         <p className="max-w-md text-sm leading-relaxed text-[#6B7280]">
-          This deployment is protected. Enter your credentials to open the app.
+          {t("auth.protectedDescription")}
         </p>
 
         <form onSubmit={handleSubmit} className="mt-7 space-y-5">
           <div className="space-y-2">
             <label htmlFor="username" className="block text-sm font-medium text-[#374151]">
-              Username
+              {t("auth.username")}
             </label>
             <input
               id="username"
@@ -320,11 +341,11 @@ export default function AuthGate() {
               onChange={(event) =>
                 setUsername(event.target.value.replace(/\s/g, ""))
               }
-              placeholder="Username"
+              placeholder={t("auth.username")}
               minLength={3}
               maxLength={128}
               pattern="\S+"
-              title="Username cannot contain spaces"
+              title={t("auth.username")}
               required
               spellCheck={false}
               className="h-12 w-full rounded-lg border border-[#E1E1E5] bg-white px-4 text-sm text-[#191919] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#7A5AF8] focus:ring-2 focus:ring-[#7A5AF8]/15"
@@ -334,7 +355,7 @@ export default function AuthGate() {
 
           <div className="space-y-2">
             <label htmlFor="password" className="block text-sm font-medium text-[#374151]">
-              Password
+              {t("auth.password")}
             </label>
             <input
               id="password"
@@ -342,7 +363,7 @@ export default function AuthGate() {
               autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="Enter your password"
+              placeholder={t("auth.password")}
               minLength={6}
               maxLength={128}
               required
@@ -353,7 +374,7 @@ export default function AuthGate() {
 
           {status.configured ? (
             <p className="rounded-lg border border-[#EDEEEF] bg-white px-4 py-3 text-xs leading-relaxed text-[#6B7280]">
-              Use the username and password provided by your administrator.
+              {t("auth.administratorCredentials")}
             </p>
           ) : null}
 
@@ -362,7 +383,7 @@ export default function AuthGate() {
             disabled={isSubmitting}
             className="w-full rounded-[58px] border border-[#EDEEEF] bg-[#7C51F8] px-5 py-3 font-syne text-xs font-semibold text-white transition hover:bg-[#6d46e6] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSubmitting ? "Signing in…" : "Sign in"}
+            {isSubmitting ? t("auth.submitting") : t("auth.submit")}
           </button>
         </form>
       </section>

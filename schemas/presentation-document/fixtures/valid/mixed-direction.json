@@ -1,0 +1,109 @@
+{
+  "schemaVersion": "1.0.0",
+  "documentId": "00000000-0000-4000-8000-00000000006d",
+  "presentationId": "00000000-0000-4000-8000-00000000006e",
+  "title": "Bayanly — ملخص 2026",
+  "locale": "ar",
+  "baseDirection": "auto",
+  "aspectRatio": {
+    "width": 16,
+    "height": 9
+  },
+  "theme": {
+    "themeRef": "bayanly-default",
+    "colorTokens": [
+      {
+        "name": "primary",
+        "value": "#2563EB"
+      }
+    ],
+    "defaultBackground": "#FFFFFF"
+  },
+  "fontPolicy": {
+    "families": [
+      {
+        "id": "body",
+        "family": "Inter",
+        "fallbacks": [
+          "Arial",
+          "sans-serif"
+        ]
+      },
+      {
+        "id": "arabic-ui",
+        "family": "Noto Sans Arabic",
+        "fallbacks": [
+          "Tahoma",
+          "Arial"
+        ]
+      }
+    ],
+    "defaultBodyRef": "body",
+    "defaultHeadingRef": "body",
+    "allowSystemFallback": true
+  },
+  "metadata": {
+    "authoringIntent": "generated",
+    "sourceApplicationVersion": "0.9.3-beta"
+  },
+  "slides": [
+    {
+      "id": "00000000-0000-4000-8000-00000000006f",
+      "order": 0,
+      "semanticRole": "title",
+      "layoutIntent": "free",
+      "elements": [
+        {
+          "id": "00000000-0000-4000-8000-000000000070",
+          "type": "text",
+          "geometry": {
+            "x": 80,
+            "y": 80,
+            "width": 1120,
+            "height": 560,
+            "anchor": "top-start"
+          },
+          "zOrder": 0,
+          "paragraphs": [
+            {
+              "id": "00000000-0000-4000-8000-000000000071",
+              "direction": "auto",
+              "logicalAlignment": "start",
+              "runs": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000072",
+                  "text": "الإيرادات ",
+                  "language": "ar",
+                  "fontFamilyRef": "arabic-ui",
+                  "fontSize": 32,
+                  "color": "#111827"
+                },
+                {
+                  "id": "00000000-0000-4000-8000-000000000073",
+                  "text": "ARR +24%",
+                  "language": "en",
+                  "fontFamilyRef": "body",
+                  "fontSize": 32,
+                  "color": "#111827"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "assets": [],
+  "exportHints": {
+    "preferredAspect": "16:9",
+    "editablePreference": "preferred",
+    "includeNotes": false,
+    "rendererFallback": "legacy"
+  },
+  "compatibility": {
+    "sourceVersion": "canonical-v1",
+    "requiresLegacyRenderer": false,
+    "warnings": [],
+    "unsupportedFeatures": []
+  }
+}

@@ -18,7 +18,7 @@ async function importRenderer() {
   await build({
     absWorkingDir: projectRoot,
     bundle: true,
-    entryPoints: ["lib/template-v2-json-to-html.ts"],
+    entryPoints: ["./lib/template-v2-json-to-html.ts"],
     format: "esm",
     outfile,
     platform: "node",

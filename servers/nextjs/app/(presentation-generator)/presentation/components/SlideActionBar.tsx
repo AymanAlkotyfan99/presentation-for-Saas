@@ -41,6 +41,7 @@ import {
 } from "../../_shared/blank-slide";
 import NewSlide from "./NewSlide";
 import { MAX_NUMBER_OF_SLIDES } from "@/utils/presentationLimits";
+import { useTranslations } from "@/i18n/catalog";
 
 interface SlideActionBarProps {
   slide: any;
@@ -66,6 +67,7 @@ const SlideActionBar = ({
   onSlideSelected,
   revealOnGroupHover = false,
 }: SlideActionBarProps) => {
+  const t = useTranslations();
   const dispatch = useDispatch();
   const store = useStore();
   const pathname = usePathname();
@@ -121,8 +123,8 @@ const SlideActionBar = ({
 
   const notifySlideLimitReached = () => {
     notify.warning(
-      "Slide limit reached",
-      `You can have up to ${MAX_NUMBER_OF_SLIDES} slides.`
+      t("editor.slideLimitReached"),
+      t("editor.slideLimitDescription", { count: MAX_NUMBER_OF_SLIDES })
     );
   };
 
@@ -134,8 +136,8 @@ const SlideActionBar = ({
 
     if (!templateId) {
       notify.error(
-        "Could not add blank slide",
-        "This slide does not have a template context."
+        t("editor.blankSlideFailed"),
+        t("editor.templateContextMissing")
       );
       return;
     }
@@ -265,8 +267,8 @@ const SlideActionBar = ({
 
     if (!templateId) {
       notify.error(
-        "Could not open templates",
-        "This slide does not have a template context."
+        t("editor.openTemplatesFailed"),
+        t("editor.templateContextMissing")
       );
       return;
     }
@@ -324,7 +326,7 @@ const SlideActionBar = ({
               hasReachedSlideLimit && "cursor-not-allowed opacity-50"
             )}
           >
-            <span>Blank</span>
+            <span>{t("editor.blankSlide")}</span>
             <Plus className="h-4 w-4" strokeWidth={2.4} />
           </button>
 
@@ -341,7 +343,7 @@ const SlideActionBar = ({
                   hasReachedSlideLimit && "cursor-not-allowed opacity-50"
                 )}
               >
-                <span>Use Template</span>
+                <span>{t("editor.useTemplate")}</span>
                 <Plus className="h-4 w-4" strokeWidth={2.4} />
               </button>
             </>
@@ -356,7 +358,7 @@ const SlideActionBar = ({
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  aria-label="Speaker notes"
+                  aria-label={t("editor.speakerNotes")}
                   className={cn(
                     "flex h-8 w-10 shrink-0 items-center justify-center rounded-[6px] text-[#050505] transition-colors hover:bg-[#F7F6F9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5141e5]",
                     isSpeakerPopoverOpen && "bg-[#F7F6F9]"
@@ -377,12 +379,12 @@ const SlideActionBar = ({
               >
                 <div className="border-b border-[#EDEEEF] px-5 py-4">
                   <p className="text-sm font-semibold text-[#191919]">
-                    Speaker notes
+                    {t("editor.speakerNotes")}
                   </p>
                 </div>
                 <div className="p-5">
                   <div className="max-h-[240px] min-h-[108px] overflow-auto whitespace-pre-wrap rounded-[12px] border border-[#EDEEEF] bg-[#FAFAFB] p-4 text-sm leading-relaxed text-[#333333]">
-                    {speakerNote || "No speaker notes for this slide."}
+                    {speakerNote || t("editor.noSpeakerNotes")}
                   </div>
                 </div>
               </PopoverContent>
@@ -397,7 +399,7 @@ const SlideActionBar = ({
             <DropdownMenu.Trigger asChild>
               <button
                 type="button"
-                aria-label="Slide actions"
+                aria-label={t("editor.slideActions")}
                 className={cn(
                   "flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] text-[#050505] transition-colors hover:bg-[#F7F6F9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5141e5]",
                   isSlideMenuOpen && "bg-[#F7F6F9]"
@@ -419,7 +421,7 @@ const SlideActionBar = ({
                   onSelect={handleDuplicateSlide}
                 >
                   <Copy className="h-4 w-4 shrink-0 text-current" />
-                  <span>Duplicate Slide</span>
+                  <span>{t("editor.duplicateSlide")}</span>
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
                   disabled={currentIndex <= 0}
@@ -427,7 +429,7 @@ const SlideActionBar = ({
                   onSelect={() => handleMoveSlide(currentIndex - 1)}
                 >
                   <ArrowUp className="h-4 w-4 shrink-0 text-current" />
-                  <span>Move Up</span>
+                  <span>{t("editor.moveUp")}</span>
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
                   disabled={currentIndex >= slideCount - 1}
@@ -435,7 +437,7 @@ const SlideActionBar = ({
                   onSelect={() => handleMoveSlide(currentIndex + 1)}
                 >
                   <ArrowDown className="h-4 w-4 shrink-0 text-current" />
-                  <span>Move Down</span>
+                  <span>{t("editor.moveDown")}</span>
                 </DropdownMenu.Item>
                 <DropdownMenu.Separator className="my-2 h-px bg-[#EDEEEF]" />
                 <DropdownMenu.Item
@@ -443,7 +445,7 @@ const SlideActionBar = ({
                   onSelect={handleDeleteSlide}
                 >
                   <Trash2 className="h-4 w-4 shrink-0 text-current" />
-                  <span>Delete Slide</span>
+                  <span>{t("editor.deleteSlide")}</span>
                 </DropdownMenu.Item>
               </DropdownMenu.Content>
             </DropdownMenu.Portal>

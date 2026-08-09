@@ -62,6 +62,7 @@ import {
   preventInvalidNumberInput,
   sanitizeNumericInput,
 } from "@/components/slide-editor/toolbar/numericInput";
+import { useTranslations } from "@/i18n/catalog";
 
 const EMPTY_TEMPLATE_FONTS: TemplateFontOption[] = [];
 
@@ -153,6 +154,7 @@ export function TextToolbar({
   onChange: (index: number, element: TextSlideElement) => void;
   onListMarkerChange?: (marker: Marker) => void;
 }) {
+  const t = useTranslations();
   const activeSelectionRange = normalizedTextSelectionRange(
     selectionRange,
     textRunsContent(element.runs).length,
@@ -427,8 +429,8 @@ export function TextToolbar({
           <Divider />
           <div style={textToolbarStyles.fontSizeControl}>
             <input
-              aria-label="Font size"
-              title="Font size"
+              aria-label={t("editor.fontSize")}
+              title={t("editor.fontSize")}
               type="text"
               inputMode={numericInputMode(fontSizeInputOptions)}
               value={fontSizeDraft}
@@ -471,8 +473,8 @@ export function TextToolbar({
             <span style={textToolbarStyles.fontSizeStepper}>
               <button
                 type="button"
-                aria-label="Increase font size"
-                title="Increase font size"
+                aria-label={t("editor.increaseFontSize")}
+                title={t("editor.increaseFontSize")}
                 onClick={() => stepFontSize(1)}
                 style={textToolbarStyles.fontSizeStepButton}
               >
@@ -480,8 +482,8 @@ export function TextToolbar({
               </button>
               <button
                 type="button"
-                aria-label="Decrease font size"
-                title="Decrease font size"
+                aria-label={t("editor.decreaseFontSize")}
+                title={t("editor.decreaseFontSize")}
                 onClick={() => stepFontSize(-1)}
                 style={textToolbarStyles.fontSizeStepButton}
               >
@@ -491,8 +493,8 @@ export function TextToolbar({
           </div>
           <Divider />
           <label
-            aria-label="Text color"
-            title="Text color"
+            aria-label={t("editor.textColor")}
+            title={t("editor.textColor")}
             style={textToolbarStyles.colorControl}
             onMouseEnter={() => setHoveredControl("color")}
             onMouseLeave={() => setHoveredControl(null)}
@@ -505,7 +507,7 @@ export function TextToolbar({
               }}
             />
             <DeferredColorInput
-              aria-label="Text color"
+              aria-label={t("editor.textColor")}
               value={font.color}
               onCommit={(color) => updateFont({ color })}
               style={textToolbarStyles.hiddenInput}
@@ -514,7 +516,7 @@ export function TextToolbar({
           <Divider />
           <div style={textToolbarStyles.modeGroup}>
             <ToolbarButton
-              title="Bold"
+              title={t("editor.bold")}
               controlId="bold"
               hoveredControl={hoveredControl}
               pressed={font.bold ?? false}
@@ -524,7 +526,7 @@ export function TextToolbar({
               <Bold size={18} strokeWidth={2.25} aria-hidden="true" />
             </ToolbarButton>
             <ToolbarButton
-              title="Italic"
+              title={t("editor.italic")}
               controlId="italic"
               hoveredControl={hoveredControl}
               pressed={font.italic ?? false}
@@ -534,7 +536,7 @@ export function TextToolbar({
               <Italic size={18} strokeWidth={2.25} aria-hidden="true" />
             </ToolbarButton>
             <ToolbarButton
-              title="Underline"
+              title={t("editor.underline")}
               controlId="underline"
               hoveredControl={hoveredControl}
               pressed={font.underline ?? false}
@@ -548,8 +550,8 @@ export function TextToolbar({
             <ToolbarButton
               title={
                 disableAlignment
-                  ? "Alignment is unavailable for list text"
-                  : "Horizontal alignment"
+                  ? t("editor.alignmentUnavailableForList")
+                  : t("editor.horizontalAlignment")
               }
               controlId="horizontal-alignment"
               disabled={disableAlignment}
@@ -578,7 +580,7 @@ export function TextToolbar({
             <>
               <div style={textToolbarStyles.settingsControlWrap}>
                 <ToolbarButton
-                  title="List marker"
+                  title={t("editor.listMarker")}
                   controlId="list-marker"
                   hoveredControl={hoveredControl}
                   pressed={openPanel === "marker"}
@@ -610,7 +612,7 @@ export function TextToolbar({
           ) : null}
           <div style={textToolbarStyles.settingsControlWrap}>
             <ToolbarButton
-              title="Settings"
+              title={t("editor.settings")}
               controlId="settings"
               hoveredControl={hoveredControl}
               setHoveredControl={setHoveredControl}
@@ -725,6 +727,7 @@ function FontFamilyPicker({
   googleFonts: GoogleFontOption[];
   onSelect: (family: string) => void;
 }) {
+  const t = useTranslations();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(selectedFamily);
   const [searching, setSearching] = useState(false);
@@ -837,10 +840,10 @@ function FontFamilyPicker({
     [activeFamilies, hasSearchQuery, normalizedQuery, searchFamilies],
   );
   const activeTitle = hasSearchQuery
-    ? "All Fonts"
+    ? t("editor.allFonts")
     : activeSource === "template" && templateFamilies.length > 0
-      ? "Template Fonts"
-      : "Google Fonts";
+      ? t("editor.templateFonts")
+      : t("editor.googleFonts");
   const swapFontSource = () => {
     setSearching(false);
     setQuery(selectedFamily);
@@ -872,10 +875,10 @@ function FontFamilyPicker({
     >
       <button
         type="button"
-        aria-label="Font family"
+        aria-label={t("editor.fontFamily")}
         aria-haspopup="listbox"
         aria-expanded={open}
-        title="Font family"
+        title={t("editor.fontFamily")}
         style={textToolbarStyles.fontTrigger}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={(event) => {
@@ -893,7 +896,7 @@ function FontFamilyPicker({
         <FloatingToolbarPanel
           ref={menuPanelRef}
           role="listbox"
-          aria-label="Font family"
+          aria-label={t("editor.fontFamily")}
           style={textToolbarStyles.fontMenu}
           onWheel={(event) => event.stopPropagation()}
           onScroll={(event) => event.stopPropagation()}
@@ -903,7 +906,7 @@ function FontFamilyPicker({
             <input
               ref={searchInputRef}
               data-font-search-input="true"
-              aria-label="Search fonts"
+              aria-label={t("editor.searchFonts")}
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
@@ -919,8 +922,8 @@ function FontFamilyPicker({
             />
             <button
               type="button"
-              aria-label="Clear font search"
-              title="Clear"
+              aria-label={t("editor.clearFontSearch")}
+              title={t("editor.clearFontSearch")}
               style={textToolbarStyles.fontSearchClear}
               onClick={() => {
                 setQuery("");
@@ -958,6 +961,7 @@ function FontMenuSection({
   onSelect: (family: string) => void;
   onSwap: () => void;
 }) {
+  const t = useTranslations();
   const optionsRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const viewportRows = Math.min(families.length, FONT_MENU_MAX_VISIBLE_ROWS);
@@ -986,8 +990,8 @@ function FontMenuSection({
         <span>{title}</span>
         <button
           type="button"
-          aria-label="Swap font source"
-          title="Swap font source"
+          aria-label={t("editor.swapFontSource")}
+          title={t("editor.swapFontSource")}
           style={textToolbarStyles.fontSourceSwapButton}
           onMouseDown={(event) => event.preventDefault()}
           onClick={onSwap}
@@ -1004,7 +1008,9 @@ function FontMenuSection({
         onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
       >
         {families.length === 0 ? (
-          <div style={textToolbarStyles.fontMenuEmpty}>No fonts</div>
+          <div style={textToolbarStyles.fontMenuEmpty}>
+            {t("editor.noFonts")}
+          </div>
         ) : (
           <div
             style={{
@@ -1091,6 +1097,7 @@ function TextSettingsPanel({
   onLetterSpacingChange: (value: number) => void;
   onLineHeightChange: (value: number) => void;
 }) {
+  const t = useTranslations();
   return (
     <FloatingToolbarPanel
       data-inline-edit-ignore="true"
@@ -1098,7 +1105,7 @@ function TextSettingsPanel({
       onMouseDown={(event) => event.stopPropagation()}
     >
       <SettingsSliderRow
-        label="Opacity"
+        label={t("editor.opacity")}
         icon={<OpacityIcon />}
         value={opacity}
         valueLabel={formatOpacity(opacity)}
@@ -1108,7 +1115,7 @@ function TextSettingsPanel({
         onChange={onOpacityChange}
       />
       <SettingsSliderRow
-        label="Letter spacing"
+        label={t("editor.letterSpacing")}
         icon={<LetterSpacingIcon />}
         value={letterSpacing}
         valueLabel={formatSettingsLetterSpacing(letterSpacing)}
@@ -1118,7 +1125,7 @@ function TextSettingsPanel({
         onChange={onLetterSpacingChange}
       />
       <SettingsSliderRow
-        label="Line height"
+        label={t("editor.lineHeight")}
         icon={<LineHeightIcon />}
         value={lineHeight}
         valueLabel={formatLineHeight(lineHeight)}
@@ -1138,29 +1145,30 @@ function ListMarkerPanel({
   marker: Marker;
   onChange: (marker: Marker) => void;
 }) {
+  const t = useTranslations();
   return (
     <FloatingToolbarPanel
-      aria-label="List marker"
+      aria-label={t("editor.listMarker")}
       style={textToolbarStyles.markerPanel}
       onMouseDown={(event) => event.stopPropagation()}
     >
       <div style={textToolbarStyles.settingsBulletActions}>
         <SettingsPanelButton
-          label="Bullet list"
+          label={t("editor.bulletList")}
           pressed={marker === "bullet"}
           onClick={() => onChange("bullet")}
         >
           <List size={19} strokeWidth={2.2} aria-hidden="true" />
         </SettingsPanelButton>
         <SettingsPanelButton
-          label="Numbered list"
+          label={t("editor.numberedList")}
           pressed={marker === "number"}
           onClick={() => onChange("number")}
         >
           <ListOrdered size={19} strokeWidth={2.2} aria-hidden="true" />
         </SettingsPanelButton>
         <SettingsPanelButton
-          label="No list"
+          label={t("editor.noList")}
           pressed={marker === "none"}
           onClick={() => onChange("none")}
         >

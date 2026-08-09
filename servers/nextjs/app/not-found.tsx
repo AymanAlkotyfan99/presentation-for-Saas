@@ -1,13 +1,11 @@
-import type { Metadata } from "next";
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { DISPLAY_PRODUCT } from "@/lib/product-metadata";
-
-export const metadata: Metadata = {
-  title: `Page not found | ${DISPLAY_PRODUCT.shortName}`,
-};
+import { useTranslations } from "@/i18n/catalog";
 
 export default function NotFound() {
+  const t = useTranslations();
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100 p-6 text-center">
       <div className="mx-auto w-full max-w-lg rounded-lg bg-white p-8 shadow-md">
@@ -18,22 +16,21 @@ export default function NotFound() {
           404
         </div>
         <h1 className="mb-4 font-syne text-2xl font-bold text-gray-800 sm:text-3xl">
-          Oops! Page Not Found
+          {t("errors.notFoundTitle")}
         </h1>
         <p className="mb-4 text-base text-gray-600 sm:text-lg">
-          It seems you&apos;ve found a page that doesn&apos;t exist. But don&apos;t worry, every
-          great presentation starts with a blank slide!
+          {t("errors.notFoundDescription")}
         </p>
 
         <div className="mb-8 flex flex-col justify-center gap-3 sm:flex-row sm:space-x-4">
           <Link href="/dashboard" className="inline-flex sm:flex-1 sm:justify-center">
             <Button className="w-full rounded-md bg-indigo-600 px-6 py-2 text-white hover:bg-indigo-700 sm:w-auto">
-              Go to Homepage
+              {t("navigation.dashboard")}
             </Button>
           </Link>
           <Link href="/" className="inline-flex sm:flex-1 sm:justify-center">
             <Button className="w-full rounded-md bg-gray-600 px-6 py-2 text-white hover:bg-gray-700 sm:w-auto">
-              Back to start
+              {t("common.back")}
             </Button>
           </Link>
         </div>

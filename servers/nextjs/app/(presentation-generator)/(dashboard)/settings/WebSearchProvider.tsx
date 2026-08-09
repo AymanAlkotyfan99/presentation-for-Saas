@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { LLMConfig } from "@/types/llm_config";
 import { WEB_SEARCH_PROVIDERS } from "@/utils/providerConstants";
 import { MixpanelEvent, trackEvent } from "@/utils/mixpanel";
+import { useTranslations } from "@/i18n/catalog";
 
 const EXTERNAL_WEB_SEARCH_OPTIONS = [
   "exa",
@@ -37,6 +38,7 @@ const WebSearchProvider = ({
   llmConfig: LLMConfig;
   setLlmConfig: React.Dispatch<React.SetStateAction<LLMConfig>>;
 }) => {
+  const t = useTranslations();
   const [showApiKey, setShowApiKey] = useState(false);
   const [openProviderSelect, setOpenProviderSelect] = useState(false);
   const isWebSearchEnabled = !!llmConfig.WEB_GROUNDING;
@@ -64,6 +66,7 @@ const WebSearchProvider = ({
       <div className="mb-4 rounded-[12px] bg-white p-10 pt-5">
         <div className="mb-6 flex justify-end">
           <Switch
+            aria-label={t("settings.toggleWebSearch")}
             checked={isWebSearchEnabled}
             className="data-[state=checked]:bg-[#4791FF] data-[state=unchecked]:bg-gray-400"
             onCheckedChange={(checked) => {
@@ -82,16 +85,16 @@ const WebSearchProvider = ({
               <Search className="h-7 w-7 text-[#5146E5]" />
             </div>
             <h3 className="py-2.5 text-xl font-normal text-[#191919]">
-              Web Search Settings
+              {t("settings.webSearchSettings")}
             </h3>
             <p className="text-sm text-gray-500">
-              Choose a provider to enable web search, or leave it disabled.
+              {t("settings.webSearchDescription")}
             </p>
           </div>
           {isWebSearchEnabled && <div className="w-full max-w-[720px] space-y-4">
-                <div className="ml-auto w-[222px]">
+                <div className="ms-auto w-[222px]">
                   <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Provider
+                    {t("settings.provider")}
                   </label>
                   <div className="w-full">
                     <Popover open={openProviderSelect} onOpenChange={setOpenProviderSelect}>
@@ -105,16 +108,16 @@ const WebSearchProvider = ({
                           <span className="truncate text-sm font-medium text-gray-900">
                             {selected
                               ? WEB_SEARCH_PROVIDERS[selected]?.label || selected
-                              : "Select web search provider"}
+                              : t("onboarding.selectWebSearchProvider")}
                           </span>
                           <ChevronUp className="h-4 w-4 text-gray-500" />
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="p-0" align="start" style={{ width: "320px" }}>
                         <Command>
-                          <CommandInput placeholder="Search provider..." />
+                          <CommandInput placeholder={t("onboarding.searchProvider")} />
                           <CommandList>
-                            <CommandEmpty>No provider found.</CommandEmpty>
+                            <CommandEmpty>{t("onboarding.noProvider")}</CommandEmpty>
                             <CommandGroup>
                               {WEB_SEARCH_PROVIDER_OPTIONS.map((option) => (
                                 <CommandItem
@@ -133,8 +136,8 @@ const WebSearchProvider = ({
                                   <Check
                                     className={
                                       selected === option.value
-                                        ? "mr-2 h-4 w-4 opacity-100"
-                                        : "mr-2 h-4 w-4 opacity-0"
+                                        ? "me-2 h-4 w-4 opacity-100"
+                                        : "me-2 h-4 w-4 opacity-0"
                                     }
                                   />
                                   <div className="flex flex-1 flex-col space-y-1">
@@ -142,7 +145,9 @@ const WebSearchProvider = ({
                                       {option.label}
                                     </span>
                                     <span className="text-xs leading-relaxed text-gray-600">
-                                      {option.description}
+                                      {option.value === "auto"
+                                        ? t("settings.automaticWebSearch")
+                                        : t("settings.connectProviderDescription")}
                                     </span>
                                   </div>
                                 </CommandItem>
@@ -157,15 +162,14 @@ const WebSearchProvider = ({
 
                 {selected === "auto" && (
                   <div className="rounded-lg border border-[#D9D6FE] bg-[#F4F3FF] p-3 text-xs text-[#5146E5]">
-                    Model-native web grounding is preferred when available.
-                    Otherwise, external search fallback is used.
+                    {t("settings.automaticWebSearch")}
                   </div>
                 )}
 
                 {provider?.urlField && (
                   <div>
                     <label className="mb-2 block text-sm font-medium text-[#4C5554]">
-                      {provider.urlLabel}
+                      {t("settings.baseUrl", { provider: provider.label })}
                     </label>
                     <input
                       type="url"
@@ -185,12 +189,12 @@ const WebSearchProvider = ({
                 {provider?.apiKeyField && (
                   <div>
                     <label className="mb-2 block text-sm font-medium text-[#4C5554]">
-                      {provider.apiKeyLabel}
+                      {t("settings.providerApiKey", { provider: provider.label })}
                     </label>
                     <div className="relative">
                       <input
                         type={showApiKey ? "text" : "password"}
-                        className="h-12 w-full rounded-lg border border-gray-300 px-4 pr-12 text-sm text-[#191919] outline-none transition-colors focus:border-blue-500"
+                        className="h-12 w-full rounded-lg border border-gray-300 px-4 pe-12 text-sm text-[#191919] outline-none transition-colors focus:border-blue-500"
                         value={getValue(provider.apiKeyField)}
                         onChange={(event) =>
                           update(
@@ -201,8 +205,9 @@ const WebSearchProvider = ({
                       />
                       <button
                         type="button"
-                        className="absolute right-3 top-1/2 -translate-y-1/2"
+                        className="absolute end-3 top-1/2 -translate-y-1/2"
                         onClick={() => setShowApiKey((value) => !value)}
+                        aria-label={showApiKey ? t("accessibility.hidePassword") : t("accessibility.showPassword")}
                       >
                         {showApiKey ? (
                           <Eye className="h-4 w-4 text-gray-500" />
@@ -217,7 +222,7 @@ const WebSearchProvider = ({
                 {selected && selected !== "auto" && (
                   <div>
                     <label className="mb-2 block text-sm font-medium text-[#4C5554]">
-                      Maximum results
+                      {t("settings.maximumResults")}
                     </label>
                     <input
                       type="number"
