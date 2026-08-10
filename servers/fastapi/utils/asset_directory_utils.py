@@ -14,13 +14,17 @@ from api.v1.auth.assets import (
     is_app_data_path_authorized,
     normalized_app_data_parts,
 )
-from api.v1.auth.context import get_current_owner_id, get_current_owner_is_admin
+from api.v1.auth.context import get_current_owner_id, get_current_owner_is_admin, get_current_workspace_id
+from utils.architecture_flags import workspace_rbac_enforcement_enabled
 
 
 def _owned_directory(root_name: str) -> str:
     directory = os.path.join(get_app_data_directory_env(), root_name)
     owner_id = get_current_owner_id()
-    if owner_id is not None:
+    workspace_id = get_current_workspace_id()
+    if workspace_rbac_enforcement_enabled() and workspace_id is not None:
+        directory = os.path.join(directory, "workspaces", str(workspace_id))
+    elif owner_id is not None:
         directory = os.path.join(directory, "users", str(owner_id))
     os.makedirs(directory, exist_ok=True)
     return directory
@@ -154,7 +158,8 @@ def _existing_file_within(candidate: str, root: str) -> Optional[str]:
 
 def _app_data_url_allowed(path: str) -> bool:
     owner_id = get_current_owner_id()
-    if owner_id is None:
+    workspace_id = get_current_workspace_id()
+    if owner_id is None and workspace_id is None:
         parts = normalized_app_data_parts(path)
         return bool(
             parts
@@ -167,6 +172,7 @@ def _app_data_url_allowed(path: str) -> bool:
         path,
         user_id=owner_id,
         is_admin=get_current_owner_is_admin(),
+        workspace_id=workspace_id if workspace_rbac_enforcement_enabled() else None,
     )
 
 

@@ -90,6 +90,7 @@ from utils.icon_weights import DEFAULT_ICON_TYPE, extract_icon_type_from_setting
 from utils.llm_utils import message_content_to_text
 from utils.sse import safe_sse_stream
 from api.v1.auth.config import SESSION_COOKIE_NAME
+from modules.workspaces.application.authorization import resource_scope_predicate
 from utils.web_search import get_selected_web_search_provider, get_web_search_route
 from utils.architecture_flags import (
     architecture_facades_enabled,
@@ -97,8 +98,9 @@ from utils.architecture_flags import (
     legacy_v1_writes_enabled,
     require_legacy_v1_read,
     require_legacy_v1_write,
+    workspace_rbac_enforcement_enabled,
 )
-from api.v1.auth.context import get_current_owner_id
+from api.v1.auth.context import get_current_owner_id, get_current_workspace_id
 from models.presentation_layout import PresentationLayoutModel, SlideLayoutModel
 from modules.presentations import (
     delete_presentation_record,
@@ -1843,7 +1845,7 @@ async def stream_presentation(
         await sql_session.execute(
             delete(SlideModel).where(
                 SlideModel.presentation == id,
-                SlideModel.owner_id == get_current_owner_id(),
+                resource_scope_predicate(SlideModel),
             )
         )
         await sql_session.commit()
@@ -1925,7 +1927,7 @@ async def update_presentation(
         await sql_session.execute(
             delete(SlideModel).where(
                 SlideModel.presentation == presentation.id,
-                SlideModel.owner_id == get_current_owner_id(),
+                resource_scope_predicate(SlideModel),
             )
         )
         sql_session.add_all(slides)
@@ -2443,9 +2445,20 @@ async def generate_presentation_handler(
         await sql_session.commit()
 
         if async_status:
+            # Pin the durable source immediately after the generated resource
+            # exists. Any edit racing the remaining export phase makes the job
+            # stale instead of allowing a late result to overwrite user work.
+            async_status.presentation_id = presentation.id
+            async_status.source_revision = presentation.current_revision
+            async_status.actor_id = presentation.owner_id
+            async_status.workspace_id = presentation.workspace_id
             async_status.message = "Exporting presentation"
             async_status.updated_at = datetime.now()
             sql_session.add(async_status)
+            await sql_session.commit()
+
+            from modules.presentations.revision_service import assert_task_revision_current
+            await assert_task_revision_current(sql_session, async_status)
 
         # 9. Export
         presentation_and_path = await export_presentation(
@@ -2545,6 +2558,13 @@ async def _run_generate_presentation_task(
                 task_id,
             )
             return
+        if workspace_rbac_enforcement_enabled():
+            if async_status.presentation_id != presentation_id or async_status.resource_id != str(presentation_id):
+                logger.warning("[presentation.generate.async] task resource mismatch task_id=%s", task_id)
+                return
+            if async_status.workspace_id != get_current_workspace_id():
+                logger.warning("[presentation.generate.async] task workspace mismatch task_id=%s", task_id)
+                return
 
         async_status.status = AsyncTaskStatus.PENDING
         async_status.message = "Starting presentation generation"
@@ -2577,6 +2597,9 @@ async def generate_presentation_async(
 
         async_status = AsyncTaskModel(
             type=ASYNC_TASK_TYPE_PRESENTATION_GENERATE,
+            presentation_id=presentation_id,
+            resource_id=str(presentation_id),
+            actor_id=get_current_owner_id(),
             status=AsyncTaskStatus.PENDING,
             message="Queued for generation",
             data=_presentation_task_progress_data(
@@ -2650,7 +2673,7 @@ async def edit_presentation_with_new_content(
     await sql_session.execute(
         delete(SlideModel).where(
             SlideModel.id.in_(slides_to_delete),
-            SlideModel.owner_id == get_current_owner_id(),
+            resource_scope_predicate(SlideModel),
         )
     )
 

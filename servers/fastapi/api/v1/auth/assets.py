@@ -46,10 +46,11 @@ def normalized_app_data_parts(path_or_uri: str) -> tuple[str, ...] | None:
 def is_app_data_path_authorized(
     path_or_uri: str,
     *,
-    user_id: uuid.UUID,
+    user_id: uuid.UUID | None,
     is_admin: bool,
+    workspace_id: uuid.UUID | None = None,
 ) -> bool:
-    """Authorize a browser-visible app_data path for one authenticated user."""
+    """Authorize a browser-visible path for a user or validated workspace."""
     parts = normalized_app_data_parts(path_or_uri)
     if not parts:
         return False
@@ -61,9 +62,16 @@ def is_app_data_path_authorized(
         return False
 
     relative_parts = parts[1:]
+    if relative_parts[0] == "workspaces":
+        return (
+            workspace_id is not None
+            and len(relative_parts) >= 3
+            and relative_parts[1] == str(workspace_id)
+        )
     if relative_parts[0] == "users":
         return (
-            len(relative_parts) >= 3
+            user_id is not None
+            and len(relative_parts) >= 3
             and relative_parts[1] == str(user_id)
         )
 

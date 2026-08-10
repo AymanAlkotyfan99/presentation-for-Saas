@@ -9,7 +9,7 @@ from sqlalchemy import CheckConstraint, Column, DateTime, Enum as SAEnum, Foreig
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
 
-from api.v1.auth.context import get_current_owner_id
+from api.v1.auth.context import get_current_owner_id, get_current_workspace_id
 from utils.datetime_utils import get_current_utc_datetime
 
 
@@ -56,6 +56,10 @@ class PresentationDocumentModel(SQLModel, table=True):
         default_factory=get_current_owner_id,
         exclude=True,
         sa_column=Column(ForeignKey("user.id", ondelete="CASCADE"), nullable=True, index=True),
+    )
+    workspace_id: Optional[UUID] = Field(
+        default_factory=get_current_workspace_id,
+        sa_column=Column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True),
     )
     schema_version: str = Field(sa_column=Column(String(16), nullable=False))
     document: Optional[dict[str, Any]] = Field(default=None, sa_column=Column(DOCUMENT_JSON, nullable=True))

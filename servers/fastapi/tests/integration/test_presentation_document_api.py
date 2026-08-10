@@ -9,9 +9,11 @@ from starlette.responses import JSONResponse
 from api.middlewares import SessionAuthMiddleware
 from api.operation_security import reset_operation_control_backend
 from api.v1.ppt.endpoints.presentation_document import PRESENTATION_DOCUMENT_ROUTER
+from api.v1.ppt.endpoints.presentation_revisions import PRESENTATION_REVISIONS_ROUTER
 from models.sql.image_asset import ImageAsset
 from models.sql.presentation import PresentationModel, PresentationVersion
 from models.sql.presentation_document import PresentationDocumentModel
+from models.sql.presentation_revision import PresentationRevisionModel, PresentationRevisionPatchModel
 from models.sql.slide import SlideModel
 from services.database import get_async_session
 from utils.api_errors import StableAPIError
@@ -27,6 +29,8 @@ def _client(tmp_path, presentation_id):
             await connection.run_sync(SlideModel.__table__.create)
             await connection.run_sync(ImageAsset.__table__.create)
             await connection.run_sync(PresentationDocumentModel.__table__.create)
+            await connection.run_sync(PresentationRevisionModel.__table__.create)
+            await connection.run_sync(PresentationRevisionPatchModel.__table__.create)
         async with sessions() as session:
             session.add(PresentationModel(
                 id=presentation_id,
@@ -57,6 +61,7 @@ def _client(tmp_path, presentation_id):
 
     app = FastAPI()
     app.include_router(PRESENTATION_DOCUMENT_ROUTER, prefix="/api/v1/ppt")
+    app.include_router(PRESENTATION_REVISIONS_ROUTER, prefix="/api/v1/ppt")
     app.dependency_overrides[get_async_session] = override_session
 
     @app.exception_handler(StableAPIError)
@@ -158,3 +163,63 @@ def test_canonical_api_preview_flags_revision_and_asset_ownership(monkeypatch, t
 def test_canonical_routes_are_session_protected():
     middleware = object.__new__(SessionAuthMiddleware)
     assert middleware._requires_auth("/api/v1/ppt/presentations/00000000-0000-4000-8000-000000000001/document") is True
+
+
+def test_revision_api_command_idempotency_conflict_history_and_restore(monkeypatch, tmp_path):
+    monkeypatch.setenv("ENVIRONMENT", "test")
+    monkeypatch.setenv("SECURITY_CONTROL_BACKEND", "memory")
+    monkeypatch.setenv("CANONICAL_DOCUMENT_WRITES_ENABLED", "true")
+    monkeypatch.setenv("CANONICAL_DOCUMENT_READS_ENABLED", "true")
+    monkeypatch.setenv("REVISION_WRITES_ENABLED", "true")
+    monkeypatch.setenv("VERSION_HISTORY_ENABLED", "true")
+    presentation_id = uuid4()
+    monkeypatch.setenv("CANONICAL_INTERNAL_COHORT", f"presentation:{presentation_id}")
+    client, engine, _sessions = _client(tmp_path, presentation_id)
+
+    converted = client.post(f"/api/v1/ppt/presentations/{presentation_id}/document/convert")
+    assert converted.status_code == 200
+    assert converted.json()["revision"] == 1
+    slide_id = converted.json()["document"]["slides"][0]["id"]
+    body = {
+        "baseRevision": 1,
+        "commands": [{
+            "commandId": "api:title-1", "type": "UPDATE_SLIDE",
+            "targetIds": [slide_id], "payload": {"changes": {"title": "Saved by command"}},
+        }],
+    }
+    headers = {"If-Match": '"1"', "Idempotency-Key": "api-save-1"}
+    saved = client.patch(f"/api/v1/ppt/presentations/{presentation_id}/revisions", headers=headers, json=body)
+    assert saved.status_code == 200
+    assert saved.json()["revision"] == 2
+    assert saved.json()["document"]["slides"][0]["title"] == "Saved by command"
+    assert saved.headers["etag"] == '"2"'
+
+    replay = client.patch(f"/api/v1/ppt/presentations/{presentation_id}/revisions", headers=headers, json=body)
+    assert replay.status_code == 200
+    assert replay.json()["replayed"] is True
+    assert replay.json()["revision"] == 2
+
+    stale_body = {**body, "commands": [{**body["commands"][0], "commandId": "api:title-stale"}]}
+    stale = client.patch(
+        f"/api/v1/ppt/presentations/{presentation_id}/revisions",
+        headers={"If-Match": '"1"', "Idempotency-Key": "api-save-stale"}, json=stale_body,
+    )
+    assert stale.status_code == 409
+    assert stale.json()["code"] == "REVISION_CONFLICT"
+    assert stale.json()["params"]["currentRevision"] == 2
+
+    history = client.get(f"/api/v1/ppt/presentations/{presentation_id}/revisions")
+    assert [item["revision"] for item in history.json()] == [2, 1]
+    restored = client.post(
+        f"/api/v1/ppt/presentations/{presentation_id}/revisions/1/restore",
+        headers={"If-Match": '"2"', "Idempotency-Key": "api-restore-1"},
+        json={"baseRevision": 2},
+    )
+    assert restored.status_code == 200
+    assert restored.json()["revision"] == 3
+    assert restored.json()["restoredFromRevision"] == 1
+    assert restored.json()["document"]["slides"][0].get("title") != "Saved by command"
+
+    client.close()
+    asyncio.run(reset_operation_control_backend())
+    asyncio.run(engine.dispose())

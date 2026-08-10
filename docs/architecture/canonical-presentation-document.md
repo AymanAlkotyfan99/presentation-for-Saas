@@ -85,3 +85,9 @@ revision sequence; transient restore snapshots are not a persistence format.
 Sprint 9 replaces private path
 mappings with object-storage identities. Sprint 16 validates export capability
 hints; Sprint 5 does not enable or promise the current exporter.
+
+Sprint 6 persists validated Sprint 5 commands as immutable patches and
+materializes the next canonical document in the same transaction. Sprint 7
+binds that same document, its revisions, and patches to the parent
+presentation workspace. Workspace selection, membership, role, and editor UI
+state remain outside canonical JSON.

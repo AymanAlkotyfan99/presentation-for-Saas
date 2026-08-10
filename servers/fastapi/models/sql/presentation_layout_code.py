@@ -6,7 +6,7 @@ from sqlalchemy import JSON, Column, DateTime, ForeignKey, Text
 from sqlmodel import Field, SQLModel
 
 from utils.datetime_utils import get_current_utc_datetime
-from api.v1.auth.context import get_current_owner_id
+from api.v1.auth.context import get_current_owner_id, get_current_workspace_id
 
 
 class PresentationLayoutCodeModel(SQLModel, table=True):
@@ -19,6 +19,10 @@ class PresentationLayoutCodeModel(SQLModel, table=True):
         sa_column=Column(
             ForeignKey("user.id", ondelete="CASCADE"), nullable=True, index=True
         ),
+    )
+    workspace_id: Optional[uuid.UUID] = Field(
+        default_factory=get_current_workspace_id,
+        sa_column=Column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True),
     )
     presentation: uuid.UUID = Field(index=True, description="UUID of the presentation")
     layout_id: str = Field(description="Unique identifier for the layout")

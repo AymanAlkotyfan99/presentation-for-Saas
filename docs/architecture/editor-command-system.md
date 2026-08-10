@@ -79,6 +79,12 @@ single `UPDATE_TEXT` on blur/done. Clipboard payloads use
 nested IDs, retain only asset IDs already present in the destination document,
 and never consume external HTML. Safe plain text may become a text element.
 
+The revision endpoint is the server authorization boundary for persisted
+commands. It verifies the selected workspace and write capability before the
+command interpreter runs; revision, patch, and materialized document all copy
+the locked presentation workspace. Frontend capability checks only disable UI
+and cannot authorize a mutation.
+
 Central shortcuts cover platform undo/redo, copy/paste/duplicate, delete,
 nudge, select all, escape, and viewport zoom. Typing targets suppress editor
 shortcuts except escape.

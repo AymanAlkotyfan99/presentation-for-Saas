@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from api.operation_security import operation_guard
-from api.v1.auth.context import get_current_owner_id
+from api.v1.auth.context import get_current_owner_id, get_current_workspace_id
 from models.sql.image_asset import ImageAsset
 from models.sql.presentation import PresentationModel
 from models.sql.presentation_document import CanonicalConversionStatus, PresentationDocumentModel
@@ -32,6 +32,11 @@ from modules.presentations.domain.conversion_status import MAX_CONVERSION_ATTEMP
 from modules.presentations.migrations.legacy_document import ConversionPreview, convert_legacy_presentation
 from modules.presentations.observability import count_bucket, record_canonical_metric, size_bucket
 from modules.presentations.repository import load_presentation_with_slides
+from modules.presentations.revision_service import (
+    IdempotencyConflictError,
+    RevisionConflictError,
+    write_snapshot_revision,
+)
 from modules.presentations.shadow_parity import compare_shadow_parity
 from services.database import get_async_session
 from utils.api_errors import StableAPIError
@@ -41,7 +46,11 @@ from utils.architecture_flags import (
     canonical_internal_cohort_allows,
     canonical_shadow_render_enabled,
     legacy_document_fallback_enabled,
+    legacy_blind_update_bridge_enabled,
+    revision_writes_enabled,
+    workspace_rbac_enforcement_enabled,
 )
+from modules.workspaces.application.authorization import resource_scope_predicate
 
 
 PRESENTATION_DOCUMENT_ROUTER = APIRouter(prefix="/presentations", tags=["Presentation Document"])
@@ -86,7 +95,13 @@ async def _load_presentation(
     session: AsyncSession, presentation_id: UUID
 ) -> tuple[PresentationModel, list[Any]]:
     presentation, slides = await load_presentation_with_slides(session, presentation_id)
-    if presentation is None or presentation.owner_id != get_current_owner_id():
+    if presentation is None or (
+        workspace_rbac_enforcement_enabled()
+        and presentation.workspace_id != get_current_workspace_id()
+    ) or (
+        not workspace_rbac_enforcement_enabled()
+        and presentation.owner_id != get_current_owner_id()
+    ):
         raise StableAPIError(404, "PRESENTATION_NOT_FOUND", "Presentation not found")
     return presentation, slides
 
@@ -145,10 +160,8 @@ async def _validate_asset_ownership(
     referenced = {asset.asset_id for asset in document.assets}
     if not referenced:
         return
-    owner_id = get_current_owner_id()
-    owner_predicate = ImageAsset.owner_id.is_(None) if owner_id is None else ImageAsset.owner_id == owner_id
     owned = set(await session.scalars(
-        select(ImageAsset.id).where(ImageAsset.id.in_(referenced), owner_predicate)
+        select(ImageAsset.id).where(ImageAsset.id.in_(referenced), resource_scope_predicate(ImageAsset))
     ))
     compatibility = {
         UUID(asset_id)
@@ -211,6 +224,7 @@ async def put_presentation_document(
     response: Response,
     payload: Annotated[dict[str, Any], Body()],
     if_match: Annotated[str | None, Header(alias="If-Match")] = None,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
     session: AsyncSession = Depends(get_async_session),
 ):
     _require_flag(canonical_document_writes_enabled(), "CANONICAL_WRITE_DISABLED")
@@ -221,6 +235,26 @@ async def put_presentation_document(
     existing = await load_document_record(session, presentation_id)
     await _validate_asset_ownership(session, document, existing)
     status = CanonicalConversionStatus.NEEDS_REVIEW if document.compatibility.requires_legacy_renderer else CanonicalConversionStatus.CONVERTED
+    if revision_writes_enabled() and legacy_blind_update_bridge_enabled():
+        checksum = canonical_checksum(document)
+        try:
+            await write_snapshot_revision(
+                session,
+                presentation_id=presentation_id,
+                actor_id=get_current_owner_id(),
+                document=document.model_dump(mode="json", by_alias=True, exclude_none=True),
+                expected_revision=expected_revision,
+                idempotency_key=idempotency_key or f"document-put:{expected_revision}:{checksum[:32]}",
+                source="legacy-document-put",
+                status=status,
+                asset_mappings=existing.asset_mappings if existing else None,
+            )
+        except RevisionConflictError as exc:
+            raise StableAPIError(409, "REVISION_CONFLICT", "Canonical document revision is stale", params={"currentRevision": exc.current_revision}) from exc
+        except IdempotencyConflictError as exc:
+            raise StableAPIError(409, "REVISION_IDEMPOTENCY_CONFLICT", "Idempotency key was reused", params={"revision": exc.revision}) from exc
+        record = await load_document_record(session, presentation_id)
+        return _record_response(record, response)
     try:
         record = await write_document_record(
             session, presentation_id=presentation_id, owner_id=get_current_owner_id(),
@@ -284,6 +318,23 @@ async def convert_presentation_document(
         record_canonical_metric("conversion_failure", schema_version="1.0.0", error_code=exc.code)
         raise StableAPIError(422, exc.code, "Legacy presentation could not be converted") from exc
     document_payload = preview.document.model_dump(mode="json", by_alias=True, exclude_none=True)
+    if revision_writes_enabled():
+        try:
+            await write_snapshot_revision(
+                session,
+                presentation_id=presentation_id,
+                actor_id=get_current_owner_id(),
+                document=document_payload,
+                expected_revision=existing.revision if existing else 0,
+                idempotency_key=f"canonical-convert:{preview.checksum[:48]}",
+                source="legacy-conversion",
+                status=preview.status,
+                asset_mappings=preview.asset_mappings,
+            )
+        except RevisionConflictError as exc:
+            raise StableAPIError(409, "REVISION_CONFLICT", "Canonical document changed during conversion", params={"currentRevision": exc.current_revision}) from exc
+        record = await load_document_record(session, presentation_id)
+        return _record_response(record, response)
     try:
         record = await write_document_record(
             session, presentation_id=presentation_id, owner_id=get_current_owner_id(),
