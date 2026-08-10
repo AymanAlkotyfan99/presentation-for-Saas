@@ -1,13 +1,15 @@
 "use client";
 
 import React from "react";
-import { LayoutDashboard, Star, Brain, Settings, HelpCircle } from "lucide-react";
+import { LayoutDashboard, Star, Brain, Settings, HelpCircle, UsersRound } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { PRODUCT_IDENTITY } from "@/lib/product-identity";
 import { BRAND_ASSETS, DISPLAY_PRODUCT } from "@/lib/product-metadata";
 import { useI18n } from "@/i18n/catalog";
 import { localizePathname, stripLocalePrefix } from "@/i18n/routing";
+import { WorkspaceSwitcher } from "@/features/workspaces/WorkspaceSwitcher";
+import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 
 
 
@@ -27,6 +29,7 @@ const DashboardSidebar = () => {
     const { locale, t } = useI18n();
     const pathname = usePathname();
     const routePath = stripLocalePrefix(pathname);
+    const workspace = useWorkspace();
 
     return (
         <aside
@@ -34,6 +37,7 @@ const DashboardSidebar = () => {
             aria-label={t("navigation.sidebar")}
         >
             <div>
+                <WorkspaceSwitcher />
 
                 <Link href={localizePathname("/dashboard", locale)} className="flex items-center gap-2 border-b border-[#E1E1E5] pb-6">
                     <div className="rounded-full cursor-pointer p-1 flex justify-center items-center mx-auto" style={{ backgroundColor: PRODUCT_IDENTITY.colors.primary }}>
@@ -57,6 +61,16 @@ const DashboardSidebar = () => {
                             <LayoutDashboard className={["h-4 w-4", routePath === "/dashboard" ? "text-[#5146E5]" : "text-slate-600"].join(" ")} />
                             <span className="text-[11px] text-slate-800">{t("navigation.dashboard")}</span>
                         </Link>
+                        {workspace.available && workspace.can("members:view") && <Link
+                            prefetch={false}
+                            href={localizePathname("/workspaces/members", locale)}
+                            className="flex flex-col items-center gap-2 transition-colors"
+                            aria-label={t("workspace.members")}
+                            title={t("workspace.members")}
+                        >
+                            <UsersRound className={["h-4 w-4", routePath === "/workspaces/members" ? "text-[#5146E5]" : "text-slate-600"].join(" ")} />
+                            <span className="text-[11px] text-slate-800">{t("workspace.members")}</span>
+                        </Link>}
                         <Link
                             prefetch={false}
                             href={localizePathname("/templates", locale)}

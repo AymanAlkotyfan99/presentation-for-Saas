@@ -216,6 +216,15 @@ def test_route_policy_points_cover_expensive_surfaces():
         "document_parsing",
     )
     assert match_operations("POST", "/api/v1/admin/users") == ("admin",)
+    assert match_operations("POST", "/api/v1/workspaces/invitations/accept") == (
+        "workspace_invitation",
+    )
+    assert match_operations("POST", "/api/v1/workspaces/00000000-0000-4000-8000-000000000001/invitations") == (
+        "workspace_invitation",
+    )
+    assert match_operations("POST", "/api/v1/workspaces/00000000-0000-4000-8000-000000000001/service-accounts/00000000-0000-4000-8000-000000000002/credentials") == (
+        "workspace_credential",
+    )
 
 
 def test_stable_error_body_and_retry_after_header():

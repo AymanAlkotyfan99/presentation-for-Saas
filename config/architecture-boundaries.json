@@ -19,6 +19,7 @@
     "servers/fastapi/api/v1/ppt/endpoints/outlines.py": "presentations",
     "servers/fastapi/api/v1/ppt/endpoints/presentation.py": "presentations",
     "servers/fastapi/api/v1/ppt/endpoints/presentation_document.py": "presentations",
+    "servers/fastapi/api/v1/ppt/endpoints/presentation_revisions.py": "presentations",
     "servers/fastapi/api/v1/ppt/endpoints/slide.py": "presentations",
     "servers/fastapi/api/v1/ppt/endpoints/template.py": "templates",
     "servers/fastapi/api/v1/ppt/endpoints/theme.py": "themes",

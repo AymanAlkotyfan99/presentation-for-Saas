@@ -14,6 +14,14 @@ import { CanonicalTextEditor } from "./CanonicalTextEditor";
 import { useCanonicalKeyboardAdapter } from "./KeyboardAdapter";
 import { useI18n } from "@/i18n/catalog";
 import { editorDeckMetric, useEditorPerformanceObserver, type EditorMetricSink } from "./observability";
+import { RevisionStatus, useRevisionPersistence } from "@/features/presentations/persistence";
+
+export type CanonicalPersistenceConfig = {
+  presentationId: string;
+  actorScope: string;
+  initialRevision: number;
+  enabled?: boolean;
+};
 
 export function CanonicalEditor({
   document,
@@ -21,19 +29,26 @@ export function CanonicalEditor({
   assetUrls = {},
   className = "",
   metricSink,
+  persistence,
 }: {
   document: PresentationDocument;
   onDocumentChange?: (document: PresentationDocument) => void;
   assetUrls?: Readonly<Record<string, string | undefined>>;
   className?: string;
   metricSink?: EditorMetricSink;
+  persistence?: CanonicalPersistenceConfig;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const baseMetric = useMemo(() => editorDeckMetric("konva", document.slides.length, countDocumentElements(document)), [document]);
+  const revisionPersistence = useRevisionPersistence(persistence ? {
+    ...persistence,
+    onServerDocument: onDocumentChange,
+  } : null);
   const handleDocumentChange = useCallback((next: PresentationDocument, command?: EditorCommand) => {
     onDocumentChange?.(next);
+    if (command) void revisionPersistence.enqueue(command);
     if (command) metricSink?.({ ...baseMetric, commandType: command.type, commandStatus: "success" });
-  }, [baseMetric, metricSink, onDocumentChange]);
+  }, [baseMetric, metricSink, onDocumentChange, revisionPersistence]);
   const handleCommandError = useCallback((command: EditorCommand) => {
     metricSink?.({ ...baseMetric, commandType: command.type, commandStatus: "failure" });
   }, [baseMetric, metricSink]);
@@ -99,6 +114,13 @@ export function CanonicalEditor({
   const editingText = viewModel.editingTextElementId ? elementIndex.get(viewModel.editingTextElementId)?.element : undefined;
   return <section className={`flex h-full min-h-0 flex-col ${className}`} data-editor="canonical" dir={uiDirection}>
     <EditorToolbar slide={slide} selectedElements={selectedElements} canUndo={canUndo} canRedo={canRedo} onCommand={execute} onUndo={undo} onRedo={redo} onZoom={zoom} onEditText={setEditingTextElement} />
+    {revisionPersistence.enabled && <RevisionStatus
+      status={revisionPersistence.status}
+      pendingCommands={revisionPersistence.pendingCommands}
+      onRetry={revisionPersistence.retry}
+      onReloadServer={() => void revisionPersistence.reloadServerVersion()}
+      recoveryPayload={revisionPersistence.recoveryPayload}
+    />}
     <div className="flex min-h-0 flex-1">
       <LayerPanel
         slide={slide}

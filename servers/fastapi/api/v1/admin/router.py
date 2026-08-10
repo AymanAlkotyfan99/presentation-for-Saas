@@ -117,6 +117,9 @@ async def create_user(
         auth_version=1,
     )
     session.add(user)
+    await session.flush()
+    from modules.workspaces.application.personal import ensure_personal_workspace
+    await ensure_personal_workspace(session, user)
     await session.commit()
     await session.refresh(user)
     return serialize_user(user)

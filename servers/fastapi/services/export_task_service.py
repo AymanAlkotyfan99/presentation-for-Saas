@@ -14,12 +14,13 @@ from fastapi import HTTPException
 from pydantic import BaseModel, ValidationError, model_validator
 
 from services.liteparse_service import _command_str, _snippet
-from api.v1.auth.context import get_current_owner_id
+from api.v1.auth.context import get_current_owner_id, get_current_workspace_id
 from utils.asset_directory_utils import (
     get_exports_directory,
     resolve_app_path_to_filesystem,
 )
 from utils.get_env import get_app_data_directory_env, get_temp_directory_env
+from utils.architecture_flags import workspace_rbac_enforcement_enabled
 from utils.icon_weights import DEFAULT_ICON_TYPE, extract_icon_type_from_settings
 from utils.runtime_limits import (
     BoundedTextBuffer,
@@ -739,7 +740,7 @@ class ExportTaskService:
 
     @staticmethod
     def _move_export_to_owner(output_path: str) -> str:
-        if get_current_owner_id() is None:
+        if get_current_owner_id() is None and get_current_workspace_id() is None:
             return output_path
         destination_dir = get_exports_directory()
         app_data = get_app_data_directory_env()
@@ -770,7 +771,8 @@ class ExportTaskService:
         root_name: Literal["pptx-to-html", "pptx-to-json"],
     ) -> Any:
         owner_id = get_current_owner_id()
-        if owner_id is None:
+        workspace_id = get_current_workspace_id()
+        if owner_id is None and workspace_id is None:
             return output_data
 
         source_dir = os.path.realpath(os.path.dirname(output_path))
@@ -782,11 +784,12 @@ class ExportTaskService:
                 detail="APP_DATA_DIRECTORY is required for conversion artifacts",
             )
         source_root = os.path.realpath(os.path.join(app_data, root_name))
-        owner_root = os.path.realpath(
-            os.path.join(source_root, "users", str(owner_id))
-        )
+        workspace_scoped = workspace_rbac_enforcement_enabled() and workspace_id is not None
+        namespace = "workspaces" if workspace_scoped else "users"
+        subject_id = workspace_id if workspace_scoped else owner_id
+        owner_root = os.path.realpath(os.path.join(source_root, namespace, str(subject_id)))
         source_parent = os.path.dirname(source_dir)
-        if source_parent not in {source_root, owner_root} or session_id == "users":
+        if source_parent not in {source_root, owner_root} or session_id in {"users", "workspaces"}:
             raise HTTPException(
                 status_code=500,
                 detail="Conversion task returned an output outside its asset directory",
@@ -801,7 +804,7 @@ class ExportTaskService:
 
         source_url = f"/app_data/{root_name}/{session_id}"
         target_url = (
-            f"/app_data/{root_name}/users/{owner_id}/{session_id}"
+            f"/app_data/{root_name}/{namespace}/{subject_id}/{session_id}"
         )
 
         def rewrite(value: Any) -> Any:

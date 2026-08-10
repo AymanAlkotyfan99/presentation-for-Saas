@@ -136,6 +136,12 @@ provider integrations, and generated Google-font metadata. Runtime assets must
 be resolved through the existing resource/path helpers; importing arbitrary
 code from user-writable storage is forbidden.
 
+Sprint 7 adds `modules/workspaces` as the tenant-policy owner. Authentication
+continues to belong to `api/v1/auth`; routes may request a permission but may
+not invent role matrices. Presentation persistence remains the canonical
+document plus immutable revision stream. Workspace tables bind those existing
+resources and do not introduce another presentation/document representation.
+
 ## Cleanup evidence
 
 `api/v1/ppt/endpoints/layouts.py` was an unregistered router: it was not

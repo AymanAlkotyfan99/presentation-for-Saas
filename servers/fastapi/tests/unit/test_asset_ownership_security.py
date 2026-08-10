@@ -8,11 +8,14 @@ from api.v1.auth.assets import is_app_data_path_authorized
 from api.v1.auth.context import (
     reset_current_owner_id,
     reset_current_owner_is_admin,
+    reset_current_workspace_id,
     set_current_owner_id,
     set_current_owner_is_admin,
+    set_current_workspace_id,
 )
 from services.export_task_service import ExportTaskService
 from utils.asset_directory_utils import resolve_app_path_to_filesystem
+from utils.asset_directory_utils import get_images_directory
 
 
 def test_browser_asset_paths_are_owner_scoped_and_traversal_safe():
@@ -50,6 +53,37 @@ def test_browser_asset_paths_are_owner_scoped_and_traversal_safe():
         user_id=owner_id,
         is_admin=True,
     )
+
+
+def test_browser_asset_paths_are_bound_to_the_validated_workspace():
+    workspace_id = uuid.uuid4()
+    other_id = uuid.uuid4()
+    assert is_app_data_path_authorized(
+        f"/app_data/images/workspaces/{workspace_id}/slide.png",
+        user_id=None,
+        is_admin=False,
+        workspace_id=workspace_id,
+    )
+    assert not is_app_data_path_authorized(
+        f"/app_data/images/workspaces/{other_id}/slide.png",
+        user_id=uuid.uuid4(),
+        is_admin=True,
+        workspace_id=workspace_id,
+    )
+
+
+def test_workspace_enforcement_uses_workspace_storage_namespace(monkeypatch, tmp_path):
+    workspace_id = uuid.uuid4()
+    owner_id = uuid.uuid4()
+    monkeypatch.setenv("APP_DATA_DIRECTORY", str(tmp_path))
+    monkeypatch.setenv("WORKSPACE_RBAC_ENFORCEMENT_ENABLED", "true")
+    owner_token = set_current_owner_id(owner_id)
+    workspace_token = set_current_workspace_id(workspace_id)
+    try:
+        assert get_images_directory() == str(tmp_path / "images" / "workspaces" / str(workspace_id))
+    finally:
+        reset_current_workspace_id(workspace_token)
+        reset_current_owner_id(owner_token)
 
 
 def test_server_side_file_resolution_rejects_other_users_and_symlink_escape(

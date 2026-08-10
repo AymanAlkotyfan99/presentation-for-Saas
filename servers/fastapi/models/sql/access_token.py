@@ -23,6 +23,10 @@ class AccessToken(SQLModel, table=True):
             index=True,
         )
     )
+    workspace_id: uuid.UUID | None = Field(
+        default=None,
+        sa_column=Column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True),
+    )
     created_at: datetime = Field(
         sa_column=Column(
             DateTime(timezone=True),

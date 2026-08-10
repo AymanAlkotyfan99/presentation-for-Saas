@@ -69,6 +69,8 @@ from utils.icon_weights import (
 )
 from utils.datetime_utils import get_current_utc_datetime
 from utils.llm_client_error_handler import handle_llm_client_exceptions
+from api.v1.auth.context import get_current_owner_id, get_current_workspace_id
+from utils.architecture_flags import workspace_rbac_enforcement_enabled
 
 
 TEMPLATE_ROUTER = APIRouter(prefix="/template", tags=["Templates"])
@@ -1168,6 +1170,13 @@ async def _run_create_template_task(
                 task_id,
             )
             return
+        if workspace_rbac_enforcement_enabled():
+            if task.resource_id != task_id:
+                LOGGER.warning("[template.create.async] task resource mismatch task_id=%s", task_id)
+                return
+            if task.workspace_id != get_current_workspace_id():
+                LOGGER.warning("[template.create.async] task workspace mismatch task_id=%s", task_id)
+                return
 
         try:
             task.status = AsyncTaskStatus.PENDING
@@ -1231,6 +1240,7 @@ async def create_template(
 ):
     task = AsyncTaskModel(
         type=ASYNC_TASK_TYPE_TEMPLATE_CREATE,
+        actor_id=get_current_owner_id(),
         status=AsyncTaskStatus.PENDING,
         message="Queued for template creation",
         data=_template_task_progress_data(
@@ -1240,6 +1250,7 @@ async def create_template(
             thumbnail=_template_request_thumbnail(request),
         ),
     )
+    task.resource_id = task.id
     sql_session.add(task)
     await sql_session.commit()
     await sql_session.refresh(task)

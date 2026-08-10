@@ -10,14 +10,19 @@ from api.v1.auth.users import UsernameUserDatabase, UserManager, get_jwt_strateg
 from models.sql.access_token import AccessToken
 from models.sql.user import User
 from api.v1.auth.config import SESSION_COOKIE_NAME
+from modules.workspaces.application.credentials import verify_service_credential
+from utils.architecture_flags import service_accounts_enabled
 
 
 @dataclass(frozen=True)
 class AuthPrincipal:
-    user_id: uuid.UUID
+    user_id: uuid.UUID | None
     username: str
     is_admin: bool
-    method: Literal["jwt", "api_key"]
+    method: Literal["jwt", "api_key", "service_account"]
+    workspace_id: uuid.UUID | None = None
+    service_account_id: uuid.UUID | None = None
+    scopes: frozenset[str] = frozenset()
 
 
 async def resolve_request_principal(
@@ -41,6 +46,22 @@ async def resolve_request_principal(
     authorization = request.headers.get("Authorization", "")
     if authorization.lower().startswith("bearer "):
         token = authorization.split(" ", 1)[1].strip()
+        if token.startswith("bws_") and service_accounts_enabled():
+            verified = await verify_service_credential(session, token)
+            if verified is None:
+                return None, None
+            return (
+                AuthPrincipal(
+                    user_id=None,
+                    username=verified.service_account_name,
+                    is_admin=False,
+                    method="service_account",
+                    workspace_id=verified.workspace_id,
+                    service_account_id=verified.service_account_id,
+                    scopes=verified.scopes,
+                ),
+                None,
+            )
         if not token.startswith("sk-presenton-"):
             return None, None
         access_token = await session.get(AccessToken, token)

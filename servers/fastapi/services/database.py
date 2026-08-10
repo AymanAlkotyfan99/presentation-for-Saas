@@ -21,6 +21,7 @@ from models.sql.ollama_pull_status import OllamaPullStatus
 from models.sql.presentation_layout_code import PresentationLayoutCodeModel
 from models.sql.presentation import PresentationModel
 from models.sql.presentation_document import PresentationDocumentModel
+from models.sql.presentation_revision import PresentationRevisionModel, PresentationRevisionPatchModel
 from models.sql.template import TemplateModel
 from models.sql.template_create_info import TemplateCreateInfoModel
 from models.sql.template_v2 import TemplateV2
@@ -29,7 +30,12 @@ from models.sql.webhook_subscription import WebhookSubscription
 from models.sql.user import User
 from models.sql.access_token import AccessToken
 from models.sql.provider_settings import ProviderSettings
-from api.v1.auth.context import get_current_owner_id
+from api.v1.auth.context import get_current_owner_id, get_current_workspace_id, get_current_service_account_id
+from modules.workspaces.persistence.models import (
+    ApiCredentialModel, ApiCredentialScopeModel, AuditEventModel, InvitationModel,
+    MembershipModel, ServiceAccountModel, WorkspaceModel,
+)
+from utils.architecture_flags import legacy_owner_bridge_enabled, workspace_rbac_enforcement_enabled
 from utils.get_env import get_migrate_database_on_startup_env
 from utils.db_utils import get_database_url_and_connect_args, get_pool_kwargs
 
@@ -59,6 +65,8 @@ async_session_maker = async_sessionmaker(sql_engine, expire_on_commit=False)
 _STRICT_OWNER_MODELS = (
     PresentationModel,
     PresentationDocumentModel,
+    PresentationRevisionModel,
+    PresentationRevisionPatchModel,
     SlideModel,
     PresentationLayoutCodeModel,
     TemplateModel,
@@ -75,44 +83,60 @@ _STRICT_OWNER_MODELS = (
 def _scope_owned_selects(execute_state) -> None:
     """Apply tenant criteria to every ORM SELECT performed during a request."""
     owner_id = get_current_owner_id()
+    workspace_id = get_current_workspace_id()
     if (
-        owner_id is None
+        (owner_id is None and workspace_id is None)
         or not execute_state.is_select
         or execute_state.execution_options.get("skip_owner_scope")
+        or execute_state.execution_options.get("skip_workspace_scope")
     ):
         return
 
     statement = execute_state.statement
-    for model in _STRICT_OWNER_MODELS:
-        statement = statement.options(
-            with_loader_criteria(
+    if workspace_rbac_enforcement_enabled() and workspace_id is not None:
+        bridge = legacy_owner_bridge_enabled() and owner_id is not None and get_current_service_account_id() is None
+        for model in _STRICT_OWNER_MODELS:
+            statement = statement.options(with_loader_criteria(
                 model,
-                lambda row: row.owner_id == owner_id,
+                (lambda row: or_(row.workspace_id == workspace_id, row.workspace_id.is_(None) & (row.owner_id == owner_id)))
+                if bridge else (lambda row: row.workspace_id == workspace_id),
                 include_aliases=True,
-            )
-        )
-    statement = statement.options(
-        with_loader_criteria(
+            ))
+        statement = statement.options(with_loader_criteria(
             TemplateV2,
-            lambda row: or_(
-                row.owner_id == owner_id,
-                (row.owner_id.is_(None) & row.is_default.is_(True)),
-            ),
+            (lambda row: or_(
+                row.workspace_id == workspace_id,
+                row.workspace_id.is_(None) & (row.owner_id == owner_id),
+                row.workspace_id.is_(None) & row.owner_id.is_(None) & row.is_default.is_(True),
+            )) if bridge else (lambda row: or_(row.workspace_id == workspace_id, row.workspace_id.is_(None) & row.owner_id.is_(None) & row.is_default.is_(True))),
             include_aliases=True,
-        )
-    )
+        ))
+    elif owner_id is not None:
+        for model in _STRICT_OWNER_MODELS:
+            statement = statement.options(
+                with_loader_criteria(model, lambda row: row.owner_id == owner_id, include_aliases=True)
+            )
+        statement = statement.options(with_loader_criteria(
+            TemplateV2,
+            lambda row: or_(row.owner_id == owner_id, (row.owner_id.is_(None) & row.is_default.is_(True))),
+            include_aliases=True,
+        ))
     execute_state.statement = statement
 
 
 @event.listens_for(Session, "before_flush")
 def _stamp_new_owned_rows(session, _flush_context, _instances) -> None:
     owner_id = get_current_owner_id()
-    if owner_id is None:
+    workspace_id = get_current_workspace_id()
+    if owner_id is None and workspace_id is None:
         return
     owner_models = _STRICT_OWNER_MODELS + (TemplateV2,)
     for instance in session.new:
         if isinstance(instance, owner_models):
-            instance.owner_id = owner_id
+            if owner_id is not None and getattr(instance, "owner_id", None) is None:
+                instance.owner_id = owner_id
+            if workspace_id is not None and getattr(instance, "workspace_id", None) is None:
+                instance.workspace_id = workspace_id
 
 
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
@@ -130,6 +154,13 @@ async def create_db_and_tables():
                     sync_conn,
                     tables=[
                         PresentationModel.__table__,
+                        WorkspaceModel.__table__,
+                        MembershipModel.__table__,
+                        InvitationModel.__table__,
+                        ServiceAccountModel.__table__,
+                        ApiCredentialModel.__table__,
+                        ApiCredentialScopeModel.__table__,
+                        AuditEventModel.__table__,
                         SlideModel.__table__,
                         KeyValueSqlModel.__table__,
                         TemplateV2.__table__,
@@ -147,6 +178,8 @@ async def create_db_and_tables():
                         AccessToken.__table__,
                         ProviderSettings.__table__,
                         PresentationDocumentModel.__table__,
+                        PresentationRevisionModel.__table__,
+                        PresentationRevisionPatchModel.__table__,
                     ],
                 )
             )

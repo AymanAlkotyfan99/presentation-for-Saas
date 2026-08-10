@@ -16,6 +16,9 @@ from modules.presentations.domain.conversion_status import (
     MAX_CONVERSION_ATTEMPTS,
     require_conversion_transition,
 )
+from api.v1.auth.context import get_current_workspace_id
+from modules.workspaces.application.authorization import resource_scope_predicate
+from utils.architecture_flags import workspace_rbac_enforcement_enabled
 from utils.datetime_utils import get_current_utc_datetime
 
 
@@ -58,6 +61,7 @@ async def write_document_record(
         record = PresentationDocumentModel(
             presentation_id=presentation_id,
             owner_id=owner_id,
+            workspace_id=get_current_workspace_id(),
             schema_version="1.0.0",
             document=document,
             checksum=checksum,
@@ -79,7 +83,9 @@ async def write_document_record(
         return record
 
     existing = await load_document_record(session, presentation_id)
-    if existing is None or existing.owner_id != owner_id:
+    if existing is None or (
+        not workspace_rbac_enforcement_enabled() and existing.owner_id != owner_id
+    ):
         raise CanonicalRevisionConflict(0)
     require_conversion_transition(existing.conversion_status, status)
     if (
@@ -103,15 +109,15 @@ async def write_document_record(
     if legacy_source_version is not None:
         values["legacy_source_version"] = legacy_source_version
         values["conversion_attempts"] = PresentationDocumentModel.conversion_attempts + 1
-    statement = (
-        update(PresentationDocumentModel)
-        .where(
-            PresentationDocumentModel.presentation_id == presentation_id,
-            PresentationDocumentModel.owner_id == owner_id,
-            PresentationDocumentModel.revision == expected_revision,
-        )
-        .values(**values)
+    statement = update(PresentationDocumentModel).where(
+        PresentationDocumentModel.presentation_id == presentation_id,
+        PresentationDocumentModel.revision == expected_revision,
     )
+    if workspace_rbac_enforcement_enabled():
+        statement = statement.where(resource_scope_predicate(PresentationDocumentModel))
+    else:
+        statement = statement.where(PresentationDocumentModel.owner_id == owner_id)
+    statement = statement.values(**values)
     result = await session.execute(statement)
     if result.rowcount != 1:
         await session.rollback()
@@ -141,6 +147,7 @@ async def record_conversion_failure(
         record = PresentationDocumentModel(
             presentation_id=presentation_id,
             owner_id=owner_id,
+            workspace_id=get_current_workspace_id(),
             schema_version="1.0.0",
             document=None,
             checksum=None,

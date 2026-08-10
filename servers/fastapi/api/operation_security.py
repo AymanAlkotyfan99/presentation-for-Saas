@@ -573,6 +573,12 @@ def default_operation_policies() -> dict[str, OperationPolicy]:
             disable_envs=("DISABLE_WEBHOOK_DELIVERY",),
         ),
         "admin": _policy("admin", rate=60, burst=10, per_subject=5, global_limit=50),
+        "workspace_invitation": _policy(
+            "workspace_invitation", rate=20, burst=5, per_subject=3, global_limit=100
+        ),
+        "workspace_credential": _policy(
+            "workspace_credential", rate=10, burst=3, per_subject=2, global_limit=50
+        ),
     }
 
 
@@ -805,16 +811,24 @@ async def operation_controller() -> OperationController:
 
 def identity_for_current_owner(*, operation: str = "operation") -> OperationIdentity:
     try:
-        from api.v1.auth.context import get_current_owner_id
+        from api.v1.auth.context import get_current_owner_id, get_current_service_account_id, get_current_workspace_id
 
         owner_id = get_current_owner_id()
+        service_account_id = get_current_service_account_id()
+        workspace_id = get_current_workspace_id()
     except Exception:
         owner_id = None
-    value = str(owner_id) if owner_id else f"internal:{operation}:{uuid.uuid4().hex}"
+        service_account_id = None
+        workspace_id = None
+    value = str(owner_id) if owner_id else (
+        f"service:{service_account_id}" if service_account_id
+        else f"internal:{operation}:{uuid.uuid4().hex}"
+    )
     return OperationIdentity(
         subject=value,
         client_ip=value,
         user_id=str(owner_id) if owner_id else None,
+        workspace_id=str(workspace_id) if workspace_id else None,
     )
 
 
@@ -924,6 +938,8 @@ DEFAULT_OPERATION_ROUTE_RULES = (
     _rule("export", {"POST"}, r"/api/v1/ppt/presentation/(?:generate(?:/async)?|edit|derive)"),
     _rule("webhook_registration", {"POST", "DELETE"}, r"/api/v1/webhook/(?:subscribe|unsubscribe)"),
     _rule("admin", {"POST", "PUT", "PATCH", "DELETE"}, r"/api/v1/admin/.*"),
+    _rule("workspace_invitation", {"POST"}, r"/api/v1/workspaces/(?:invitations/accept|[^/]+/invitations)"),
+    _rule("workspace_credential", {"POST"}, r"/api/v1/workspaces/[^/]+/service-accounts/[^/]+/credentials"),
 )
 
 

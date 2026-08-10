@@ -40,6 +40,48 @@ def canonical_shadow_render_enabled() -> bool:
     return _enabled("CANONICAL_SHADOW_RENDER_ENABLED", False)
 
 
+def revision_writes_enabled() -> bool:
+    return _enabled("REVISION_WRITES_ENABLED", False)
+
+
+def revision_if_match_required() -> bool:
+    if os.getenv("REQUIRE_IF_MATCH") is not None:
+        return _enabled("REQUIRE_IF_MATCH", True)
+    return _enabled("REVISION_IF_MATCH_REQUIRED", True)
+
+
+def indexeddb_recovery_enabled() -> bool:
+    return _enabled("INDEXEDDB_RECOVERY_ENABLED", False)
+
+
+def version_history_enabled() -> bool:
+    return _enabled("VERSION_HISTORY_ENABLED", False)
+
+
+def legacy_blind_update_bridge_enabled() -> bool:
+    return _enabled("LEGACY_BLIND_UPDATE_BRIDGE_ENABLED", True)
+
+
+def workspaces_enabled() -> bool:
+    return _enabled("WORKSPACES_ENABLED", False)
+
+
+def workspace_rbac_enforcement_enabled() -> bool:
+    return _enabled("WORKSPACE_RBAC_ENFORCEMENT_ENABLED", False)
+
+
+def invitations_enabled() -> bool:
+    return _enabled("INVITATIONS_ENABLED", False)
+
+
+def service_accounts_enabled() -> bool:
+    return _enabled("SERVICE_ACCOUNTS_ENABLED", False)
+
+
+def legacy_owner_bridge_enabled() -> bool:
+    return _enabled("LEGACY_OWNER_BRIDGE_ENABLED", True)
+
+
 def legacy_document_fallback_enabled() -> bool:
     return _enabled("LEGACY_DOCUMENT_FALLBACK_ENABLED", True)
 

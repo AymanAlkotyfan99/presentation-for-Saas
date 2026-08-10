@@ -31,7 +31,9 @@ REVISION_USERNAME_PROVIDER_SETTINGS = "d0a2b4c6e8f1"
 REVISION_PRIMARY_ADMIN_SLOT = "e1b3c5d7f9a2"
 REVISION_USER_PREFERRED_LOCALE = "f3a5c7e9b1d2"
 REVISION_CANONICAL_DOCUMENTS = "04b6d8f0a2c4"
-REVISION_CURRENT_HEAD = REVISION_CANONICAL_DOCUMENTS
+REVISION_REVISION_SAFE_PERSISTENCE = "7c9e1a3b5d6f"
+REVISION_WORKSPACES_RBAC = "8d0f2b4c6e8a"
+REVISION_CURRENT_HEAD = REVISION_WORKSPACES_RBAC
 
 
 async def migrate_database_on_startup() -> None:
@@ -117,6 +119,19 @@ def _infer_revision_from_schema(
     _head_revision: str,
 ) -> str:
     """Best-effort: map existing SQLite/Postgres schema to our linear migration chain."""
+    if {
+        "workspaces",
+        "memberships",
+        "invitations",
+        "service_accounts",
+        "api_credentials",
+        "api_credential_scopes",
+        "audit_events",
+    }.issubset(tables) and "presentations" in tables and _has_column(inspector, "presentations", "workspace_id"):
+        return REVISION_WORKSPACES_RBAC
+    if "presentation_revisions" in tables and "presentation_revision_patches" in tables:
+        if _has_column(inspector, "presentations", "current_revision"):
+            return REVISION_REVISION_SAFE_PERSISTENCE
     if "presentation_documents" in tables:
         canonical_columns = {
             column["name"]
