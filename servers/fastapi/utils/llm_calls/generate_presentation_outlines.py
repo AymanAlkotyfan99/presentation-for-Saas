@@ -3,7 +3,7 @@ from datetime import datetime
 import logging
 from typing import Optional
 
-from llmai import get_client
+from modules.providers.application.text_client import get_text_client as get_client
 from llmai.shared import (
     JSONSchemaResponse,
     Message,
@@ -18,7 +18,7 @@ from constants.presentation import MAX_NUMBER_OF_SLIDES, MAX_OUTLINE_CONTENT_WOR
 from utils.get_dynamic_models import get_presentation_outline_model_with_n_slides
 from utils.llm_calls.generate_web_search_query import generate_web_search_query
 from utils.llm_client_error_handler import handle_llm_client_exceptions
-from utils.llm_config import get_llm_config
+from modules.providers.application.legacy_facade import get_text_provider_client_config as get_llm_config
 from utils.llm_provider import get_model
 from utils.llm_utils import (
     DisconnectChecker,
@@ -27,7 +27,7 @@ from utils.llm_utils import (
     stream_generate_events,
 )
 from utils.schema_utils import prepare_schema_for_validation
-from utils.web_search import (
+from modules.providers.application.legacy_search_facade import (
     build_web_search_query,
     get_web_search_route,
     get_selected_web_search_provider,
@@ -263,7 +263,10 @@ async def generate_ppt_outline(
     use_search_tool = web_search and should_use_native_web_search()
     use_external_search = web_search and should_expose_external_web_search_tool()
     client = get_client(
-        config=get_llm_config(use_openai_responses_api=use_search_tool)
+        config=get_llm_config(
+            use_openai_responses_api=use_search_tool,
+            operation="presentation.outline",
+        )
     )
     route_mode, actual_provider = get_web_search_route()
     actual_provider_name = (

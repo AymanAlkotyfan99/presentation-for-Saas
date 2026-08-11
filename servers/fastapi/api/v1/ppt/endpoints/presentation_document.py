@@ -15,6 +15,8 @@ from api.v1.auth.context import get_current_owner_id, get_current_workspace_id
 from models.sql.image_asset import ImageAsset
 from models.sql.presentation import PresentationModel
 from models.sql.presentation_document import CanonicalConversionStatus, PresentationDocumentModel
+from modules.assets.domain.models import AssetState
+from modules.assets.persistence.models import AssetModel
 from modules.presentations.document_repository import (
     CanonicalConversionAttemptsExceeded,
     CanonicalRevisionConflict,
@@ -162,6 +164,13 @@ async def _validate_asset_ownership(
         return
     owned = set(await session.scalars(
         select(ImageAsset.id).where(ImageAsset.id.in_(referenced), resource_scope_predicate(ImageAsset))
+    ))
+    owned.update(await session.scalars(
+        select(AssetModel.id).where(
+            AssetModel.id.in_(referenced),
+            AssetModel.state == AssetState.READY,
+            resource_scope_predicate(AssetModel),
+        )
     ))
     compatibility = {
         UUID(asset_id)

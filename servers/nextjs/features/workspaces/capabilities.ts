@@ -4,7 +4,7 @@ const PERMISSIONS = new Set<WorkspacePermission>([
   "workspace:view", "workspace:update", "workspace:delete", "members:view",
   "members:manage", "owner:transfer", "finance:review", "presentations:read",
   "presentations:write", "assets:read", "assets:write", "templates:read",
-  "templates:write", "jobs:read", "invitations:manage", "credentials:manage",
+  "templates:write", "jobs:read", "jobs:write", "invitations:manage", "credentials:manage",
   "audit:read",
 ]);
 

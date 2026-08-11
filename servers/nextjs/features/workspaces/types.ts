@@ -15,6 +15,7 @@ export type WorkspacePermission =
   | "templates:read"
   | "templates:write"
   | "jobs:read"
+  | "jobs:write"
   | "invitations:manage"
   | "credentials:manage"
   | "audit:read";

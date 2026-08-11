@@ -8,6 +8,40 @@ from sqlmodel import select
 from enums.async_task_status import AsyncTaskStatus
 from models.sql.async_task import AsyncTaskModel
 from services.database import get_async_session
+from modules.jobs.domain.models import JobStatus
+from modules.jobs.persistence.models import JobModel
+
+
+async def synchronize_durable_task_view(
+    task: AsyncTaskModel,
+    sql_session: AsyncSession,
+) -> AsyncTaskModel:
+    """Project a durable job onto the legacy polling shape without rewriting history."""
+    if task.durable_job_id is None:
+        return task
+    job = await sql_session.get(JobModel, task.durable_job_id)
+    if job is None:
+        return task
+    if job.status == JobStatus.SUCCEEDED:
+        task.status = AsyncTaskStatus.COMPLETED
+    elif job.status in {JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.DEAD_LETTER}:
+        task.status = AsyncTaskStatus.ERROR
+    else:
+        task.status = AsyncTaskStatus.PENDING
+    task.message = job.progress_message or task.message
+    task.data = {
+        **(task.data or {}),
+        "durableJobId": str(job.id),
+        "durableStatus": job.status.value,
+        "progress": job.progress,
+        **({"result": job.result} if job.result is not None else {}),
+    }
+    if job.safe_error_code:
+        task.error = {
+            "code": job.safe_error_code,
+            "message": job.safe_error_message or "Durable job failed",
+        }
+    return task
 
 
 API_V1_ASYNC_TASKS_ROUTER = APIRouter(
@@ -62,7 +96,10 @@ async def list_async_tasks(
     statement = statement.offset(offset).limit(limit)
 
     result = await sql_session.execute(statement)
-    return list(result.scalars().all())
+    tasks = list(result.scalars().all())
+    for task in tasks:
+        await synchronize_durable_task_view(task, sql_session)
+    return tasks
 
 
 @API_V1_ASYNC_TASKS_ROUTER.get(
@@ -76,4 +113,4 @@ async def check_async_task_status(
     task = await sql_session.get(AsyncTaskModel, id)
     if not task:
         raise HTTPException(status_code=404, detail="No async task found")
-    return task
+    return await synchronize_durable_task_view(task, sql_session)

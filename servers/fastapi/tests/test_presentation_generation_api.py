@@ -135,6 +135,8 @@ class TestPresentationGenerationAPI:
         assert task.type == "presentation.generate"
         assert task.status == "pending"
         assert task.message == "Queued for generation"
+        assert task.presentation_id is None
+        assert task.resource_id is not None
         assert task.data == {"created_slides": 0, "remaining_slides": 5}
         assert fake_session.added == [task]
         assert fake_session.commit_count == 1

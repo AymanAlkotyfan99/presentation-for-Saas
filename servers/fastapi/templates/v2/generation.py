@@ -10,7 +10,7 @@ from json import JSONDecodeError
 from time import perf_counter
 from typing import Any, Callable
 
-from llmai import get_client
+from modules.providers.application.text_client import get_text_client as get_client
 from llmai.shared import (
     AssistantMessage,
     ImageContentPart,
@@ -37,7 +37,7 @@ from templates.v2.models.elements import Image as SlideImageElement
 from templates.v2.models.elements import ImageFit
 from templates.v2.tools import PREVIEW_SLIDE_TOOL_NAME, PreviewSlideTool
 from utils.asset_directory_utils import resolve_image_path_to_filesystem
-from utils.llm_config import get_llm_config
+from modules.providers.application.legacy_facade import get_text_provider_client_config as get_llm_config
 from utils.llm_provider import get_model
 
 DEFAULT_VALIDATION_RETRIES = 5
@@ -320,7 +320,7 @@ def merge_similar_components(layouts: SlideLayouts) -> MergedComponents:
         len(indexed_components),
     )
     response = _generate_with_validation_retries(
-        client=get_client(config=get_llm_config()),
+        client=get_client(config=get_llm_config(operation="template.components.cluster")),
         model=get_model(),
         messages=[
             SystemMessage(content=CLUSTER_SIMILAR_COMPONENTS_SYSTEM_PROMPT),
@@ -763,7 +763,7 @@ def generate_slide_layout(
             source_layout.model_dump(mode="json", exclude_none=True)
         ),
     )
-    llm_config = get_llm_config()
+    llm_config = get_llm_config(operation="template.slide_layout.generate")
     client = get_client(config=llm_config)
     model = get_model()
     messages = [
@@ -828,7 +828,7 @@ def generate_prompted_slide_layout(
                 "layout must contain at least one semantic element with decorative=false"
             )
 
-    client = get_client(config=get_llm_config())
+    client = get_client(config=get_llm_config(operation="template.slide_layout.prompted"))
     model = get_model()
     generated = _generate_with_validation_retries(
         client=client,

@@ -20,7 +20,8 @@ from models.sql.slide import SlideModel
 from models.sql.template_v2 import TemplateV2
 from services.icon_finder_service import ICON_FINDER_SERVICE
 from services.documents_loader import DocumentsLoader
-from services.image_generation_service import ImageGenerationService
+from modules.providers.application.legacy_image_facade import ProviderImageService as ImageGenerationService
+from modules.providers.application.image_service import ManagedProviderImage
 from services.mem0_presentation_memory_service import MEM0_PRESENTATION_MEMORY_SERVICE
 from services.temp_file_service import TEMP_FILE_SERVICE
 from services.chat.theme_policy import (
@@ -865,6 +866,9 @@ class PresentationChatMemoryLayer:
     async def generate_image(self, prompt: str) -> str:
         image_generation_service = ImageGenerationService(get_images_directory())
         image = await image_generation_service.generate_image(ImagePrompt(prompt=prompt))
+
+        if isinstance(image, ManagedProviderImage):
+            return str(image.asset_id)
 
         if isinstance(image, ImageAsset):
             self._sql_session.add(image)

@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 import uuid
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Uuid
 from sqlmodel import Field, SQLModel
 
 from enums.async_task_status import AsyncTaskStatus
@@ -49,6 +49,12 @@ class AsyncTaskModel(SQLModel, table=True):
     actor_id: Optional[uuid.UUID] = Field(
         default=None,
         sa_column=Column(ForeignKey("user.id", ondelete="SET NULL"), nullable=True),
+    )
+    durable_job_id: Optional[uuid.UUID] = Field(
+        default=None,
+        # The Alembic schema owns the FK. Keeping the model column dependency-free
+        # preserves partial-table unit fixtures used by legacy compatibility tests.
+        sa_column=Column(Uuid(), nullable=True, index=True),
     )
     created_at: datetime = Field(
         sa_column=Column(

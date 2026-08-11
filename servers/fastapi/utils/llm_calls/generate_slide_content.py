@@ -2,13 +2,13 @@ import json
 from datetime import datetime
 from typing import Optional
 
-from llmai import get_client
+from modules.providers.application.text_client import get_text_client as get_client
 from llmai.shared import JSONSchemaResponse, Message, SystemMessage, UserMessage
 
 from models.presentation_layout import SlideLayoutModel
 from models.presentation_outline_model import SlideOutlineModel
 from utils.llm_client_error_handler import handle_llm_client_exceptions
-from utils.llm_config import get_llm_config
+from modules.providers.application.legacy_facade import get_text_provider_client_config as get_llm_config
 from utils.llm_provider import get_model
 from utils.llm_utils import DisconnectChecker, generate_structured_with_schema_retries
 from utils.schema_utils import (
@@ -234,7 +234,7 @@ async def get_slide_content_from_type_and_outline(
     if response_schema is None:
         return {}
 
-    client = get_client(config=get_llm_config())
+    client = get_client(config=get_llm_config(operation="presentation.slide_content"))
     model = get_model()
 
     try:

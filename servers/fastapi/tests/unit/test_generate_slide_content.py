@@ -102,7 +102,7 @@ def test_slide_content_generation_normalizes_object_schema_and_calls_llm(
         }
 
     monkeypatch.setattr(generate_slide_content, "get_client", lambda **_kwargs: object())
-    monkeypatch.setattr(generate_slide_content, "get_llm_config", lambda: {})
+    monkeypatch.setattr(generate_slide_content, "get_llm_config", lambda **_kwargs: {})
     monkeypatch.setattr(generate_slide_content, "get_model", lambda: "test-model")
     monkeypatch.setattr(
         generate_slide_content,

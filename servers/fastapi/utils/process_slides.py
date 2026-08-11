@@ -6,7 +6,8 @@ from models.json_path_guide import JsonPathGuide
 from models.sql.image_asset import ImageAsset
 from models.sql.slide import SlideModel
 from services.icon_finder_service import ICON_FINDER_SERVICE
-from services.image_generation_service import ImageGenerationService
+from modules.providers.application.legacy_image_facade import ProviderImageService as ImageGenerationService
+from modules.providers.application.image_service import ManagedProviderImage
 from utils.asset_directory_utils import (
     filesystem_image_path_to_app_data_url,
     normalize_slide_asset_url,
@@ -174,6 +175,14 @@ async def process_slide_and_fetch_assets(
                     filesystem_image_path_to_app_data_url(result.path),
                     template=template,
                 )
+            elif isinstance(result, ManagedProviderImage):
+                image_dict["assetId"] = str(result.asset_id)
+                _set_asset_url(
+                    image_dict,
+                    "image",
+                    normalize_slide_asset_url("/static/images/placeholder.jpg"),
+                    template=template,
+                )
             else:
                 _set_asset_url(
                     image_dict,
@@ -224,7 +233,7 @@ async def process_old_and_new_slides_and_fetch_assets(
     new_icon_assets = _asset_dicts_with_prompt(new_slide_content, ICON_QUERY_KEYS)
 
     old_image_urls = {
-        prompt: image_url
+        prompt: (image_url, asset.get("assetId"))
         for _path, asset, prompt in old_image_assets
         if (
             image_url := _get_asset_url(
@@ -250,12 +259,15 @@ async def process_old_and_new_slides_and_fetch_assets(
     fetched_image_targets = []
     for _path, new_image, image_prompt in new_image_assets:
         if image_prompt in old_image_urls:
+            image_url, asset_id = old_image_urls[image_prompt]
             _set_asset_url(
                 new_image,
                 "image",
-                old_image_urls[image_prompt],
+                image_url,
                 template=use_template_asset_fields,
             )
+            if asset_id:
+                new_image["assetId"] = asset_id
             continue
         async_image_fetch_tasks.append(
             image_generation_service.generate_image(ImagePrompt(prompt=image_prompt))
@@ -301,6 +313,9 @@ async def process_old_and_new_slides_and_fetch_assets(
         elif isinstance(fetched_image, ImageAsset):
             new_assets.append(fetched_image)
             image_url = filesystem_image_path_to_app_data_url(fetched_image.path)
+        elif isinstance(fetched_image, ManagedProviderImage):
+            target["assetId"] = str(fetched_image.asset_id)
+            image_url = normalize_slide_asset_url("/static/images/placeholder.jpg")
         else:
             image_url = normalize_slide_asset_url(fetched_image)
         _set_asset_url(

@@ -32,6 +32,7 @@ import {
 } from "@/utils/chatgptAuth";
 import { useI18n } from "@/i18n/catalog";
 import { localizePathname } from "@/i18n/routing";
+import { ProviderRegistryPanel } from "@/features/providers/ProviderRegistryPanel";
 
 const STOCK_IMAGE_PROVIDERS = new Set(["pexels", "pixabay"]);
 
@@ -390,6 +391,7 @@ const SettingsPage = () => {
           />}
           {selectedProvider === 'image-provider' && <ImageProvider llmConfig={llmConfig} setLlmConfig={setLlmConfig} />}
           {selectedProvider === 'web-search-provider' && <WebSearchProvider llmConfig={llmConfig} setLlmConfig={setLlmConfig} />}
+          {selectedProvider === 'provider-registry' && <ProviderRegistryPanel />}
           {selectedProvider === 'privacy' && <PrivacySettings />}
           {selectedProvider === "admin" && <AdminPanel embedded />}
           {selectedProvider === "session" && (
@@ -411,7 +413,7 @@ const SettingsPage = () => {
       </main>
 
       {/* Fixed Bottom Button — hidden on Sign out; nothing to save there */}
-      {!["session", "admin"].includes(selectedProvider) ? (
+      {!['session', 'admin', 'provider-registry'].includes(selectedProvider) ? (
         <div className="mx-auto fixed bottom-20 end-5">
           <button
             onClick={handleSaveConfig}

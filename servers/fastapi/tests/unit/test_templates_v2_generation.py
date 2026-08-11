@@ -216,7 +216,7 @@ def test_generate_slide_layout_requests_complete_layout(monkeypatch, caplog):
         ]
     )
     monkeypatch.setattr("templates.v2.generation.get_client", lambda **_kwargs: client)
-    monkeypatch.setattr("templates.v2.generation.get_llm_config", lambda: {})
+    monkeypatch.setattr("templates.v2.generation.get_llm_config", lambda **_kwargs: {})
     monkeypatch.setattr("templates.v2.generation.get_model", lambda: "test-model")
     monkeypatch.setattr(
         PreviewSlideTool,
@@ -277,7 +277,7 @@ def test_generate_slide_layout_requests_complete_layout(monkeypatch, caplog):
 def test_generate_slide_layout_accepts_direct_schema_response(monkeypatch, caplog):
     client = _FakeClient(responses=[_FakeResponse(_generated_layout())])
     monkeypatch.setattr("templates.v2.generation.get_client", lambda **_kwargs: client)
-    monkeypatch.setattr("templates.v2.generation.get_llm_config", lambda: {})
+    monkeypatch.setattr("templates.v2.generation.get_llm_config", lambda **_kwargs: {})
     monkeypatch.setattr("templates.v2.generation.get_model", lambda: "test-model")
     monkeypatch.setattr(
         PreviewSlideTool,
@@ -308,7 +308,7 @@ def test_generate_slide_layout_accepts_direct_schema_response(monkeypatch, caplo
 def test_generate_slide_layout_replaces_content_image_urls(monkeypatch):
     client = _FakeClient(responses=[_FakeResponse(_generated_layout_with_images())])
     monkeypatch.setattr("templates.v2.generation.get_client", lambda **_kwargs: client)
-    monkeypatch.setattr("templates.v2.generation.get_llm_config", lambda: {})
+    monkeypatch.setattr("templates.v2.generation.get_llm_config", lambda **_kwargs: {})
     monkeypatch.setattr("templates.v2.generation.get_model", lambda: "test-model")
     monkeypatch.setattr(
         PreviewSlideTool,
@@ -336,7 +336,7 @@ def test_generate_slide_layout_replaces_content_image_urls(monkeypatch):
 def test_generate_slide_layout_passes_max_tokens_when_provided(monkeypatch):
     client = _FakeClient(responses=[_FakeResponse(_generated_layout())])
     monkeypatch.setattr("templates.v2.generation.get_client", lambda **_kwargs: client)
-    monkeypatch.setattr("templates.v2.generation.get_llm_config", lambda: {})
+    monkeypatch.setattr("templates.v2.generation.get_llm_config", lambda **_kwargs: {})
     monkeypatch.setattr("templates.v2.generation.get_model", lambda: "test-model")
     monkeypatch.setattr(
         PreviewSlideTool,
@@ -360,7 +360,7 @@ def test_generate_slide_layout_uses_json_schema_response_for_google(monkeypatch)
     monkeypatch.setattr("templates.v2.generation.get_client", lambda **_kwargs: client)
     monkeypatch.setattr(
         "templates.v2.generation.get_llm_config",
-        lambda: GoogleClientConfig(api_key="test-key"),
+        lambda **_kwargs: GoogleClientConfig(api_key="test-key"),
     )
     monkeypatch.setattr("templates.v2.generation.get_model", lambda: "gemini-test")
     monkeypatch.setattr(
@@ -514,7 +514,7 @@ def test_generate_slide_layout_allows_second_preview_then_returns_final_json(
         )
 
     monkeypatch.setattr("templates.v2.generation.get_client", lambda **_kwargs: client)
-    monkeypatch.setattr("templates.v2.generation.get_llm_config", lambda: {})
+    monkeypatch.setattr("templates.v2.generation.get_llm_config", lambda **_kwargs: {})
     monkeypatch.setattr("templates.v2.generation.get_model", lambda: "test-model")
     monkeypatch.setattr(PreviewSlideTool, "render", fake_render)
     caplog.set_level(logging.INFO, logger="templates.v2.generation")
@@ -691,7 +691,7 @@ def test_merge_similar_components_clusters_by_global_component_index(
         }
     )
     monkeypatch.setattr("templates.v2.generation.get_client", lambda **_kwargs: client)
-    monkeypatch.setattr("templates.v2.generation.get_llm_config", lambda: {})
+    monkeypatch.setattr("templates.v2.generation.get_llm_config", lambda **_kwargs: {})
     monkeypatch.setattr("templates.v2.generation.get_model", lambda: "test-model")
     caplog.set_level(logging.INFO, logger="templates.v2.generation")
 
@@ -847,7 +847,7 @@ def test_merge_similar_components_removes_structural_duplicates_after_clustering
     layouts = SlideLayouts.model_validate({"layouts": [first, second, third]})
     client = _FakeClient({"similar_components": []})
     monkeypatch.setattr("templates.v2.generation.get_client", lambda **_kwargs: client)
-    monkeypatch.setattr("templates.v2.generation.get_llm_config", lambda: {})
+    monkeypatch.setattr("templates.v2.generation.get_llm_config", lambda **_kwargs: {})
     monkeypatch.setattr("templates.v2.generation.get_model", lambda: "test-model")
 
     merged = merge_similar_components(layouts)

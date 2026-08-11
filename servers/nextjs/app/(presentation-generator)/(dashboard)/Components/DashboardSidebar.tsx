@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { LayoutDashboard, Star, Brain, Settings, HelpCircle, UsersRound } from "lucide-react";
+import { LayoutDashboard, Star, Brain, Settings, HelpCircle, UsersRound, ListChecks, Library } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { PRODUCT_IDENTITY } from "@/lib/product-identity";
@@ -70,6 +70,26 @@ const DashboardSidebar = () => {
                         >
                             <UsersRound className={["h-4 w-4", routePath === "/workspaces/members" ? "text-[#5146E5]" : "text-slate-600"].join(" ")} />
                             <span className="text-[11px] text-slate-800">{t("workspace.members")}</span>
+                        </Link>}
+                        {process.env.NEXT_PUBLIC_DURABLE_JOBS_ENABLED === "true" && workspace.available && workspace.can("jobs:read") && <Link
+                            prefetch={false}
+                            href={localizePathname("/jobs", locale)}
+                            className="flex flex-col items-center gap-2 transition-colors"
+                            aria-label={t("jobs.title")}
+                            title={t("jobs.title")}
+                        >
+                            <ListChecks className={["h-4 w-4", routePath === "/jobs" ? "text-[#5146E5]" : "text-slate-600"].join(" ")} />
+                            <span className="text-[11px] text-slate-800">{t("jobs.nav")}</span>
+                        </Link>}
+                        {process.env.NEXT_PUBLIC_ASSET_LIBRARY_ENABLED === "true" && workspace.available && workspace.can("assets:read") && <Link
+                            prefetch={false}
+                            href={localizePathname("/assets", locale)}
+                            className="flex flex-col items-center gap-2 transition-colors"
+                            aria-label={t("assets.title")}
+                            title={t("assets.title")}
+                        >
+                            <Library className={["h-4 w-4", routePath === "/assets" ? "text-[#5146E5]" : "text-slate-600"].join(" ")} />
+                            <span className="text-[11px] text-slate-800">{t("assets.nav")}</span>
                         </Link>}
                         <Link
                             prefetch={false}

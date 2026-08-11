@@ -709,6 +709,19 @@ const startServers = async (nginxReadyPromise) => {
 
   try {
     await Promise.all([fastApiReadyPromise, nextjsReadyPromise, nginxReadyPromise]);
+    const durableJobsEnabled = ["1", "true", "yes", "on"].includes(
+      String(process.env.DURABLE_JOBS_ENABLED || "").trim().toLowerCase()
+    );
+    if (durableJobsEnabled) {
+      const jobWorkerProcess = spawn(
+        "python",
+        ["-m", "modules.jobs.workers.main"],
+        { cwd: fastapiDir, stdio: ["ignore", "pipe", "pipe"], env: process.env }
+      );
+      watchManagedProcess("Durable job worker", jobWorkerProcess);
+      forwardProcessOutput(jobWorkerProcess.stdout, process.stdout, { suppressStartupUrls: true });
+      forwardProcessOutput(jobWorkerProcess.stderr, process.stderr, { suppressStartupUrls: true });
+    }
     printPresentonStartupBanner({
       mode: isDev ? "development" : "production",
       nextPort: nextjsPort,

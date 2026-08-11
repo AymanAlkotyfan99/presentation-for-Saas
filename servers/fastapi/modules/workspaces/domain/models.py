@@ -28,6 +28,7 @@ class Permission(str, Enum):
     TEMPLATES_READ = "templates:read"
     TEMPLATES_WRITE = "templates:write"
     JOBS_READ = "jobs:read"
+    JOBS_WRITE = "jobs:write"
     INVITATIONS_MANAGE = "invitations:manage"
     CREDENTIALS_MANAGE = "credentials:manage"
     AUDIT_READ = "audit:read"

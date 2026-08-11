@@ -15,6 +15,7 @@ from models.sql.presentation import PresentationModel, PresentationVersion
 from models.sql.presentation_document import PresentationDocumentModel
 from models.sql.presentation_revision import PresentationRevisionModel, PresentationRevisionPatchModel
 from models.sql.slide import SlideModel
+from modules.assets.persistence.models import AssetModel
 from services.database import get_async_session
 from utils.api_errors import StableAPIError
 
@@ -28,6 +29,7 @@ def _client(tmp_path, presentation_id):
             await connection.run_sync(PresentationModel.__table__.create)
             await connection.run_sync(SlideModel.__table__.create)
             await connection.run_sync(ImageAsset.__table__.create)
+            await connection.run_sync(AssetModel.__table__.create)
             await connection.run_sync(PresentationDocumentModel.__table__.create)
             await connection.run_sync(PresentationRevisionModel.__table__.create)
             await connection.run_sync(PresentationRevisionPatchModel.__table__.create)

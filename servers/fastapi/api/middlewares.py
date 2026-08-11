@@ -1,3 +1,4 @@
+from dataclasses import replace
 from uuid import UUID
 from fastapi import Request
 from sqlalchemy import func, select
@@ -67,6 +68,16 @@ class SessionAuthMiddleware(BaseHTTPMiddleware):
             return None
         if path.startswith("/app_data/"):
             return Permission.ASSETS_READ
+        if path == "/api/v1/jobs" or path.startswith("/api/v1/jobs/"):
+            return (
+                Permission.JOBS_READ
+                if method == "GET"
+                else Permission.JOBS_WRITE
+            )
+        if path == "/api/v1/assets" or path.startswith("/api/v1/assets/"):
+            if method == "GET" or path.endswith("/download-capability"):
+                return Permission.ASSETS_READ
+            return Permission.ASSETS_WRITE
         if path.startswith("/api/v1/async"):
             return Permission.JOBS_READ
         if path.startswith("/api/v1/webhook"):
@@ -175,6 +186,9 @@ class SessionAuthMiddleware(BaseHTTPMiddleware):
                 request.state.workspace = workspace
                 request.state.workspace_membership = membership
                 request.state.workspace_permissions = permissions
+                if workspace is not None and principal.workspace_id != workspace.id:
+                    principal = replace(principal, workspace_id=workspace.id)
+                    request.state.auth_principal = principal
 
                 if workspace_rbac_enforcement_enabled():
                     required = self._required_workspace_permission(path, request.method)

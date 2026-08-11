@@ -15,7 +15,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
         Permission.PRESENTATIONS_READ, Permission.PRESENTATIONS_WRITE,
         Permission.ASSETS_READ, Permission.ASSETS_WRITE,
         Permission.TEMPLATES_READ, Permission.TEMPLATES_WRITE,
-        Permission.JOBS_READ, Permission.INVITATIONS_MANAGE,
+        Permission.JOBS_READ, Permission.JOBS_WRITE, Permission.INVITATIONS_MANAGE,
         Permission.CREDENTIALS_MANAGE, Permission.AUDIT_READ,
     }),
     Role.EDITOR: frozenset({
@@ -23,7 +23,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
         Permission.PRESENTATIONS_READ, Permission.PRESENTATIONS_WRITE,
         Permission.ASSETS_READ, Permission.ASSETS_WRITE,
         Permission.TEMPLATES_READ, Permission.TEMPLATES_WRITE,
-        Permission.JOBS_READ,
+        Permission.JOBS_READ, Permission.JOBS_WRITE,
     }),
     Role.VIEWER: frozenset({
         Permission.WORKSPACE_VIEW, Permission.MEMBERS_VIEW,
@@ -39,6 +39,7 @@ SERVICE_ACCOUNT_SCOPES = frozenset({
     Permission.ASSETS_WRITE.value,
     Permission.TEMPLATES_READ.value,
     Permission.JOBS_READ.value,
+    Permission.JOBS_WRITE.value,
 })
 
 

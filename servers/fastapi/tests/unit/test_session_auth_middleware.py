@@ -43,5 +43,13 @@ def test_workspace_permissions_are_centralized_by_resource_and_method():
     assert required("/api/v1/ppt/images/generate", "GET") == Permission.ASSETS_WRITE
     assert required("/api/v1/ppt/template/item", "DELETE") == Permission.TEMPLATES_WRITE
     assert required("/api/v1/async-tasks/status/task", "GET") == Permission.JOBS_READ
+    assert required("/api/v1/jobs", "GET") == Permission.JOBS_READ
+    assert required("/api/v1/jobs/id/cancel", "POST") == Permission.JOBS_WRITE
+    assert required("/api/v1/assets", "GET") == Permission.ASSETS_READ
+    assert required("/api/v1/assets/id", "DELETE") == Permission.ASSETS_WRITE
+    assert (
+        required("/api/v1/assets/id/download-capability", "POST")
+        == Permission.ASSETS_READ
+    )
     assert required("/app_data/images/workspaces/id/file.png", "GET") == Permission.ASSETS_READ
     assert required("/api/v1/workspaces/current", "GET") is None

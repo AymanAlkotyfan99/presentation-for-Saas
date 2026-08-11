@@ -146,7 +146,10 @@ def test_generate_ppt_outline_default_openai_uses_native_search_tool(monkeypatch
             )
         )
 
-    assert captured_config_kwargs == {"use_openai_responses_api": True}
+    assert captured_config_kwargs == {
+        "use_openai_responses_api": True,
+        "operation": "presentation.outline",
+    }
     assert len(captured_kwargs["tools"]) == 1
     assert isinstance(captured_kwargs["tools"][0], WebSearchTool)
     assert captured_kwargs["disconnect_checker"] is is_disconnected
