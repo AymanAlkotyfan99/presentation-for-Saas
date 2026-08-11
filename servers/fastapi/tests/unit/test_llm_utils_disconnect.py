@@ -43,6 +43,7 @@ class StreamingClient:
 
 def test_regular_generation_keeps_existing_retry_behavior(monkeypatch):
     monkeypatch.setenv("LLM", "ollama")
+    monkeypatch.setenv("PROVIDER_REGISTRY_ENABLED", "false")
     client = RetryClient()
 
     with patch("utils.llm_utils.asyncio.sleep", new=AsyncMock()):
@@ -63,6 +64,7 @@ def test_regular_generation_keeps_existing_retry_behavior(monkeypatch):
 
 def test_disconnect_cancels_generation_without_retrying(monkeypatch):
     monkeypatch.setenv("LLM", "ollama")
+    monkeypatch.setenv("PROVIDER_REGISTRY_ENABLED", "false")
     client = StreamingClient()
 
     async def run():
@@ -90,6 +92,7 @@ def test_disconnect_cancels_generation_without_retrying(monkeypatch):
 
 def test_connected_request_uses_stream_completion_content(monkeypatch):
     monkeypatch.setenv("LLM", "ollama")
+    monkeypatch.setenv("PROVIDER_REGISTRY_ENABLED", "false")
 
     class CompletedClient:
         def __init__(self):
@@ -126,6 +129,7 @@ def test_connected_request_uses_stream_completion_content(monkeypatch):
 
 def test_connected_request_keeps_schema_validation_retries(monkeypatch):
     monkeypatch.setenv("LLM", "ollama")
+    monkeypatch.setenv("PROVIDER_REGISTRY_ENABLED", "false")
 
     class ValidationRetryClient:
         def __init__(self):
@@ -161,3 +165,36 @@ def test_connected_request_keeps_schema_validation_retries(monkeypatch):
     assert asyncio.run(run()) == {"result": "fixed"}
     assert len(client.calls) == 2
     assert all(call["stream"] is True for call in client.calls)
+
+
+def test_registry_mode_has_one_parse_attempt_and_one_schema_correction(monkeypatch):
+    monkeypatch.setenv("PROVIDER_REGISTRY_ENABLED", "true")
+
+    class BoundedClient:
+        def __init__(self):
+            self.calls = []
+            self.responses = [{"wrong": "value"}, {"still": "wrong"}, {"result": "late"}]
+
+        def generate(self, **kwargs):
+            self.calls.append(kwargs)
+            return SimpleNamespace(content=self.responses.pop(0))
+
+    client = BoundedClient()
+    result = asyncio.run(
+        generate_structured_with_schema_retries(
+            client,
+            "test-model",
+            messages=[],
+            response_format=object(),
+            json_schema={
+                "type": "object",
+                "properties": {"result": {"type": "string"}},
+                "required": ["result"],
+            },
+            validate_schema=True,
+            validate_schema_max_loop_count=99,
+        )
+    )
+
+    assert result == {"still": "wrong"}
+    assert len(client.calls) == 2

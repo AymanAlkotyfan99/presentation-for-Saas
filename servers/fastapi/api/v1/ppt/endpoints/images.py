@@ -8,7 +8,7 @@ from sqlmodel import select
 from models.image_prompt import ImagePrompt
 from models.sql.image_asset import ImageAsset
 from services.database import get_async_session
-from services.image_generation_service import ImageGenerationService
+from modules.providers.application.legacy_image_facade import ManagedProviderImage, ProviderImageService as ImageGenerationService
 from utils.asset_directory_utils import (
     filesystem_image_path_to_app_data_url,
     get_images_directory,
@@ -20,6 +20,13 @@ from enums.image_provider import ImageProvider
 import os
 import uuid
 from utils.file_utils import get_file_name_with_random_uuid
+from api.v1.auth.context import (
+    get_current_owner_id,
+    get_current_service_account_id,
+    get_current_workspace_id,
+)
+from utils.architecture_flags import asset_library_enabled, object_storage_writes_enabled
+from modules.providers.application.runtime import provider_platform_active
 
 IMAGES_ROUTER = APIRouter(prefix="/images", tags=["Images"])
 
@@ -120,6 +127,15 @@ async def search_stock_images(
     strict_api_key: bool = Query(default=False),
     x_provider_api_key: str | None = Header(default=None, alias="X-Provider-Api-Key"),
 ):
+    if provider_platform_active():
+        if provider or x_provider_api_key or strict_api_key:
+            raise HTTPException(
+                status_code=400,
+                detail="Provider selection and request-scoped credentials are forbidden in registry mode",
+            )
+        service = ImageGenerationService(get_images_directory())
+        values = await service.get_image_from_pexels(query, limit=min(limit, 8))
+        return [str(item.asset_id) for item in values if isinstance(item, ManagedProviderImage)]
     normalized_provider = _normalize_stock_provider(provider)
 
     image_generation_service = ImageGenerationService(get_images_directory())
@@ -171,8 +187,31 @@ async def generate_image(
     image_generation_service = ImageGenerationService(images_directory)
 
     image = await image_generation_service.generate_image(image_prompt)
+    if isinstance(image, ManagedProviderImage):
+        return {"assetId": str(image.asset_id), "state": image.state, "mimeType": None}
     if not isinstance(image, ImageAsset):
         return normalize_slide_asset_url(image) if isinstance(image, str) else image
+
+    if object_storage_writes_enabled() and asset_library_enabled():
+        from modules.assets.application.service import ingest_file
+        from modules.assets.domain.models import RetentionClass
+
+        workspace_id = get_current_workspace_id()
+        if workspace_id is None:
+            raise HTTPException(status_code=409, detail="A workspace is required for managed generated assets")
+        with Image.open(image.path) as generated_image:
+            detected = generated_image.get_format_mimetype() or "image/png"
+        managed = await ingest_file(
+            sql_session,
+            path=image.path,
+            declared_mime=detected,
+            workspace_id=workspace_id,
+            actor_id=get_current_owner_id(),
+            actor_service_account_id=get_current_service_account_id(),
+            retention_class=RetentionClass.WORKSPACE,
+        )
+        await sql_session.commit()
+        return {"assetId": str(managed.id), "state": managed.state.value, "mimeType": managed.detected_mime}
 
     sql_session.add(image)
     await sql_session.commit()
@@ -212,6 +251,29 @@ async def upload_image(
 ):
     try:
         content = await _read_validated_image_upload(file)
+        if object_storage_writes_enabled() and asset_library_enabled():
+            from modules.assets.application.service import ingest_bytes
+
+            workspace_id = get_current_workspace_id()
+            if workspace_id is None:
+                raise HTTPException(status_code=409, detail="A workspace is required for managed uploads")
+            managed = await ingest_bytes(
+                sql_session,
+                workspace_id=workspace_id,
+                actor_id=get_current_owner_id(),
+                actor_service_account_id=get_current_service_account_id(),
+                data=content,
+                filename=file.filename,
+                declared_mime=file.content_type or "application/octet-stream",
+            )
+            await sql_session.commit()
+            return {
+                "id": managed.id,
+                "assetId": managed.id,
+                "state": managed.state.value,
+                "detectedMime": managed.detected_mime,
+                "file_url": None,
+            }
         new_filename = get_file_name_with_random_uuid(file)
         image_path = os.path.join(
             get_images_directory(), os.path.basename(new_filename)

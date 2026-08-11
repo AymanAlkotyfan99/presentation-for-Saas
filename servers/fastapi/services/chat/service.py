@@ -10,7 +10,7 @@ from typing import Any, Literal
 
 import dirtyjson  # type: ignore[import-untyped]
 from fastapi import HTTPException
-from llmai import get_client  # type: ignore[import-not-found]
+from modules.providers.application.text_client import get_text_client as get_client
 from llmai.shared import (  # type: ignore[import-not-found]
     AssistantMessage,
     AssistantToolCall,
@@ -33,7 +33,7 @@ from services.documents_loader import DocumentsLoader
 from services.mem0_presentation_memory_service import MEM0_PRESENTATION_MEMORY_SERVICE
 from services.temp_file_service import TEMP_FILE_SERVICE
 from utils.llm_client_error_handler import handle_llm_client_exceptions
-from utils.llm_config import get_llm_config
+from modules.providers.application.legacy_facade import get_text_provider_client_config as get_llm_config
 from utils.llm_provider import get_model
 from utils.llm_utils import (
     extract_text,
@@ -117,7 +117,7 @@ class PresentationChatService:
             attachments or [],
         )
 
-        client = get_client(config=get_llm_config())
+        client = get_client(config=get_llm_config(operation="chat.stream"))
         model = get_model()
         tools = build_chat_llm_tools(self._tools.get_tool_definitions())
 
@@ -360,7 +360,7 @@ class PresentationChatService:
         )
 
     async def _run_llm_with_tools(self, messages: list[Message]) -> tuple[str, list[str]]:
-        client = get_client(config=get_llm_config())
+        client = get_client(config=get_llm_config(operation="chat.respond"))
         model = get_model()
         tools = build_chat_llm_tools(self._tools.get_tool_definitions())
 

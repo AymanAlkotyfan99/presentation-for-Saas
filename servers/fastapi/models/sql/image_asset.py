@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 import uuid
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Uuid
 from sqlmodel import Field, SQLModel
 
 from utils.datetime_utils import get_current_utc_datetime
@@ -29,4 +29,5 @@ class ImageAsset(SQLModel, table=True):
     )
     is_uploaded: bool = Field(default=False)
     path: str
+    asset_id: Optional[uuid.UUID] = Field(default=None, sa_column=Column(Uuid(), nullable=True, index=True))
     extras: Optional[dict] = Field(sa_column=Column(JSON), default=None)

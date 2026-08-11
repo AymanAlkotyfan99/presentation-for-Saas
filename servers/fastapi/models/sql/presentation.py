@@ -53,6 +53,7 @@ class PresentationModel(SQLModel, table=True):
     language: str
     title: Optional[str] = None
     file_paths: Optional[List[str]] = Field(sa_column=Column(JSON), default=None)
+    file_asset_ids: Optional[List[str]] = Field(sa_column=Column(JSON), default=None)
     outlines: Optional[dict] = Field(sa_column=Column(JSON), default=None)
     created_at: datetime = Field(
         sa_column=Column(
@@ -90,6 +91,7 @@ class PresentationModel(SQLModel, table=True):
             language=self.language,
             title=self.title,
             file_paths=copy.deepcopy(self.file_paths),
+            file_asset_ids=copy.deepcopy(self.file_asset_ids),
             outlines=copy.deepcopy(self.outlines),
             layout=copy.deepcopy(self.layout),
             structure=copy.deepcopy(self.structure),

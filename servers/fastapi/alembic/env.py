@@ -44,6 +44,17 @@ from modules.workspaces.persistence.models import (  # noqa: F401, E402
     ServiceAccountModel,
     WorkspaceModel,
 )
+from modules.jobs.persistence.models import (  # noqa: F401, E402
+    ConsumerInboxModel, DeadLetterModel, JobAttemptModel, JobEventModel,
+    JobModel, OutboxMessageModel,
+)
+from modules.assets.persistence.models import (  # noqa: F401, E402
+    AssetModel, AssetReferenceModel, ObjectVersionModel, UploadSessionModel,
+)
+from modules.providers.persistence.models import (  # noqa: F401, E402
+    EncryptedProviderSecretModel, ProviderAccountModel, ProviderCapabilityModel,
+    ProviderCircuitModel, ProviderHealthModel, ProviderSnapshotModel, ProviderUsageModel, RoutingPolicyModel,
+)
 
 alembic_config = context.config
 

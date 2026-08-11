@@ -16,6 +16,8 @@ import {
   stripLocalePrefix,
 } from "@/i18n/routing";
 
+const LOCALE_REWRITE_HEADER = "x-bayanly-locale-rewrite";
+
 function withLocaleCookie(response: NextResponse, locale: "en" | "ar") {
   response.cookies.set(LOCALE_COOKIE_NAME, locale, {
     httpOnly: false,
@@ -31,6 +33,12 @@ export function proxy(request: NextRequest) {
   try {
     const { pathname } = request.nextUrl;
     if (!LOCALE_ROUTING_ENABLED || shouldBypassLocaleRouting(pathname, request.method)) {
+      return NextResponse.next();
+    }
+    // Next.js 16 may pass an internal rewrite through the proxy a second time.
+    // Let the already-localized request reach the flat App Router tree instead
+    // of redirecting the stripped path back to its locale prefix forever.
+    if (request.headers.get(LOCALE_REWRITE_HEADER) === "1") {
       return NextResponse.next();
     }
 
@@ -57,6 +65,7 @@ export function proxy(request: NextRequest) {
 
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set(LOCALE_REQUEST_HEADER, explicitLocale);
+    requestHeaders.set(LOCALE_REWRITE_HEADER, "1");
     const rewriteUrl = request.nextUrl.clone();
     rewriteUrl.pathname = stripLocalePrefix(pathname);
     return withLocaleCookie(

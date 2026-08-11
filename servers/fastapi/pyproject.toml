@@ -34,6 +34,8 @@ dependencies = [
     "python-pptx>=1.0.2",
     "fonttools>=4.55.0",
     "redis>=5.2.0",
+    "boto3>=1.35.0",
+    "cryptography>=44.0.0",
 ]
 
 [tool.uv]
@@ -51,6 +53,7 @@ include = [
     "constants*",
     "utils*",
     "templates*",
+    "modules*",
 ]
 
 [tool.pyright]
@@ -65,7 +68,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "modules"]
 
 # Line coverage defaults (omit non-runtime / generated paths). Branch coverage doubles
 # the work for marginal signal; optimize for deterministic statement coverage runs.

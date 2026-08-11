@@ -17,6 +17,7 @@ from llmai.shared import (
 )
 
 from utils.llm_config import get_extra_body
+from utils.architecture_flags import provider_registry_enabled
 from utils.schema_utils import get_schema_validation_errors
 
 
@@ -82,7 +83,7 @@ def get_generate_kwargs(
     if response_format is not None:
         kwargs["response_format"] = response_format
 
-    extra_body = get_extra_body(uses_tool_choice=bool(tools or response_format))
+    extra_body = None if provider_registry_enabled() else get_extra_body(uses_tool_choice=bool(tools or response_format))
     if extra_body:
         kwargs["extra_body"] = extra_body
 
@@ -138,13 +139,23 @@ async def generate_structured_with_schema_retries(
     """
     Parse retries (inner loop) plus optional JSON Schema validation feedback loops (outer loop),
     matching the overflow-mitigation behavior from structured generation with validate_schema.
+
+    Registry mode already has bounded account fallback in ``ProviderExecutor`` and durable
+    jobs have their own retry budget. Keep this business-layer budget to one provider
+    execution plus, at most, one schema-correction execution so the layers cannot multiply
+    into an unreasonably large retry fan-out. Legacy mode retains its historical budget for
+    rollback compatibility.
     """
+    registry_mode = provider_registry_enabled()
     max_validation_loops = max(1, validate_schema_max_loop_count)
+    if registry_mode:
+        max_validation_loops = min(max_validation_loops, 2)
+    parse_attempt_count = 1 if registry_mode else 3
     working_messages: list[Message] = list(messages)
 
     for validation_attempt in range(max_validation_loops):
         content: Optional[dict] = None
-        for attempt in range(3):
+        for attempt in range(parse_attempt_count):
             await _raise_if_client_disconnected(disconnect_checker)
             content = await _generate_structured_content(
                 client,
@@ -157,7 +168,7 @@ async def generate_structured_with_schema_retries(
             )
             if content is not None:
                 break
-            if attempt < 2:
+            if attempt < parse_attempt_count - 1:
                 await asyncio.sleep(0.5 * (attempt + 1))
 
         if content is None:

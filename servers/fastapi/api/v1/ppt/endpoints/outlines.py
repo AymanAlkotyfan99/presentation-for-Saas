@@ -35,7 +35,7 @@ from utils.llm_calls.generate_presentation_outlines import (
     get_messages as get_outline_messages,
 )
 from utils.sse import safe_sse_stream
-from utils.web_search import get_selected_web_search_provider, get_web_search_route
+from modules.providers.application.legacy_search_facade import get_selected_web_search_provider, get_web_search_route
 from utils.architecture_flags import require_legacy_v1_read, require_legacy_v1_write
 
 OUTLINES_ROUTER = APIRouter(prefix="/outlines", tags=["Outlines"])

@@ -1,11 +1,11 @@
 import React from 'react'
-import { LogOut, Search, Shield, ShieldCheck } from 'lucide-react'
+import { Cpu, LogOut, Search, Shield, ShieldCheck } from 'lucide-react'
 import { IMAGE_PROVIDERS, LLM_PROVIDERS } from '@/utils/providerConstants'
 import { useSelector } from 'react-redux'
 import { RootState } from '@/store/store'
 import { useTranslations } from '@/i18n/catalog'
 
-export type SettingsSection = 'text-provider' | 'image-provider' | 'web-search-provider' | 'privacy' | 'admin' | 'session'
+export type SettingsSection = 'text-provider' | 'image-provider' | 'web-search-provider' | 'provider-registry' | 'privacy' | 'admin' | 'session'
 
 const SettingSideBar = ({ selectedProvider, setSelectedProvider }: { selectedProvider: SettingsSection, setSelectedProvider: (provider: SettingsSection) => void }) => {
     const t = useTranslations()
@@ -36,6 +36,10 @@ const SettingSideBar = ({ selectedProvider, setSelectedProvider }: { selectedPro
                             <Search className='w-3 h-3 text-[#5146E5]' />
                         </div>
                         <p className='text-[#191919] text-xs font-medium'>{t("settings.webSearchProvider")}</p>
+                    </button>
+                    <button className={`w-full rounded-[6px] px-3 py-4 flex items-center gap-1.5 border ${selectedProvider === 'provider-registry' ? 'bg-[#F4F3FF] border-[#D9D6FE]' : 'bg-white border-[#EDEEEF]'}`} onClick={() => setSelectedProvider('provider-registry')}>
+                        <div className='relative w-[18px] h-[18px] rounded-full border border-[#EDEEEF] flex items-center justify-center bg-white'><Cpu className='w-3 h-3 text-[#5146E5]' /></div>
+                        <p className='text-[#191919] text-xs font-medium'>{t("providers.nav")}</p>
                     </button>
                 </div>
             </div>

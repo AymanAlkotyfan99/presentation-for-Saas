@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import random
+import uuid
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextvars import copy_context
@@ -18,6 +19,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Header,
     Path,
     Query,
     Response,
@@ -69,8 +71,16 @@ from utils.icon_weights import (
 )
 from utils.datetime_utils import get_current_utc_datetime
 from utils.llm_client_error_handler import handle_llm_client_exceptions
-from api.v1.auth.context import get_current_owner_id, get_current_workspace_id
-from utils.architecture_flags import workspace_rbac_enforcement_enabled
+from api.v1.auth.context import (
+    get_current_owner_id,
+    get_current_service_account_id,
+    get_current_workspace_id,
+)
+from utils.architecture_flags import (
+    durable_jobs_for_operation,
+    legacy_background_tasks_enabled,
+    workspace_rbac_enforcement_enabled,
+)
 
 
 TEMPLATE_ROUTER = APIRouter(prefix="/template", tags=["Templates"])
@@ -1236,9 +1246,21 @@ async def _run_create_template_task(
 async def create_template(
     background_tasks: BackgroundTasks,
     request: CreateTemplateRequest = Body(...),
+    idempotency_key: Annotated[Optional[str], Header(alias="Idempotency-Key", max_length=128)] = None,
     sql_session: AsyncSession = Depends(get_async_session),
 ):
+    use_durable = durable_jobs_for_operation("template.create")
+    workspace_id = get_current_workspace_id()
+    task_id: str | None = None
+    if use_durable and idempotency_key:
+        if workspace_id is None:
+            raise HTTPException(status_code=409, detail="A workspace is required for durable template creation")
+        task_id = f"task-{uuid.uuid5(workspace_id, f'template.create:{idempotency_key}').hex}"
+        existing_task = await sql_session.get(AsyncTaskModel, task_id)
+        if existing_task is not None:
+            return existing_task
     task = AsyncTaskModel(
+        **({"id": task_id} if task_id else {}),
         type=ASYNC_TASK_TYPE_TEMPLATE_CREATE,
         actor_id=get_current_owner_id(),
         status=AsyncTaskStatus.PENDING,
@@ -1252,10 +1274,35 @@ async def create_template(
     )
     task.resource_id = task.id
     sql_session.add(task)
+    if use_durable:
+        from modules.jobs.application.submit import JobSubmission, submit_job
+        from modules.jobs.domain.models import QueueClass
+
+        if workspace_id is None:
+            raise HTTPException(status_code=409, detail="A workspace is required for durable template creation")
+        job, _ = await submit_job(
+            sql_session,
+            JobSubmission(
+                operation="template.create",
+                queue_class=QueueClass.GENERATION,
+                workspace_id=workspace_id,
+                actor_id=get_current_owner_id(),
+                actor_service_account_id=get_current_service_account_id(),
+                idempotency_scope=f"template.create:{get_current_owner_id() or get_current_service_account_id()}",
+                idempotency_key=idempotency_key or uuid.uuid4().hex,
+                payload={"legacy_task_id": task.id, "request": request.model_dump(mode="json")},
+                max_attempts=3,
+                resource_type="template",
+                resource_id=task.id,
+            ),
+        )
+        task.durable_job_id = job.id
+    elif legacy_background_tasks_enabled():
+        background_tasks.add_task(_run_create_template_task, task.id, request)
+    else:
+        raise HTTPException(status_code=503, detail="No template creation worker is enabled")
     await sql_session.commit()
     await sql_session.refresh(task)
-
-    background_tasks.add_task(_run_create_template_task, task.id, request)
     return task
 
 

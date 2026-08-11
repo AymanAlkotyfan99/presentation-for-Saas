@@ -1,8 +1,12 @@
 import uvicorn
 import argparse
+import asyncio
+import sys
 from api.main import app
 
 if __name__ == "__main__":
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     parser = argparse.ArgumentParser(description="Run the FastAPI server")
     parser.add_argument(
         "--port", type=int, required=True, help="Port number to run the server on"
@@ -26,4 +30,5 @@ if __name__ == "__main__":
         port=args.port,
         log_level=args.log_level,
         reload=reload,
+        loop=asyncio.SelectorEventLoop if sys.platform == "win32" else "auto",
     )

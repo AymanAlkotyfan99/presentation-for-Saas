@@ -9,6 +9,7 @@ import pytest
 
 SPRINT_6_REVISION = "7c9e1a3b5d6f"
 SPRINT_7_REVISION = "8d0f2b4c6e8a"
+CURRENT_PLATFORM_REVISION = "d4f6a8c0e2b3"
 USER_ID = "00000000000040008000000000000001"
 PRESENTATION_ID = "00000000000040008000000000000010"
 REVISION_ID = "00000000000040008000000000000011"
@@ -60,7 +61,7 @@ def test_workspace_migration_backfill_is_repeatable_and_audit_is_append_only(tmp
         {column["name"] for column in inspector.get_columns("async_presentation_generation_tasks")}
     )
     with engine.begin() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == SPRINT_7_REVISION
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == CURRENT_PLATFORM_REVISION
         assert connection.execute(text("SELECT COUNT(*) FROM workspaces WHERE personal_owner_id = :id"), {"id": USER_ID}).scalar_one() == 1
         assert connection.execute(text("SELECT COUNT(*) FROM memberships WHERE workspace_id = :id AND user_id = :id AND role = 'OWNER' AND status = 'ACTIVE'"), {"id": USER_ID}).scalar_one() == 1
         assert connection.execute(text("SELECT workspace_id FROM presentation_revisions WHERE id = :id"), {"id": REVISION_ID}).scalar_one() == USER_ID

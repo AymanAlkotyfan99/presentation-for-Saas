@@ -22,6 +22,7 @@ from utils.get_env import (
     get_openai_compat_image_base_url_env,
     get_openai_compat_image_api_key_env,
     get_openai_compat_image_model_env,
+    get_openai_api_key_env,
     is_parallel_image_generation_enabled,
 )
 from utils.get_env import get_pixabay_api_key_env
@@ -156,7 +157,7 @@ class ImageGenerationService:
     async def generate_image_openai(
         self, prompt: str, output_directory: str, model: str, quality: str
     ) -> str:
-        client = AsyncOpenAI()
+        client = AsyncOpenAI(api_key=get_openai_api_key_env(), max_retries=0)
         result = await client.images.generate(
             model=model,
             prompt=prompt,
@@ -864,29 +865,36 @@ class ImageGenerationService:
         parsed = urlparse(base_url)
         origin = f"{parsed.scheme}://{parsed.netloc}"
 
-        # The OpenAI SDK owns its HTTP transport. Validate the administrator-
-        # configured origin before constructing it; returned asset downloads
-        # below use the fully DNS-pinned client. A future provider adapter should
-        # replace this SDK call so the generation request itself is pinned too.
-        await validate_outbound_url(f"{base_url.rstrip('/')}/images/generations")
-
-        client = AsyncOpenAI(base_url=base_url, api_key=api_key)
-
-        response = await client.images.generate(
-            model=model,
-            prompt=prompt,
-            n=1,
-            size="1024x1024",
-        )
-
-        item = response.data[0]
+        generation_url = f"{base_url.rstrip('/')}/images/generations"
+        async with SecureClientSession() as session:
+            generation_response = await session.post(
+                generation_url,
+                json={"model": model, "prompt": prompt, "n": 1, "size": "1024x1024"},
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                timeout=aiohttp.ClientTimeout(total=300),
+                max_response_bytes=2 * 1024 * 1024,
+            )
+        if generation_response.status >= 400:
+            raise HTTPException(
+                status_code=generation_response.status,
+                detail="OpenAI-compatible image provider request failed",
+            )
+        body = await generation_response.json()
+        items = body.get("data") if isinstance(body, dict) else None
+        if not isinstance(items, list) or not items or not isinstance(items[0], dict):
+            raise HTTPException(status_code=422, detail="OpenAI-compatible provider returned malformed image data")
+        item = items[0]
         image_path = os.path.join(output_directory, f"{uuid.uuid4()}.png")
 
-        if item.b64_json:
+        if item.get("b64_json"):
+            try:
+                decoded_image = base64.b64decode(item["b64_json"], validate=True)
+            except (TypeError, ValueError) as exc:
+                raise HTTPException(status_code=422, detail="OpenAI-compatible provider returned malformed image bytes") from exc
             with open(image_path, "wb") as f:
-                f.write(base64.b64decode(item.b64_json))
-        elif item.url:
-            image_url = item.url
+                f.write(decoded_image)
+        elif item.get("url"):
+            image_url = item["url"]
             is_relative_url = image_url.startswith("/")
             if is_relative_url:
                 image_url = origin + image_url
@@ -913,6 +921,6 @@ class ImageGenerationService:
                 with open(image_path, "wb") as f:
                     f.write(await dl_resp.read())
         else:
-            raise Exception("OpenAI-compatible provider returned no image data")
+            raise HTTPException(status_code=422, detail="OpenAI-compatible provider returned no image data")
 
         return image_path

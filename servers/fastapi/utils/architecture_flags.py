@@ -86,6 +86,84 @@ def legacy_document_fallback_enabled() -> bool:
     return _enabled("LEGACY_DOCUMENT_FALLBACK_ENABLED", True)
 
 
+def durable_jobs_enabled() -> bool:
+    return _enabled("DURABLE_JOBS_ENABLED", False)
+
+
+def durable_jobs_for_operation(operation: str) -> bool:
+    if not durable_jobs_enabled():
+        return False
+    configured = {
+        value.strip()
+        for value in os.getenv("DURABLE_JOBS_BY_OPERATION", "").split(",")
+        if value.strip()
+    }
+    return "*" in configured or operation in configured
+
+
+def durable_webhooks_enabled() -> bool:
+    return durable_jobs_enabled() and _enabled("DURABLE_WEBHOOKS_ENABLED", False)
+
+
+def durable_generation_enabled() -> bool:
+    return durable_jobs_enabled() and _enabled("DURABLE_GENERATION_ENABLED", False)
+
+
+def durable_exports_enabled() -> bool:
+    return durable_jobs_enabled() and _enabled("DURABLE_EXPORTS_ENABLED", False)
+
+
+def legacy_background_tasks_enabled() -> bool:
+    return _enabled("LEGACY_BACKGROUND_TASKS_ENABLED", True)
+
+
+def object_storage_writes_enabled() -> bool:
+    return _enabled("OBJECT_STORAGE_WRITES_ENABLED", False)
+
+
+def direct_uploads_enabled() -> bool:
+    return _enabled("DIRECT_UPLOADS_ENABLED", False)
+
+
+def asset_library_enabled() -> bool:
+    return _enabled("ASSET_LIBRARY_ENABLED", False)
+
+
+def legacy_path_readthrough_enabled() -> bool:
+    return _enabled("LEGACY_PATH_READTHROUGH_ENABLED", True)
+
+
+def orphan_deletion_enabled() -> bool:
+    return _enabled("ORPHAN_DELETION_ENABLED", False)
+
+
+def provider_registry_enabled() -> bool:
+    return _enabled("PROVIDER_REGISTRY_ENABLED", False)
+
+
+def encrypted_provider_config_enabled() -> bool:
+    return _enabled("ENCRYPTED_PROVIDER_CONFIG_ENABLED", False)
+
+
+def policy_routing_enabled() -> bool:
+    return _enabled("POLICY_ROUTING_ENABLED", False)
+
+
+def provider_fallback_enabled() -> bool:
+    return _enabled("PROVIDER_FALLBACK_ENABLED", False)
+
+
+def legacy_provider_switches_enabled() -> bool:
+    return _enabled("LEGACY_PROVIDER_SWITCHES_ENABLED", True)
+
+
+def disabled_provider_adapters() -> frozenset[str]:
+    return frozenset(
+        value.strip() for value in os.getenv("DISABLED_PROVIDER_ADAPTERS", "").split(",")
+        if value.strip()
+    )
+
+
 def canonical_internal_cohort_allows(
     presentation_id: uuid.UUID, owner_id: uuid.UUID | None
 ) -> bool:

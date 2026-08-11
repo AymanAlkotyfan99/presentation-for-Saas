@@ -35,6 +35,18 @@ from modules.workspaces.persistence.models import (
     ApiCredentialModel, ApiCredentialScopeModel, AuditEventModel, InvitationModel,
     MembershipModel, ServiceAccountModel, WorkspaceModel,
 )
+from modules.jobs.persistence.models import (
+    ConsumerInboxModel, DeadLetterModel, JobAttemptModel, JobEventModel,
+    JobModel, OutboxMessageModel,
+)
+from modules.assets.persistence.models import (
+    AssetModel, AssetReferenceModel, ObjectVersionModel, UploadSessionModel,
+)
+from modules.providers.persistence.models import (
+    EncryptedProviderSecretModel, ProviderAccountModel, ProviderCapabilityModel,
+    ProviderCircuitModel, ProviderHealthModel, ProviderSnapshotModel, RoutingPolicyModel,
+    ProviderUsageModel,
+)
 from utils.architecture_flags import legacy_owner_bridge_enabled, workspace_rbac_enforcement_enabled
 from utils.get_env import get_migrate_database_on_startup_env
 from utils.db_utils import get_database_url_and_connect_args, get_pool_kwargs
@@ -76,6 +88,9 @@ _STRICT_OWNER_MODELS = (
     AsyncTaskModel,
     AsyncPresentationGenerationTaskModel,
     WebhookSubscription,
+    JobModel,
+    AssetModel,
+    ProviderAccountModel,
 )
 
 
@@ -161,6 +176,24 @@ async def create_db_and_tables():
                         ApiCredentialModel.__table__,
                         ApiCredentialScopeModel.__table__,
                         AuditEventModel.__table__,
+                        JobModel.__table__,
+                        JobAttemptModel.__table__,
+                        OutboxMessageModel.__table__,
+                        ConsumerInboxModel.__table__,
+                        DeadLetterModel.__table__,
+                        JobEventModel.__table__,
+                        AssetModel.__table__,
+                        ObjectVersionModel.__table__,
+                        UploadSessionModel.__table__,
+                        AssetReferenceModel.__table__,
+                        ProviderAccountModel.__table__,
+                        EncryptedProviderSecretModel.__table__,
+                        ProviderCapabilityModel.__table__,
+                        ProviderHealthModel.__table__,
+                        RoutingPolicyModel.__table__,
+                        ProviderSnapshotModel.__table__,
+                        ProviderCircuitModel.__table__,
+                        ProviderUsageModel.__table__,
                         SlideModel.__table__,
                         KeyValueSqlModel.__table__,
                         TemplateV2.__table__,

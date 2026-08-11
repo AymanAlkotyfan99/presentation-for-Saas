@@ -7,7 +7,7 @@ import uuid
 from models.sql.presentation import PresentationModel
 from models.sql.slide import SlideModel
 from services.database import get_async_session
-from services.image_generation_service import ImageGenerationService
+from modules.providers.application.legacy_image_facade import ProviderImageService as ImageGenerationService
 from services.mem0_presentation_memory_service import (
     MEM0_PRESENTATION_MEMORY_SERVICE,
 )

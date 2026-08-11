@@ -15,6 +15,7 @@ from fastapi import (
     Body,
     Depends,
     HTTPException,
+    Header,
     Path,
     Query,
     Request,
@@ -45,7 +46,7 @@ from services.documents_loader import DocumentsLoader
 from services.chat.slide_ui_helpers import _normalize_generated_image_fit
 from services.temp_file_service import TEMP_FILE_SERVICE
 from services.webhook_service import WebhookService
-from services.image_generation_service import ImageGenerationService
+from modules.providers.application.legacy_image_facade import ProviderImageService as ImageGenerationService
 from services.mem0_presentation_memory_service import (
     MEM0_PRESENTATION_MEMORY_SERVICE,
 )
@@ -91,7 +92,7 @@ from utils.llm_utils import message_content_to_text
 from utils.sse import safe_sse_stream
 from api.v1.auth.config import SESSION_COOKIE_NAME
 from modules.workspaces.application.authorization import resource_scope_predicate
-from utils.web_search import get_selected_web_search_provider, get_web_search_route
+from modules.providers.application.legacy_search_facade import get_selected_web_search_provider, get_web_search_route
 from utils.architecture_flags import (
     architecture_facades_enabled,
     legacy_v1_reads_enabled,
@@ -99,8 +100,18 @@ from utils.architecture_flags import (
     require_legacy_v1_read,
     require_legacy_v1_write,
     workspace_rbac_enforcement_enabled,
+    durable_generation_enabled,
+    durable_webhooks_enabled,
+    durable_jobs_for_operation,
+    legacy_background_tasks_enabled,
+    canonical_document_writes_enabled,
+    revision_writes_enabled,
 )
-from api.v1.auth.context import get_current_owner_id, get_current_workspace_id
+from api.v1.auth.context import (
+    get_current_owner_id,
+    get_current_service_account_id,
+    get_current_workspace_id,
+)
 from models.presentation_layout import PresentationLayoutModel, SlideLayoutModel
 from modules.presentations import (
     delete_presentation_record,
@@ -774,6 +785,9 @@ def _apply_template_image_content(
 
     updated = copy.deepcopy(element)
     updated["data"] = url
+    asset_id = value.get("assetId") or value.get("asset_id")
+    if isinstance(asset_id, str) and asset_id:
+        updated["assetId"] = asset_id
     _normalize_generated_image_fit(updated, url)
     prompt = _template_asset_prompt(value, element.get("is_icon") is True)
     if prompt:
@@ -2444,6 +2458,23 @@ async def generate_presentation_handler(
         sql_session.add_all(generated_assets)
         await sql_session.commit()
 
+        if canonical_document_writes_enabled() and revision_writes_enabled():
+            from modules.presentations.migrations.legacy_document import convert_legacy_presentation
+            from modules.presentations.revision_service import write_snapshot_revision
+
+            preview = convert_legacy_presentation(presentation, slides)
+            await write_snapshot_revision(
+                sql_session,
+                presentation_id=presentation.id,
+                actor_id=presentation.owner_id,
+                document=preview.document.model_dump(mode="json", by_alias=True, exclude_none=True),
+                expected_revision=0,
+                idempotency_key=f"generation:{presentation.id}",
+                source="presentation.generate",
+                status=preview.status,
+                asset_mappings=preview.asset_mappings,
+            )
+
         if async_status:
             # Pin the durable source immediately after the generated resource
             # exists. Any edit racing the remaining export phase makes the job
@@ -2485,12 +2516,18 @@ async def generate_presentation_handler(
             await sql_session.commit()
 
         # Triggering webhook on success
-        CONCURRENT_SERVICE.run_task(
-            None,
-            WebhookService.send_webhook,
-            WebhookEvent.PRESENTATION_GENERATION_COMPLETED,
-            response.model_dump(mode="json"),
-        )
+        if durable_webhooks_enabled():
+            await WebhookService.send_webhook(
+                WebhookEvent.PRESENTATION_GENERATION_COMPLETED,
+                response.model_dump(mode="json"),
+            )
+        else:
+            CONCURRENT_SERVICE.run_task(
+                None,
+                WebhookService.send_webhook,
+                WebhookEvent.PRESENTATION_GENERATION_COMPLETED,
+                response.model_dump(mode="json"),
+            )
 
         return response
 
@@ -2502,12 +2539,18 @@ async def generate_presentation_handler(
         api_error_model = APIErrorModel.from_exception(e)
 
         # Triggering webhook on failure
-        CONCURRENT_SERVICE.run_task(
-            None,
-            WebhookService.send_webhook,
-            WebhookEvent.PRESENTATION_GENERATION_FAILED,
-            api_error_model.model_dump(mode="json"),
-        )
+        if durable_webhooks_enabled():
+            await WebhookService.send_webhook(
+                WebhookEvent.PRESENTATION_GENERATION_FAILED,
+                api_error_model.model_dump(mode="json"),
+            )
+        else:
+            CONCURRENT_SERVICE.run_task(
+                None,
+                WebhookService.send_webhook,
+                WebhookEvent.PRESENTATION_GENERATION_FAILED,
+                api_error_model.model_dump(mode="json"),
+            )
 
         if async_status:
             async_status.status = AsyncTaskStatus.ERROR
@@ -2559,7 +2602,14 @@ async def _run_generate_presentation_task(
             )
             return
         if workspace_rbac_enforcement_enabled():
-            if async_status.presentation_id != presentation_id or async_status.resource_id != str(presentation_id):
+            # A queued generation task cannot reference the presentation row yet:
+            # that row is created by the worker.  ``resource_id`` is the durable
+            # pre-creation binding; once generation persists the presentation the
+            # existing completion path pins ``presentation_id`` and its revision.
+            if (
+                async_status.resource_id != str(presentation_id)
+                or async_status.presentation_id not in {None, presentation_id}
+            ):
                 logger.warning("[presentation.generate.async] task resource mismatch task_id=%s", task_id)
                 return
             if async_status.workspace_id != get_current_workspace_id():
@@ -2590,14 +2640,30 @@ async def generate_presentation_async(
     request_http: Request,
     request: GeneratePresentationRequest,
     background_tasks: BackgroundTasks,
+    idempotency_key: Annotated[Optional[str], Header(alias="Idempotency-Key", max_length=128)] = None,
     sql_session: AsyncSession = Depends(get_async_session),
 ):
     try:
         (presentation_id,) = await check_if_api_request_is_valid(request, sql_session)
+        use_durable = durable_generation_enabled() or durable_jobs_for_operation("presentation.generate")
+        workspace_id = get_current_workspace_id()
+        task_id: str | None = None
+        if use_durable and idempotency_key:
+            if workspace_id is None:
+                raise HTTPException(status_code=409, detail="A workspace is required for durable generation")
+            presentation_id = uuid.uuid5(workspace_id, f"presentation.generate:{idempotency_key}")
+            task_id = f"task-{uuid.uuid5(workspace_id, f'presentation.generate.task:{idempotency_key}').hex}"
+            existing_task = await sql_session.get(AsyncTaskModel, task_id)
+            if existing_task is not None:
+                return existing_task
 
         async_status = AsyncTaskModel(
+            **({"id": task_id} if task_id else {}),
             type=ASYNC_TASK_TYPE_PRESENTATION_GENERATE,
-            presentation_id=presentation_id,
+            # PostgreSQL enforces this foreign key.  The presentation is created
+            # by the generation worker, so keep it null while queued and use the
+            # bounded resource_id as the pre-creation identity.
+            presentation_id=None,
             resource_id=str(presentation_id),
             actor_id=get_current_owner_id(),
             status=AsyncTaskStatus.PENDING,
@@ -2608,16 +2674,45 @@ async def generate_presentation_async(
             ),
         )
         sql_session.add(async_status)
+        if use_durable:
+            from modules.jobs.application.submit import JobSubmission, submit_job
+            from modules.jobs.domain.models import QueueClass
+
+            if workspace_id is None:
+                raise HTTPException(status_code=409, detail="A workspace is required for durable generation")
+            job, _ = await submit_job(
+                sql_session,
+                JobSubmission(
+                    operation="presentation.generate",
+                    queue_class=QueueClass.GENERATION,
+                    workspace_id=workspace_id,
+                    actor_id=get_current_owner_id(),
+                    actor_service_account_id=get_current_service_account_id(),
+                    idempotency_scope=f"presentation.generate:{get_current_owner_id() or get_current_service_account_id()}",
+                    idempotency_key=idempotency_key or uuid.uuid4().hex,
+                    payload={
+                        "presentation_id": str(presentation_id),
+                        "legacy_task_id": async_status.id,
+                        "request": request.model_dump(mode="json"),
+                    },
+                    max_attempts=3,
+                    resource_type="presentation",
+                    resource_id=str(presentation_id),
+                ),
+            )
+            async_status.durable_job_id = job.id
+        elif legacy_background_tasks_enabled():
+            background_tasks.add_task(
+                _run_generate_presentation_task,
+                request,
+                presentation_id,
+                async_status.id,
+                _build_export_cookie_header(request_http),
+            )
+        else:
+            raise HTTPException(status_code=503, detail="No presentation generation worker is enabled")
         await sql_session.commit()
         await sql_session.refresh(async_status)
-
-        background_tasks.add_task(
-            _run_generate_presentation_task,
-            request,
-            presentation_id,
-            async_status.id,
-            _build_export_cookie_header(request_http),
-        )
         return async_status
 
     except Exception as e:
@@ -2638,7 +2733,8 @@ async def check_async_presentation_generation_status(
         raise HTTPException(
             status_code=404, detail="No presentation generation task found"
         )
-    return status
+    from api.v1.async_tasks.router import synchronize_durable_task_view
+    return await synchronize_durable_task_view(status, sql_session)
 
 
 @PRESENTATION_ROUTER.post("/edit", response_model=PresentationPathAndEditPath)

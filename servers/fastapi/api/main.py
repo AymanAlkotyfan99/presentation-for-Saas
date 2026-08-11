@@ -20,6 +20,9 @@ from api.v1.mock.router import API_V1_MOCK_ROUTER
 from api.v1.ppt.router import API_V1_PPT_ROUTER
 from api.v1.webhook.router import API_V1_WEBHOOK_ROUTER
 from modules.workspaces.api import WORKSPACES_ROUTER
+from modules.jobs.api import JOBS_ROUTER
+from modules.assets.api import ASSETS_ROUTER
+from modules.providers.api import PROVIDERS_ROUTER
 from utils.get_env import (
     get_app_data_directory_env,
     get_sentry_dsn_env,
@@ -97,6 +100,9 @@ app.include_router(API_V1_AUTH_ROUTER)
 app.include_router(API_V1_ADMIN_ROUTER)
 app.include_router(API_V1_ASYNC_TASKS_ROUTER)
 app.include_router(WORKSPACES_ROUTER)
+app.include_router(JOBS_ROUTER)
+app.include_router(ASSETS_ROUTER)
+app.include_router(PROVIDERS_ROUTER)
 
 # Mount app_data and static assets (direct FastAPI access; nginx also serves /static in Docker).
 app_data_dir = get_app_data_directory_env()
@@ -142,6 +148,28 @@ async def readiness():
     except Exception:
         pass
     checks["operation_controls"] = await healthcheck_operation_controls()
+    from utils.architecture_flags import durable_jobs_enabled, object_storage_writes_enabled
+
+    if durable_jobs_enabled():
+        checks["job_redis"] = False
+        try:
+            from modules.jobs.outbox import RedisQueueTransport
+
+            transport = RedisQueueTransport.from_environment()
+            try:
+                checks["job_redis"] = await transport.health()
+            finally:
+                await transport.close()
+        except Exception:
+            pass
+    if object_storage_writes_enabled():
+        checks["object_storage"] = False
+        try:
+            from modules.assets.providers.storage import get_storage_provider
+
+            checks["object_storage"] = await get_storage_provider().health()
+        except Exception:
+            pass
     ready = all(checks.values())
     return JSONResponse(
         status_code=200 if ready else 503,

@@ -1,4 +1,43 @@
-import os
+import os as _stdlib_os
+from contextlib import contextmanager
+from contextvars import ContextVar
+from typing import Iterator, Mapping
+
+
+_ENV_OVERRIDES: ContextVar[Mapping[str, str | None]] = ContextVar(
+    "bayanly_provider_env_overrides", default={}
+)
+
+
+class _ContextAwareEnvironment:
+    """Minimal os.getenv facade with task/thread-local provider overrides.
+
+    Provider compatibility adapters use this instead of mutating process-wide
+    environment variables.  That keeps workspace credentials and provider
+    selection isolated when several workers execute concurrently.
+    """
+
+    @staticmethod
+    def getenv(name: str, default: str | None = None) -> str | None:
+        overrides = _ENV_OVERRIDES.get()
+        if name in overrides:
+            value = overrides[name]
+            return default if value is None else value
+        return _stdlib_os.getenv(name, default)
+
+
+os = _ContextAwareEnvironment()
+
+
+@contextmanager
+def provider_environment(overrides: Mapping[str, str | None]) -> Iterator[None]:
+    current = dict(_ENV_OVERRIDES.get())
+    current.update(overrides)
+    token = _ENV_OVERRIDES.set(current)
+    try:
+        yield
+    finally:
+        _ENV_OVERRIDES.reset(token)
 
 
 def _is_truthy(value: str | None) -> bool:
