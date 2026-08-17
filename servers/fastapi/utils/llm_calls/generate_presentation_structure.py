@@ -1,16 +1,26 @@
 from typing import Optional
 
+from fastapi import HTTPException
 from modules.providers.application.text_client import get_text_client as get_client
 from llmai.shared import JSONSchemaResponse, Message, SystemMessage, UserMessage
 from models.presentation_layout import PresentationLayoutModel
 from models.presentation_outline_model import PresentationOutlineModel
 from modules.providers.application.legacy_facade import get_text_provider_client_config as get_llm_config
 from utils.llm_client_error_handler import handle_llm_client_exceptions
-from utils.llm_utils import DisconnectChecker, generate_structured_with_schema_retries
+from utils.llm_utils import (
+    DisconnectChecker,
+    StructuredGenerationError,
+    generate_structured_with_schema_retries,
+)
 from utils.llm_provider import get_model
 from utils.get_dynamic_models import get_presentation_structure_model_with_n_slides
 from utils.schema_utils import prepare_schema_for_validation
 from models.presentation_structure_model import PresentationStructureModel
+
+
+PRESENTATION_PREPARE_FAILURE_DETAIL = (
+    "We couldn't prepare this presentation. Please try again."
+)
 
 
 STRUCTURE_FROM_SLIDES_MARKDOWN_SYSTEM_PROMPT = """
@@ -207,5 +217,10 @@ async def generate_presentation_structure(
             disconnect_checker=disconnect_checker,
         )
         return PresentationStructureModel(**content)
+    except StructuredGenerationError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=PRESENTATION_PREPARE_FAILURE_DETAIL,
+        ) from exc
     except Exception as e:
         raise handle_llm_client_exceptions(e)

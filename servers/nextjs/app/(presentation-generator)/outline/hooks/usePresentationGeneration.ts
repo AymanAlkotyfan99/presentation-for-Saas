@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { notify } from "@/components/ui/sonner";
 import { clearPresentationData } from "@/store/slices/presentationGeneration";
 import { PresentationGenerationApi } from "../../services/api/presentation-generation";
+import { ApiResponseError } from "../../services/api/api-error-handler";
 import { LoadingState } from "../types/index";
 
 import { MixpanelEvent, trackEvent } from "@/utils/mixpanel";
@@ -13,7 +14,8 @@ import {
   MAX_NUMBER_OF_SLIDES,
 } from "@/utils/presentationLimits";
 import { store } from "@/store/store";
-import { useTranslations } from "@/i18n/catalog";
+import { useI18n } from "@/i18n/catalog";
+import { localizePathname } from "@/i18n/routing";
 
 const DEFAULT_LOADING_STATE: LoadingState = {
   message: "",
@@ -26,7 +28,7 @@ export const usePresentationGeneration = (
   presentationId: string | null,
   selectedTemplateId: string | null
 ) => {
-  const t = useTranslations();
+  const { locale, t } = useI18n();
   const dispatch = useDispatch();
   const router = useRouter();
   const pathname = usePathname();
@@ -120,8 +122,12 @@ export const usePresentationGeneration = (
         });
         dispatch(clearPresentationData());
         clearTheme();
+        const presentationPath = localizePathname(
+          "/presentation",
+          locale
+        );
         router.replace(
-          `/presentation?id=${presentationId}&stream=true&type=standard`
+          `${presentationPath}?id=${presentationId}&stream=true&type=standard`
         );
       }
     } catch (error: unknown) {
@@ -135,10 +141,11 @@ export const usePresentationGeneration = (
           "Error in presentation generation"
         ),
       });
-      notify.error(
-        t("outline.generationErrorTitle"),
-        t("outline.generationError")
-      );
+      const description =
+        error instanceof ApiResponseError && error.status >= 400 && error.status < 500
+          ? error.message
+          : t("outline.generationError");
+      notify.error(t("outline.generationErrorTitle"), description);
     } finally {
       setLoadingState(DEFAULT_LOADING_STATE);
     }
@@ -149,6 +156,7 @@ export const usePresentationGeneration = (
     router,
     selectedTemplateId,
     pathname,
+    locale,
     t,
   ]);
 

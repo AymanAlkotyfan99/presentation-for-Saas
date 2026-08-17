@@ -3,6 +3,7 @@ import {
 } from "@/app/(presentation-generator)/services/api/header";
 import { ApiResponseHandler } from "@/app/(presentation-generator)/services/api/api-error-handler";
 import { getApiUrl } from "@/utils/api";
+import { fetchWithTimeout } from "@/utils/fetchWithTimeout";
 
 export type PresentationVersion = "v1-standard" | "v2-standard";
 
@@ -45,11 +46,13 @@ export class DashboardApi {
         params.set("include_slides", "false");
       }
       const query = params.toString();
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         getApiUrl(`/api/v1/ppt/presentation/all${query ? `?${query}` : ""}`),
         {
           method: "GET",
-        }
+          credentials: "include",
+        },
+        15_000,
       );
 
       // Handle the special case where 404 means "no presentations found"
@@ -67,12 +70,13 @@ export class DashboardApi {
 
   static async getPresentation(id: string) {
     try {
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         getApiUrl(`/api/v1/ppt/presentation/${id}`),
         {
           method: "GET",
           credentials: "include",
-        }
+        },
+        15_000,
       );
 
       return await ApiResponseHandler.handleResponse(response, "Presentation not found");
@@ -84,12 +88,14 @@ export class DashboardApi {
 
   static async deletePresentation(presentation_id: string) {
     try {
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         getApiUrl(`/api/v1/ppt/presentation/${presentation_id}`),
         {
           method: "DELETE",
+          credentials: "include",
           headers: getHeader(),
-        }
+        },
+        15_000,
       );
 
       return await ApiResponseHandler.handleResponseWithResult(response, "Failed to delete presentation");
@@ -104,12 +110,14 @@ export class DashboardApi {
 
   static async duplicatePresentation(presentation_id: string) {
     try {
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         getApiUrl(`/api/v1/ppt/presentation/${presentation_id}/duplicate`),
         {
           method: "POST",
+          credentials: "include",
           headers: getHeader(),
-        }
+        },
+        15_000,
       );
 
       return await ApiResponseHandler.handleResponse(response, "Failed to duplicate presentation");

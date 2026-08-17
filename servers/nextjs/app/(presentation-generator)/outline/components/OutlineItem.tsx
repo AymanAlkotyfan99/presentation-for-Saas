@@ -10,6 +10,10 @@ import {
 } from "react";
 
 import { Textarea } from "@/components/ui/textarea";
+import {
+  normalizeOutlineContent,
+  splitOutlineContent,
+} from "@/lib/outline-content";
 import { renderSafeMarkdown } from "@/lib/safe-markdown";
 import { useTranslations } from "@/i18n/catalog";
 
@@ -26,7 +30,7 @@ interface OutlineItemProps {
 }
 
 const outlineMarkdownClassName =
-  "prose prose-sm max-w-none flex-1 font-syne text-base font-normal leading-normal text-[#666666] [overflow-wrap:anywhere] [&>*]:!my-0 [&>*+*]:!mt-[10px] [&_h1]:text-xl [&_h1]:font-medium [&_h1]:leading-normal [&_h1]:text-[#191919] [&_h2]:text-xl [&_h2]:font-medium [&_h2]:leading-normal [&_h2]:text-[#191919] [&_h3]:text-base [&_h3]:font-semibold [&_h3]:leading-normal [&_h3]:text-[#191919] [&_p]:text-base [&_p]:font-normal [&_p]:leading-normal [&_p]:text-[#666666] [&_strong]:font-semibold [&_strong]:text-[#191919] [&_ul]:!my-0 [&_ul]:list-none [&_ul]:space-y-1.5 [&_ul]:pl-0 [&_ul_li]:my-0 [&_ul_li]:bg-[url('/figma/outline-check.svg')] [&_ul_li]:bg-[length:20px_20px] [&_ul_li]:bg-[position:left_2px] [&_ul_li]:bg-no-repeat [&_ul_li]:pl-7 [&_ul_li]:text-base [&_ul_li]:font-normal [&_ul_li]:leading-6 [&_ul_li]:text-[#333333]";
+  "prose prose-sm max-w-none font-syne text-[15px] font-normal leading-6 text-[#5E6472] [overflow-wrap:anywhere] [&>*]:!my-0 [&>*+*]:!mt-2 [&_p]:text-[15px] [&_p]:font-normal [&_p]:leading-6 [&_p]:text-[#5E6472] [&_strong]:font-semibold [&_strong]:text-[#303442] [&_ul]:!my-0 [&_ul]:list-none [&_ul]:space-y-1.5 [&_ul]:pl-0 [&_ul_li]:my-0 [&_ul_li]:bg-[url('/figma/outline-check.svg')] [&_ul_li]:bg-[length:18px_18px] [&_ul_li]:bg-[position:left_3px] [&_ul_li]:bg-no-repeat [&_ul_li]:pl-6 [&_ul_li]:text-[15px] [&_ul_li]:font-normal [&_ul_li]:leading-6 [&_ul_li]:text-[#424754]";
 
 export function OutlineItem({
   id,
@@ -70,13 +74,13 @@ export function OutlineItem({
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const throttleRef = useRef<number | null>(null);
   const [markdownDraft, setMarkdownDraft] = useState(
-    slideOutline.content || ""
+    normalizeOutlineContent(slideOutline.content || "")
   );
   const [isEditingMarkdown, setIsEditingMarkdown] = useState(false);
   const [renderedHtml, setRenderedHtml] = useState<string>("");
 
   useEffect(() => {
-    setMarkdownDraft(slideOutline.content || "");
+    setMarkdownDraft(normalizeOutlineContent(slideOutline.content || ""));
   }, [slideOutline.content]);
 
   useEffect(() => {
@@ -90,14 +94,15 @@ export function OutlineItem({
   }, [isEditingMarkdown]);
 
   const handleMarkdownBlur = () => {
-    if (markdownDraft !== slideOutline.content) {
-      onUpdate?.(markdownDraft);
+    const normalizedDraft = normalizeOutlineContent(markdownDraft);
+    if (normalizedDraft !== normalizeOutlineContent(slideOutline.content)) {
+      onUpdate?.(normalizedDraft);
     }
     setIsEditingMarkdown(false);
   };
 
   const handleStartMarkdownEdit = () => {
-    setMarkdownDraft(slideOutline.content || "");
+    setMarkdownDraft(normalizeOutlineContent(slideOutline.content || ""));
     setIsEditingMarkdown(true);
   };
 
@@ -121,13 +126,13 @@ export function OutlineItem({
 
   useEffect(() => {
     if (!isStreaming || !isActiveStreaming) return;
-    const content = slideOutline.content || "";
+    const { body } = splitOutlineContent(slideOutline.content || "");
 
     if (throttleRef.current) {
       window.clearTimeout(throttleRef.current);
     }
     throttleRef.current = window.setTimeout(() => {
-      setRenderedHtml(renderSafeMarkdown(content));
+      setRenderedHtml(renderSafeMarkdown(body, { breaks: true }));
     }, 60);
 
     return () => {
@@ -140,59 +145,79 @@ export function OutlineItem({
   const stableHtml = useMemo(() => {
     if (!isStreaming || isActiveStreaming) return null;
     if (!isStableStreaming) return null;
-    return renderSafeMarkdown(slideOutline.content || "");
+    return renderSafeMarkdown(
+      splitOutlineContent(slideOutline.content || "").body,
+      { breaks: true }
+    );
   }, [isStreaming, isActiveStreaming, isStableStreaming, slideOutline.content]);
 
   const previewHtml = useMemo(() => {
     if (isStreaming) return "";
-    return renderSafeMarkdown(slideOutline.content || "", { breaks: true });
+    return renderSafeMarkdown(
+      splitOutlineContent(slideOutline.content || "").body,
+      { breaks: true }
+    );
   }, [isStreaming, slideOutline.content]);
+
+  const displayContent = useMemo(
+    () => splitOutlineContent(slideOutline.content || ""),
+    [slideOutline.content]
+  );
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative mb-5 rounded-[12px] border bg-white px-5 py-8 font-syne transition-all duration-500 hover:shadow-[0_10px_24px_0_rgba(15,23,42,0.12)] sm:py-10 sm:ps-[30px] sm:pe-[66px] ${
+      className={`group relative mb-4 rounded-2xl border bg-white p-4 font-syne transition-all duration-300 hover:-translate-y-0.5 hover:border-[#D8D3F7] hover:shadow-[0_12px_30px_rgba(36,31,65,0.10)] sm:p-6 ${
         isEditingMarkdown
           ? "border-[#BDB4FE] shadow-[0_6.6px_13.2px_0_rgba(0,0,0,0.10)]"
           : "border-transparent shadow-[0_6.6px_6.6px_rgba(0,0,0,0.10)]"
       } ${isDragging ? "opacity-50" : ""}`}
     >
-      <div className="flex items-start gap-3 rounded-[8px]">
+      <div className="flex items-start gap-3 sm:gap-4">
         <div
           {...attributes}
           {...listeners}
           aria-label={t("outline.moveSlide", { number: index })}
-          className="relative flex touch-none select-none items-center justify-center cursor-grab active:cursor-grabbing"
+          className="relative flex h-9 w-9 shrink-0 touch-none select-none items-center justify-center rounded-lg border border-transparent text-[#858B98] transition cursor-grab hover:border-[#E2DDFB] hover:bg-[#F5F2FF] hover:text-[#6344E8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/30 active:cursor-grabbing"
         >
-          <Grip aria-hidden="true" className="h-6 w-6 text-[#191919]" />
+          <Grip aria-hidden="true" className="h-5 w-5" />
         </div>
 
         <div
           id={`outline-item-${index}`}
-          className="flex min-w-0 basis-full flex-col gap-[10px]"
+          className="flex min-w-0 basis-full flex-col"
         >
-          <p className="flex h-[22px] w-fit items-center rounded-[80px] border border-[#EDEEEF] bg-white px-2.5 font-unbounded text-[10px] font-light tracking-[-0.1px] text-black">
+          <p className="flex h-6 w-fit items-center rounded-full bg-[#F0EDFF] px-2.5 font-unbounded text-[10px] font-medium tracking-[0.02em] text-[#6044D8]">
             {t("outline.slideLabel", { number: index })}
           </p>
 
           {isStreaming ? (
             isActiveStreaming ? (
-              <div
-                className={outlineMarkdownClassName}
-                dir="auto"
-                dangerouslySetInnerHTML={{ __html: renderedHtml || "" }}
-              />
+              <div className="mt-3">
+                <h2 className="text-lg font-semibold leading-7 text-[#20232D] sm:text-xl" dir="auto">
+                  {displayContent.title}
+                </h2>
+                {renderedHtml && (
+                  <div className={`${outlineMarkdownClassName} mt-2`} dir="auto" dangerouslySetInnerHTML={{ __html: renderedHtml }} />
+                )}
+              </div>
             ) : stableHtml ? (
-              <div
-                className={outlineMarkdownClassName}
-                dir="auto"
-                dangerouslySetInnerHTML={{ __html: stableHtml }}
-              />
+              <div className="mt-3">
+                <h2 className="text-lg font-semibold leading-7 text-[#20232D] sm:text-xl" dir="auto">
+                  {displayContent.title}
+                </h2>
+                {stableHtml && (
+                  <div className={`${outlineMarkdownClassName} mt-2`} dir="auto" dangerouslySetInnerHTML={{ __html: stableHtml }} />
+                )}
+              </div>
             ) : (
-              <p className="flex-1 text-base font-normal text-[#666666]" dir="auto">
-                {slideOutline.content || ""}
-              </p>
+              <div className="mt-3" dir="auto">
+                <h2 className="text-lg font-semibold leading-7 text-[#20232D] sm:text-xl">
+                  {displayContent.title}
+                </h2>
+                {displayContent.body && <p className="mt-2 whitespace-pre-line text-[15px] leading-6 text-[#5E6472]">{displayContent.body}</p>}
+              </div>
             )
           ) : isEditingMarkdown ? (
             <Textarea
@@ -204,7 +229,7 @@ export function OutlineItem({
               spellCheck={false}
               placeholder={t("outline.markdownPlaceholder")}
               dir="auto"
-              className="min-h-[140px] resize-y rounded-[8px] border-[#D8D8DF] bg-[#FBFBFC] px-3 py-3 font-mono text-[13px] leading-6 text-[#191919] shadow-none focus-visible:border-[#7A5AF8] focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/20"
+              className="mt-3 min-h-[120px] resize-y rounded-xl border-[#D8D8DF] bg-[#FBFBFC] px-4 py-3 font-mono text-[13px] leading-6 text-[#191919] shadow-none focus-visible:border-[#7A5AF8] focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/20"
             />
           ) : (
             <div
@@ -218,10 +243,16 @@ export function OutlineItem({
                   handleStartMarkdownEdit();
                 }
               }}
-              className={`${outlineMarkdownClassName} min-h-[60px] w-full cursor-text rounded-[8px] px-0 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/25`}
+              className="mt-3 min-h-[54px] w-full cursor-text rounded-lg text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/25 focus-visible:ring-offset-4"
               dir="auto"
-              dangerouslySetInnerHTML={{ __html: previewHtml }}
-            />
+            >
+              <h2 className="text-lg font-semibold leading-7 text-[#20232D] sm:text-xl">
+                {displayContent.title}
+              </h2>
+              {previewHtml && (
+                <div className={`${outlineMarkdownClassName} mt-2`} dangerouslySetInnerHTML={{ __html: previewHtml }} />
+              )}
+            </div>
           )}
         </div>
       </div>

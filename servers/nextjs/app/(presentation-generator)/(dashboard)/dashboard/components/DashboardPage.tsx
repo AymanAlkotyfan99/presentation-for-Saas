@@ -1,506 +1,161 @@
 "use client";
 
-import React, {
-  useState,
-  useEffect,
-  useMemo,
-  useCallback,
-  useRef,
-} from "react";
-
-import {
-  DashboardApi,
-  type PresentationResponse,
-} from "@/app/(presentation-generator)/services/api/dashboard";
-import { PresentationGrid } from "@/app/(presentation-generator)/(dashboard)/dashboard/components/PresentationGrid";
-import { LegacyPresentationsTable } from "@/app/(presentation-generator)/(dashboard)/dashboard/components/LegacyPresentationsTable";
-import { PresentationGenerationApi } from "@/app/(presentation-generator)/services/api/presentation-generation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, LayoutGrid, List, Loader2, Plus, Search, Sparkles } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
-import { Loader2, Plus } from "lucide-react";
-import { trackEvent, MixpanelEvent } from "@/utils/mixpanel";
 import { usePathname, useRouter } from "next/navigation";
-import { useSelector } from "react-redux";
-import { RootState } from "@/store/store";
+
+import { PresentationGrid } from "./PresentationGrid";
+import { LegacyPresentationsTable } from "./LegacyPresentationsTable";
+import { ProductOnboarding } from "./ProductOnboarding";
+import { DashboardApi, type PresentationResponse } from "@/app/(presentation-generator)/services/api/dashboard";
+import { PresentationGenerationApi } from "@/app/(presentation-generator)/services/api/presentation-generation";
 import { notify } from "@/components/ui/sonner";
-import { sanitizeAnalyticsError } from "@/utils/analytics";
-import {
-  IMAGE_PROVIDERS,
-  LLM_PROVIDERS,
-} from "@/utils/providerConstants";
 import { useI18n } from "@/i18n/catalog";
 import { localizePathname } from "@/i18n/routing";
+import { sanitizeAnalyticsError } from "@/utils/analytics";
+import { MixpanelEvent, trackEvent } from "@/utils/mixpanel";
 
-const GITHUB_REPOSITORY_URL = "https://github.com/presenton/presenton";
-const DISCORD_INVITE_URL = "https://discord.com/invite/9ZsKKxudNE";
-const APP_UPDATE_URL = "https://presenton.ai/download";
+type DashboardPageProps = { mode?: "dashboard" | "library"; username?: string };
+type SortMode = "updated" | "created" | "title";
+const PAGE_SIZE = 12;
 
-const actionCardBase =
-  "absolute aspect-[16/9] h-[46.238px] w-[82.201px] rounded-[4.474px] border border-white/50 bg-cover bg-center bg-no-repeat shadow-[0_8px_18px_rgba(16,24,40,0.18)] transition-all duration-500 ease-out opacity-100 translate-y-0 scale-100";
-
-const dashboardHeaderPill =
-  "inline-flex shrink-0 items-center justify-center rounded-full text-[#191919] transition-colors hover:bg-[#F8F8FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8] focus-visible:ring-offset-2";
-
-const dashboardHeaderAsset = (name: string) => `/dashboard-header/${name}`;
-const dashboardBodyAsset = (name: string) => `/dashboard-body/${name}`;
-
-const DashboardHeaderDivider = () => (
-  <span className="relative h-5 w-px shrink-0" aria-hidden="true">
-    <Image
-      src={dashboardHeaderAsset("divider.svg")}
-      alt=""
-      width={20}
-      height={1}
-      className="absolute left-1/2 top-1/2 h-px w-5 max-w-none -translate-x-1/2 -translate-y-1/2 rotate-90"
-    />
-  </span>
-);
-
-const FloatingActionCards = () => (
-  <div className="pointer-events-none absolute right-[14px] top-[-36px] z-0 block h-[64px] w-[158px]">
-    <div
-      className={`${actionCardBase} left-0 top-0 border-none group-hover/action:-translate-x-2 group-hover/action:-rotate-3 group-focus-visible/action:-translate-x-2 group-focus-visible/action:-rotate-3`}
-      style={{
-        backgroundImage: "url('/create_presentation_card_3.png')",
-      }}
-    />
-    <div
-      className={`${actionCardBase} left-[39px] top-1 z-10 border-none group-hover/action:-translate-y-1 group-hover/action:scale-105 group-focus-visible/action:-translate-y-1 group-focus-visible/action:scale-105`}
-      style={{
-        backgroundImage: "url('/create_presentation_card_2.png')",
-      }}
-    />
-    <div
-      className={`${actionCardBase} left-[76px] top-0 border-none group-hover/action:translate-x-2 group-hover/action:rotate-3 group-focus-visible/action:translate-x-2 group-focus-visible/action:rotate-3`}
-      style={{
-        backgroundImage: "url('/create_presentation_card_1.png')",
-      }}
-    />
-  </div>
-);
-
-const GridViewIcon = () => (
-  <Image
-    src={dashboardBodyAsset("grid.svg")}
-    alt=""
-    width={16}
-    height={16}
-    className="h-4 w-4 shrink-0"
-    aria-hidden="true"
-  />
-);
-
-const ListViewIcon = () => (
-  <Image
-    src={dashboardBodyAsset("list.svg")}
-    alt=""
-    width={16}
-    height={16}
-    className="h-4 w-4 shrink-0"
-    aria-hidden="true"
-  />
-);
-
-const sortPresentationsNewestFirst = (
-  presentations: PresentationResponse[]
-) =>
-  [...presentations].sort((a, b) => {
-    const createdAtA = Date.parse(a.created_at);
-    const createdAtB = Date.parse(b.created_at);
-
-    return (
-      (Number.isNaN(createdAtB) ? 0 : createdAtB) -
-      (Number.isNaN(createdAtA) ? 0 : createdAtA)
-    );
-  });
-
-function DashboardHeader() {
-  const { locale, t } = useI18n();
-  const pathname = usePathname();
-  const llmConfig = useSelector(
-    (state: RootState) => state.userConfig.llm_config
-  );
-  const [isElectronApp, setIsElectronApp] = useState(false);
-
-  const textProvider = LLM_PROVIDERS[llmConfig.LLM || "openai"];
-  const imageProvider = llmConfig.DISABLE_IMAGE_GENERATION
-    ? undefined
-    : IMAGE_PROVIDERS[llmConfig.IMAGE_PROVIDER || ""];
-  const configuredProviders = [textProvider, imageProvider].filter(
-    (provider): provider is NonNullable<typeof provider> =>
-      Boolean(provider?.icon)
-  );
-
-  useEffect(() => {
-    setIsElectronApp(Boolean(window.electron));
-
-    let isMounted = true;
-
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  return (
-    <header className="sticky top-0 z-50 ms-7 me-[9px] flex h-[105px] items-center justify-between border-b border-[#EDEEEF] bg-white px-1 max-lg:h-auto max-lg:min-h-[105px] max-lg:flex-col max-lg:items-start max-lg:gap-4 max-lg:py-5">
-      <div className="flex w-[504.392px] max-w-full shrink-0 items-center gap-3.5 max-xl:w-auto">
-        <h1 className="whitespace-nowrap font-syne text-[22px] font-medium leading-normal tracking-[-0.66px] text-[#101323]">
-          {t("navigation.dashboard")}
-        </h1>
-      </div>
-
-      <div className="max-w-full overflow-x-auto hide-scrollbar lg:overflow-visible">
-        <div className="flex h-[42.24px] w-max max-w-none items-center gap-3 rounded-full ps-3">
-          <div className="flex h-[42.24px] items-center gap-[18px] rounded-[32px] border border-[#EDEEEF] bg-white px-3 py-1">
-            <Link
-              href={localizePathname("/settings", locale)}
-              className={`${dashboardHeaderPill} h-[26.1px] gap-1.5 p-1.5`}
-              onClick={() =>
-                trackEvent(MixpanelEvent.Navigation, {
-                  from: pathname,
-                  to: "/settings",
-                  source: "dashboard_header_settings",
-                })
-              }
-            >
-              <span
-                className="flex h-[34.1px] shrink-0 items-center"
-                title={configuredProviders
-                  .map((provider) => provider.label)
-                  .join(" + ")}
-              >
-                {configuredProviders.map((provider, index) => (
-                  <span
-                    key={`${provider.value}-${index}`}
-                    className={`relative h-[22px] w-[22px] shrink-0 overflow-hidden rounded-full border-[1.238px] border-[#EDEEEF] bg-white ${index > 0 ? "-ms-[4.4px]" : "z-10"
-                      }`}
-                  >
-                    <Image
-                      src={provider.icon!}
-                      alt=""
-                      aria-hidden="true"
-                      width={224}
-                      height={224}
-                      className="h-full w-full rounded-full object-cover"
-                    />
-                  </span>
-                ))}
-              </span>
-              <span className="font-syne text-sm font-medium leading-[17.6px] tracking-[0.56px]">
-                {t("navigation.settings")}
-              </span>
-            </Link>
-
-            <DashboardHeaderDivider />
-
-
-
-            <Link
-              href={DISCORD_INVITE_URL}
-              target="_blank"
-              rel="noreferrer"
-              className={`${dashboardHeaderPill} h-[29.6px] gap-[8.8px] p-1.5`}
-              onClick={() =>
-                trackEvent(MixpanelEvent.Navigation, {
-                  from: pathname,
-                  to: DISCORD_INVITE_URL,
-                  source: "dashboard_header_discord",
-                })
-              }
-            >
-              <Image
-                src={dashboardHeaderAsset("discord.svg")}
-                alt=""
-                aria-hidden="true"
-                width={18}
-                height={18}
-                className="h-[17.6px] w-[17.6px] shrink-0"
-              />
-              <span className="font-syne text-sm font-normal leading-normal tracking-[-0.14px] text-[#191919]">
-                {t("dashboard.joinDiscord")}
-              </span>
-            </Link>
-            <DashboardHeaderDivider />
-            <Link
-              href={GITHUB_REPOSITORY_URL}
-              target="_blank"
-              rel="noreferrer"
-              className={`${dashboardHeaderPill} h-[29.6px] gap-[8.8px] p-1.5`}
-              onClick={() =>
-                trackEvent(MixpanelEvent.Navigation, {
-                  from: pathname,
-                  to: GITHUB_REPOSITORY_URL,
-                  source: "dashboard_header_github",
-                })
-              }
-            >
-              <Image
-                src={dashboardHeaderAsset("github.svg")}
-                alt=""
-                aria-hidden="true"
-                width={18}
-                height={18}
-                className="h-[17.6px] w-[17.6px] shrink-0"
-              />
-
-            </Link>
-
-
-          </div>
-
-          {isElectronApp && (
-            <Link
-              href={APP_UPDATE_URL}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={t("dashboard.updateProduct")}
-              title={t("dashboard.updateProduct")}
-              className="relative flex h-[42.24px] w-[42.24px] shrink-0 items-center justify-center rounded-full border-[1.32px] border-[#D9D6FE] bg-[#FAFAFF] transition-colors hover:bg-[#F3F0FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8] focus-visible:ring-offset-2"
-              onClick={() =>
-                trackEvent(MixpanelEvent.Navigation, {
-                  from: pathname,
-                  to: APP_UPDATE_URL,
-                  source: "dashboard_header_update_app",
-                  app_version: window.env?.APP_VERSION,
-                })
-              }
-            >
-              <Image
-                src={dashboardHeaderAsset("update-arrow.svg")}
-                alt=""
-                aria-hidden="true"
-                width={16}
-                height={16}
-                className="h-4 w-4 -rotate-90"
-              />
-              <Image
-                src={dashboardHeaderAsset("update-badge.svg")}
-                alt=""
-                aria-hidden="true"
-                width={14}
-                height={14}
-                className="absolute left-[26.44px] top-[-2.32px] h-[13.2px] w-[13.2px]"
-              />
-            </Link>
-          )}
-        </div>
-      </div>
-    </header>
-  );
+function byDate(value: string | undefined): number {
+  const parsed = Date.parse(value || "");
+  return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-const DashboardPage: React.FC = () => {
+function sortPresentations(items: PresentationResponse[], sort: SortMode) {
+  return [...items].sort((left, right) => {
+    if (sort === "title") return (left.title || "").localeCompare(right.title || "");
+    if (sort === "created") return byDate(right.created_at) - byDate(left.created_at);
+    return byDate(right.updated_at || right.created_at) - byDate(left.updated_at || left.created_at);
+  });
+}
+
+export default function DashboardPage({ mode = "dashboard", username }: DashboardPageProps) {
   const { locale, t } = useI18n();
-  const pathname = usePathname();
+  const pathname = usePathname() || "/";
   const router = useRouter();
   const [presentations, setPresentations] = useState<PresentationResponse[]>([]);
-  const [legacyPresentations, setLegacyPresentations] = useState<
-    PresentationResponse[]
-  >([]);
+  const [legacyPresentations, setLegacyPresentations] = useState<PresentationResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isCreatingBlankPresentation, setIsCreatingBlankPresentation] =
-    useState(false);
+  const [isCreatingBlank, setIsCreatingBlank] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [deckViewMode, setDeckViewMode] = useState<"grid" | "list">("grid");
-  const blankPresentationRequestInFlight = useRef(false);
-
-  const sortedPresentations = useMemo(
-    () => sortPresentationsNewestFirst(presentations),
-    [presentations]
-  );
-
-  const sortedLegacyPresentations = useMemo(
-    () => sortPresentationsNewestFirst(legacyPresentations),
-    [legacyPresentations]
-  );
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortMode>("updated");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const blankRequest = useRef(false);
 
   const fetchPresentations = useCallback(async () => {
-    let fetchedCount = 0;
-    let hasError = false;
+    setIsLoading(true);
+    setError(null);
     try {
-      setIsLoading(true);
-      setError(null);
       const [supported, legacy] = await Promise.all([
         DashboardApi.getPresentations("v2-standard"),
         DashboardApi.getPresentations("v1-standard", { includeSlides: false }),
       ]);
-      fetchedCount = supported.length + legacy.length;
       setPresentations(supported);
       setLegacyPresentations(legacy);
-    } catch {
-      hasError = true;
-      setError(null);
-      setPresentations([]);
-      setLegacyPresentations([]);
+      trackEvent(MixpanelEvent.Dashboard_Page_Viewed, { pathname, presentation_count: supported.length + legacy.length, load_failed: false });
+    } catch (cause) {
+      console.error("Dashboard presentation load failed", cause);
+      setError(t("dashboard.loadFailedDescription"));
+      trackEvent(MixpanelEvent.Dashboard_Page_Viewed, { pathname, presentation_count: 0, load_failed: true, error_message: sanitizeAnalyticsError(cause, "Presentation load failed") });
     } finally {
-      trackEvent(MixpanelEvent.Dashboard_Page_Viewed, {
-        pathname,
-        presentation_count: fetchedCount,
-        load_failed: hasError,
-      });
       setIsLoading(false);
     }
-  }, [pathname]);
+  }, [pathname, t]);
 
-  useEffect(() => {
-    void fetchPresentations();
-  }, [fetchPresentations]);
+  useEffect(() => void fetchPresentations(), [fetchPresentations]);
+  useEffect(() => setVisibleCount(PAGE_SIZE), [search, sort]);
+
+  const filtered = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase(locale);
+    const matching = query
+      ? presentations.filter((item) => `${item.title || ""} ${item.prompt || ""}`.toLocaleLowerCase(locale).includes(query))
+      : presentations;
+    return sortPresentations(matching, sort);
+  }, [locale, presentations, search, sort]);
+  const shownPresentations = mode === "dashboard" ? filtered.slice(0, 4) : filtered.slice(0, visibleCount);
 
   const createBlankPresentation = useCallback(async () => {
-    if (blankPresentationRequestInFlight.current) return;
-
-    blankPresentationRequestInFlight.current = true;
-    setIsCreatingBlankPresentation(true);
-    trackEvent(MixpanelEvent.Dashboard_New_Presentation_Clicked, {
-      pathname,
-      source: "dashboard_blank_presentation_card",
-    });
-
+    if (blankRequest.current) return;
+    blankRequest.current = true;
+    setIsCreatingBlank(true);
     try {
-      const presentation =
-        await PresentationGenerationApi.createBlankPresentation();
-      trackEvent(MixpanelEvent.Dashboard_Blank_Presentation_Created, {
-        pathname,
-        presentation_id: presentation.id,
-        slide_count: presentation.n_slides,
-      });
-      router.push(
-        `${localizePathname("/presentation", locale)}?id=${encodeURIComponent(presentation.id)}&type=standard`
-      );
-    } catch (creationError) {
-      trackEvent(MixpanelEvent.Dashboard_Blank_Presentation_Create_Failed, {
-        pathname,
-        error_message: sanitizeAnalyticsError(creationError),
-      });
-      notify.error(t("dashboard.createFailedTitle"), t("dashboard.createFailed"));
+      const presentation = await PresentationGenerationApi.createBlankPresentation();
+      router.push(`${localizePathname("/presentation", locale)}?id=${encodeURIComponent(presentation.id)}&type=standard`);
+    } catch (cause) {
+      console.error("Blank presentation creation failed", cause);
+      notify.error(t("dashboard.createFailedTitle"), t("dashboard.createFailed"), { id: "blank-presentation-failed" });
     } finally {
-      blankPresentationRequestInFlight.current = false;
-      setIsCreatingBlankPresentation(false);
+      blankRequest.current = false;
+      setIsCreatingBlank(false);
     }
-  }, [locale, pathname, router, t]);
+  }, [locale, router, t]);
 
   const removePresentation = (presentationId: string) => {
-    setPresentations((prev) => prev.filter((p) => p.id !== presentationId));
-    setLegacyPresentations((prev) =>
-      prev.filter((p) => p.id !== presentationId)
-    );
+    setPresentations((items) => items.filter((item) => item.id !== presentationId));
+    setLegacyPresentations((items) => items.filter((item) => item.id !== presentationId));
   };
-
   const removeLegacyPresentations = (presentationIds: string[]) => {
-    const deletedIds = new Set(presentationIds);
-    setLegacyPresentations((prev) =>
-      prev.filter((presentation) => !deletedIds.has(presentation.id))
-    );
+    const deleted = new Set(presentationIds);
+    setLegacyPresentations((items) => items.filter((item) => !deleted.has(item.id)));
   };
 
   return (
-    <div className="relative min-h-screen w-full pb-10">
-      <DashboardHeader />
-      <section className="relative z-10 overflow-visible pb-0 ps-3 pe-3 pt-[17px] sm:ps-6 sm:pe-[9px]">
-        <h2 className="w-full font-syne text-[16px] font-medium leading-[normal] text-[#191919]">
-          {t("dashboard.actions")}
-        </h2>
-        <div className="mt-[18px] flex flex-wrap items-start gap-4">
-          <Link
-            href={localizePathname("/upload", locale)}
-            onClick={() =>
-              trackEvent(MixpanelEvent.Dashboard_New_Presentation_Clicked, {
-                pathname,
-                source: "dashboard_actions_card",
-              })
-            }
-            className="group/action relative z-50 block w-[304.5px] max-w-full cursor-pointer overflow-visible rounded-[10.8px] bg-white outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8] focus-visible:ring-offset-4"
-            aria-label={t("dashboard.newPresentation")}
-          >
-            <FloatingActionCards />
+    <div className="space-y-8">
+      {mode === "dashboard" ? (
+        <>
+          <ProductOnboarding />
+          <section className="relative overflow-hidden rounded-[24px] bg-[#17142B] px-6 py-8 text-white shadow-[0_18px_50px_rgba(24,20,46,0.14)] sm:px-8 sm:py-10 lg:px-10" aria-labelledby="dashboard-welcome-heading">
+            <div className="absolute -end-20 -top-28 h-72 w-72 rounded-full bg-[#7758F6]/35 blur-3xl" aria-hidden="true" />
+            <div className="absolute -bottom-24 end-36 h-56 w-56 rounded-full bg-[#42C9B8]/15 blur-3xl" aria-hidden="true" />
+            <div className="relative max-w-2xl">
+              <p className="mb-3 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-[#C9BEFF]"><Sparkles className="h-4 w-4" aria-hidden="true" />Bayanly</p>
+              <h2 id="dashboard-welcome-heading" className="text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">{username ? t("dashboard.welcome", { name: username }) : t("dashboard.welcomeGeneric")}</h2>
+              <p className="mt-3 text-sm leading-6 text-white/70 sm:text-base">{t("dashboard.welcomeDescription")}</p>
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                <Link href={localizePathname("/create", locale)} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-[#3F2BAF] transition hover:-translate-y-0.5 hover:bg-[#F7F5FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#17142B] motion-reduce:transform-none"><Plus className="h-4 w-4" aria-hidden="true" />{t("navigation.create")}</Link>
+                <button type="button" onClick={() => void createBlankPresentation()} disabled={isCreatingBlank} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/5 px-5 text-sm font-semibold text-white transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-60">
+                  {isCreatingBlank ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <LayoutGrid className="h-4 w-4" aria-hidden="true" />}{isCreatingBlank ? t("dashboard.creatingBlank") : t("dashboard.createBlank")}
+                </button>
+              </div>
+            </div>
+          </section>
+        </>
+      ) : (
+        <header className="max-w-2xl">
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#6F4EF6]">{t("navigation.presentations")}</p>
+          <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-[#171A24] sm:text-4xl">{t("dashboard.allPresentations")}</h2>
+          <p className="mt-3 text-sm leading-6 text-[#667085] sm:text-base">{t("dashboard.libraryDescription")}</p>
+        </header>
+      )}
 
-            <img
-              src="/create_presentation_bg.png"
-              alt=""
-              aria-hidden="true"
-              className="relative z-10 h-[89.983px] w-[304.5px] max-w-full rounded-[10.8px] bg-white object-cover"
-            />
-            <span className="absolute inset-0 z-20 flex items-center justify-center text-center font-syne text-sm font-medium text-[#191919]">
-              {t("dashboard.newPresentation")}
-            </span>
-          </Link>
-
-          <button
-            type="button"
-            onClick={() => void createBlankPresentation()}
-            disabled={isCreatingBlankPresentation}
-            aria-busy={isCreatingBlankPresentation}
-            className="group relative z-50 flex h-[89.983px] w-[304.5px] max-w-full items-center overflow-hidden rounded-[10.8px] border border-[#EDEEEF] bg-[linear-gradient(135deg,#FAFAFF_0%,#F3F0FF_100%)] px-5 text-start outline-none transition hover:border-[#CFC7FF] hover:shadow-[0_8px_22px_rgba(81,70,229,0.12)] focus-visible:ring-2 focus-visible:ring-[#7A5AF8] focus-visible:ring-offset-4 disabled:cursor-not-allowed disabled:opacity-70"
-            aria-label={t("dashboard.createBlank")}
-          >
-            <span className="font-syne text-sm font-medium text-[#191919]">
-              {isCreatingBlankPresentation
-                ? t("dashboard.creatingBlank")
-                : t("dashboard.createBlank")}
-            </span>
-            <span
-              className="ms-auto flex aspect-video w-[112px] items-center justify-center rounded-[6px] border border-[#DDD9F8] bg-white shadow-[0_6px_14px_rgba(16,24,40,0.12)] transition-transform group-hover:-translate-y-0.5"
-              aria-hidden="true"
-            >
-              {isCreatingBlankPresentation ? (
-                <Loader2 className="h-5 w-5 animate-spin text-[#7A5AF8]" />
-              ) : (
-                <Plus className="h-5 w-5 text-[#7A5AF8]" />
-              )}
-            </span>
-          </button>
-        </div>
-      </section>
-      <section className="relative z-10 mt-[46px] ps-3 pe-3 sm:ps-6 sm:pe-[9px]">
-        <div className="mb-[14px] flex items-center justify-between gap-4">
-          <h2 className="font-syne text-[16px] font-medium leading-[normal] text-[#191919]">
-            {t("dashboard.title")}
-          </h2>
-          <div className="flex items-center gap-[17px]">
-            <div className="flex items-center rounded-[4px] border border-[#EDEEEF] p-1">
-              <button
-                type="button"
-                onClick={() => setDeckViewMode("grid")}
-                aria-label={t("dashboard.gridView")}
-                aria-pressed={deckViewMode === "grid"}
-                className={`flex items-center rounded px-2 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8] ${deckViewMode === "grid" ? "bg-[#F6F6F9]" : "hover:bg-[#FAFAFC]"}`}
-              >
-                <GridViewIcon />
-              </button>
-              <button
-                type="button"
-                onClick={() => setDeckViewMode("list")}
-                aria-label={t("dashboard.listView")}
-                aria-pressed={deckViewMode === "list"}
-                className={`flex items-center rounded px-2 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A5AF8] ${deckViewMode === "list" ? "bg-[#F6F6F9]" : "hover:bg-[#FAFAFC]"}`}
-              >
-                <ListViewIcon />
-              </button>
+      <section className="rounded-[20px] border border-[#E7E7ED] bg-white p-4 shadow-[0_10px_35px_rgba(36,31,65,0.04)] sm:p-6" aria-labelledby="presentation-library-heading">
+        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div><h2 id="presentation-library-heading" className="text-xl font-semibold tracking-[-0.02em] text-[#20232D]">{mode === "dashboard" ? t("dashboard.recent") : t("dashboard.title")}</h2>{!isLoading && !error && <p className="mt-1 text-xs text-[#7A8190]">{t("dashboard.allPresentations")} · {presentations.length}</p>}</div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {mode === "library" && <>
+              <label className="relative block min-w-0 sm:w-64"><span className="sr-only">{t("dashboard.searchPlaceholder")}</span><Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8A90A0]" aria-hidden="true" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("dashboard.searchPlaceholder")} className="min-h-11 w-full rounded-xl border border-[#DDE0E6] bg-[#FAFAFC] pe-3 ps-10 text-sm outline-none transition focus:border-[#8D79F6] focus:bg-white focus:ring-2 focus:ring-[#6F4EF6]/15" /></label>
+              <select value={sort} onChange={(event) => setSort(event.target.value as SortMode)} aria-label={t("dashboard.sortLabel")} className="min-h-11 rounded-xl border border-[#DDE0E6] bg-[#FAFAFC] px-3 text-sm outline-none transition focus:border-[#8D79F6] focus:ring-2 focus:ring-[#6F4EF6]/15"><option value="updated">{t("dashboard.sortUpdated")}</option><option value="created">{t("dashboard.sortCreated")}</option><option value="title">{t("dashboard.sortTitle")}</option></select>
+            </>}
+            <div className="flex rounded-xl border border-[#DDE0E6] bg-[#FAFAFC] p-1">
+              <button type="button" onClick={() => setViewMode("grid")} aria-pressed={viewMode === "grid"} aria-label={t("dashboard.gridView")} className={`flex h-9 w-9 items-center justify-center rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6F4EF6] ${viewMode === "grid" ? "bg-white text-[#5538D7] shadow-sm" : "text-[#7A8190]"}`}><LayoutGrid className="h-4 w-4" /></button>
+              <button type="button" onClick={() => setViewMode("list")} aria-pressed={viewMode === "list"} aria-label={t("dashboard.listView")} className={`flex h-9 w-9 items-center justify-center rounded-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6F4EF6] ${viewMode === "list" ? "bg-white text-[#5538D7] shadow-sm" : "text-[#7A8190]"}`}><List className="h-4 w-4" /></button>
             </div>
           </div>
         </div>
-        <PresentationGrid
-          presentations={sortedPresentations}
-          viewMode={deckViewMode}
-          isLoading={isLoading}
-          error={error}
-          onPresentationDeleted={removePresentation}
-          onPresentationDuplicated={(presentation) =>
-            setPresentations((prev) => [presentation, ...prev])
-          }
-        />
+
+        <PresentationGrid presentations={shownPresentations} viewMode={viewMode} isLoading={isLoading} error={error} searchActive={Boolean(search.trim())} onRetry={() => void fetchPresentations()} onClearSearch={() => setSearch("")} onPresentationDeleted={removePresentation} onPresentationDuplicated={(presentation) => setPresentations((items) => [presentation, ...items])} />
+
+        {mode === "dashboard" && !isLoading && !error && presentations.length > 4 && <div className="mt-6 flex justify-center border-t border-[#EEEEF2] pt-5"><Link href={localizePathname("/presentations", locale)} className="inline-flex min-h-10 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-[#5538D7] transition hover:bg-[#F5F2FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6F4EF6]">{t("dashboard.allPresentations")}<ArrowRight className="rtl-flip h-4 w-4" /></Link></div>}
+        {mode === "library" && visibleCount < filtered.length && <div className="mt-6 flex justify-center border-t border-[#EEEEF2] pt-5"><button type="button" onClick={() => setVisibleCount((count) => count + PAGE_SIZE)} className="min-h-10 rounded-xl border border-[#D9D4F8] bg-[#F7F5FF] px-5 text-sm font-semibold text-[#5538D7] hover:bg-[#F0EDFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6F4EF6]">{t("dashboard.loadMore")}</button></div>}
       </section>
-      {!isLoading && sortedLegacyPresentations.length > 0 && (
-        <div className="relative z-10 mt-[46px] px-3 sm:px-6">
-          <LegacyPresentationsTable
-            presentations={sortedLegacyPresentations}
-            onPresentationsDeleted={removeLegacyPresentations}
-          />
-        </div>
-      )}
+
+      {mode === "library" && !isLoading && legacyPresentations.length > 0 && <section className="rounded-[20px] border border-[#E7E7ED] bg-white p-4 sm:p-6"><LegacyPresentationsTable presentations={sortPresentations(legacyPresentations, "created")} onPresentationsDeleted={removeLegacyPresentations} /></section>}
     </div>
   );
-};
-
-export default DashboardPage;
+}

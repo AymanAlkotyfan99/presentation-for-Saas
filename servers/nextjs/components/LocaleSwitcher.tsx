@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Languages } from "lucide-react";
 import {
   LOCALE_COOKIE_MAX_AGE_SECONDS,
@@ -31,7 +31,6 @@ export function LocaleSwitcher({ compact = false }: { compact?: boolean }) {
   const { locale, t } = useI18n();
   const pathname = usePathname() || "/";
   const searchParams = useSearchParams();
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   const switchLocale = (nextLocale: SupportedLocale) => {
@@ -44,7 +43,11 @@ export function LocaleSwitcher({ compact = false }: { compact?: boolean }) {
     void persistAuthenticatedLocale(nextLocale);
     const query = searchParams.toString();
     const href = `${localizePathname(pathname, nextLocale)}${query ? `?${query}` : ""}`;
-    startTransition(() => router.push(href));
+    // The locale catalog and document direction live in the persistent root
+    // layout. A document navigation ensures <html lang/dir> and the complete
+    // server-rendered catalog change together instead of retaining stale LTR
+    // state during an App Router transition.
+    startTransition(() => window.location.assign(href));
   };
 
   return (

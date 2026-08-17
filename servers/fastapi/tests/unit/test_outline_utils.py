@@ -3,7 +3,7 @@ from pydantic import ValidationError
 
 from constants.presentation import MAX_NUMBER_OF_SLIDES, MAX_OUTLINE_CONTENT_WORDS
 from models.presentation_outline_model import PresentationOutlineModel, SlideOutlineModel
-from utils.outline_limits import count_outline_words
+from utils.outline_limits import count_outline_words, normalize_outline_content
 from utils.outline_utils import (
     _extract_outline_title,
     get_images_for_slides_from_outline,
@@ -38,6 +38,22 @@ def test_slide_outline_content_is_trimmed_to_word_limit():
     assert count_outline_words(slide.content) == MAX_OUTLINE_CONTENT_WORDS
     assert f"word{MAX_OUTLINE_CONTENT_WORDS - 1}" in slide.content
     assert f"word{MAX_OUTLINE_CONTENT_WORDS}" not in slide.content
+
+
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        ("Title<br>Body", "Title\nBody"),
+        ("Title<br/>Body", "Title\nBody"),
+        ("Title<br />Body", "Title\nBody"),
+        ("Title\nBody", "Title\nBody"),
+        ("التعليم<br>مستقبل أفضل", "التعليم\nمستقبل أفضل"),
+        ("الذكاء الاصطناعي<br />AI in Education", "الذكاء الاصطناعي\nAI in Education"),
+    ],
+)
+def test_outline_content_normalizes_known_break_markup(content, expected):
+    assert normalize_outline_content(content) == expected
+    assert SlideOutlineModel(content=content).content == expected
 
 
 def test_presentation_outline_rejects_more_than_max_slides():

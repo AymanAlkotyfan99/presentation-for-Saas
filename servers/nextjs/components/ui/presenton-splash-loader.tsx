@@ -10,9 +10,9 @@ interface PresentonSplashLoaderProps {
   className?: string;
 }
 
-export const PRESENTON_SPLASH_MIN_DURATION_MS = 3000;
+export const PRESENTON_SPLASH_MIN_DURATION_MS = 600;
 
-const SPLASH_ANIMATION_MS = 2600;
+const SPLASH_ANIMATION_MS = 500;
 const SPLASH_MASK_SRC = BRAND_ASSETS.splash;
 
 let splashSessionStartedAt: number | null = null;
@@ -123,7 +123,7 @@ export function PresentonSplashLoader({
   };
 
   return (
-    <main
+    <div
       aria-busy="true"
       aria-label={message}
       className={cn("presenton-splash-loader", className)}
@@ -158,6 +158,6 @@ export function PresentonSplashLoader({
           }}
         />
       </div>
-    </main>
+    </div>
   );
 }

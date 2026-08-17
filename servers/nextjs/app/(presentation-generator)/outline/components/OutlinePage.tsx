@@ -25,6 +25,12 @@ import { sanitizeAnalyticsError } from "@/utils/analytics";
 import { MixpanelEvent, trackEvent } from "@/utils/mixpanel";
 import { useI18n } from "@/i18n/catalog";
 import { localizePathname } from "@/i18n/routing";
+import { normalizeOutlineContent } from "@/lib/outline-content";
+import {
+  DEFAULT_PRODUCT_PREFERENCES,
+  loadProductPreferences,
+  type ProductPreferences,
+} from "@/lib/product-preferences";
 
 import Chat from "../../presentation/components/Chat";
 import {
@@ -96,12 +102,12 @@ const getOutlinesFromResponse = (outline: unknown): { content: string }[] => {
           : null;
 
       if (typeof content === "string") {
-        return { content };
+        return { content: normalizeOutlineContent(content) };
       }
       if (content == null) {
         return { content: "" };
       }
-      return { content: String(content) };
+      return { content: normalizeOutlineContent(String(content)) };
     })
   );
 };
@@ -130,6 +136,8 @@ const OutlinePage: React.FC = () => {
   const [draftConfig, setDraftConfig] = useState<PresentationConfig>(
     savedConfig ? normalizeOutlineConfig(savedConfig) : DEFAULT_OUTLINE_CONFIG
   );
+  const [productPreferences, setProductPreferences] =
+    useState<ProductPreferences>(DEFAULT_PRODUCT_PREFERENCES);
   const [isRegeneratingOutline, setIsRegeneratingOutline] = useState(false);
   const [hasOutlineStreamFinished, setHasOutlineStreamFinished] =
     useState(false);
@@ -146,6 +154,19 @@ const OutlinePage: React.FC = () => {
   );
 
   const documentPaths = useMemo(() => getDocumentPaths(files), [files]);
+  const settingsSummary = useMemo(
+    () => [
+      draftConfig.slides
+        ? t("generation.slideCount", { count: draftConfig.slides })
+        : t("generation.autoSlides"),
+      draftConfig.language || productPreferences.presentationLanguage,
+      t(`preferences.design.${productPreferences.designStyle}`),
+      t(`preferences.palette.${productPreferences.colorPalette}`),
+      productPreferences.aspectRatio,
+      t(`preferences.images.${productPreferences.imagePreference}`),
+    ],
+    [draftConfig.language, draftConfig.slides, productPreferences, t]
+  );
   const outlineControlsBusy =
     isRegeneratingOutline || streamState.isLoading || streamState.isStreaming;
   const isOutlineReady =
@@ -156,6 +177,10 @@ const OutlinePage: React.FC = () => {
     !isTemplateStage &&
     !outlineControlsBusy &&
     (outlines.length > 0 || streamState.statusMessage === t("outline.ready"));
+
+  useEffect(() => {
+    setProductPreferences(loadProductPreferences());
+  }, []);
 
   useEffect(() => {
     if (savedConfig) {
@@ -314,7 +339,9 @@ const OutlinePage: React.FC = () => {
     const slideIndex = index - 1;
     if (!outlines[slideIndex]) return;
 
-    const limitedContent = trimTextToWordLimit(newContent);
+    const limitedContent = trimTextToWordLimit(
+      normalizeOutlineContent(newContent)
+    );
     if (outlines[slideIndex].content === limitedContent) return;
 
     const updatedOutlines = [...outlines];
@@ -405,7 +432,24 @@ const OutlinePage: React.FC = () => {
                 onRegenerate={handleRegenerateOutline}
               />
 
-              <div className="mt-12">
+              <section
+                aria-label={t("outline.settingsSummary")}
+                className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-[#E5E2F5] bg-white/85 px-4 py-3 shadow-[0_6px_18px_rgba(36,31,65,0.04)] backdrop-blur"
+              >
+                <span className="text-xs font-semibold text-[#4B4F5C]">
+                  {t("outline.settingsSummary")}:
+                </span>
+                {settingsSummary.map((setting) => (
+                  <span
+                    key={setting}
+                    className="rounded-full bg-[#F3F1FC] px-2.5 py-1 text-xs font-medium text-[#5D49B9]"
+                  >
+                    {setting}
+                  </span>
+                ))}
+              </section>
+
+              <div className="mt-8">
                 <OutlineContent
                   outlines={outlines}
                   isLoading={streamState.isLoading}
@@ -417,6 +461,17 @@ const OutlinePage: React.FC = () => {
                   onAddSlide={handleAddSlide}
                   onUpdateOutline={handleUpdateOutline}
                 />
+              </div>
+
+              <div className="mt-6 flex justify-end pb-4">
+                <div className="rounded-xl border border-[#E5E2F5] bg-white p-1.5 shadow-[0_8px_24px_rgba(36,31,65,0.08)]">
+                  <GenerateButton
+                    loadingState={loadingState}
+                    streamState={streamState}
+                    selectedTemplateId={selectedTemplateId}
+                    onSubmit={handleSubmit}
+                  />
+                </div>
               </div>
             </main>
           </div>
@@ -460,17 +515,6 @@ const OutlinePage: React.FC = () => {
               </div>
             </aside>
           )}
-
-          <div className="pointer-events-none fixed bottom-6 start-5 end-5 z-50 flex justify-center sm:start-10 sm:end-10 lg:start-0 lg:end-[369px]">
-            <div className="pointer-events-auto">
-              <GenerateButton
-                loadingState={loadingState}
-                streamState={streamState}
-                selectedTemplateId={selectedTemplateId}
-                onSubmit={handleSubmit}
-              />
-            </div>
-          </div>
         </>
       )}
     </div>

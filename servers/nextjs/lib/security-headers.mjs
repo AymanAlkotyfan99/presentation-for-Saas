@@ -2,8 +2,9 @@
  * Browser security policy shared by every Next.js route.
  *
  * `unsafe-inline` remains necessary for Next's boot payload and the existing
- * HTML/template renderer. `unsafe-eval` is added only when a build deliberately
- * enables the legacy executable custom-layout compiler.
+ * HTML/template renderer. `unsafe-eval` is added for the Next.js development
+ * runtime or when a build deliberately enables the legacy executable
+ * custom-layout compiler.
  */
 export function buildContentSecurityPolicy({ allowUnsafeEval = false } = {}) {
   const scriptSources = [
@@ -33,6 +34,7 @@ export function buildContentSecurityPolicy({ allowUnsafeEval = false } = {}) {
 
 export const contentSecurityPolicy = buildContentSecurityPolicy({
   allowUnsafeEval:
+    process.env.NODE_ENV !== "production" ||
     process.env.NEXT_PUBLIC_ENABLE_UNSAFE_CUSTOM_LAYOUTS === "true",
 });
 

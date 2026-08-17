@@ -54,6 +54,7 @@ export async function getServerAuthStatus(): Promise<AuthStatus> {
       method: "GET",
       headers: cookie ? { cookie } : undefined,
       cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!response.ok) {

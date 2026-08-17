@@ -26,6 +26,40 @@ CLIENT_DISCONNECT_POLL_SECONDS = 0.1
 DisconnectChecker = Callable[[], Awaitable[bool]]
 
 
+class StructuredGenerationError(RuntimeError):
+    """Structured provider output could not be parsed or validated safely."""
+
+
+def _json_decode_error_from_exception(
+    error: BaseException,
+) -> Optional[json.JSONDecodeError]:
+    """Find a JSON parser failure wrapped by a provider client.
+
+    Provider SDKs commonly normalize ``JSONDecodeError`` into their own error
+    type. Walk the explicit exception chain without inspecting or logging the
+    raw provider response.
+    """
+
+    current: Optional[BaseException] = error
+    visited: set[int] = set()
+    while current is not None and id(current) not in visited:
+        visited.add(id(current))
+        if isinstance(current, json.JSONDecodeError):
+            return current
+        current = current.__cause__ or current.__context__
+    return None
+
+
+def malformed_structured_output_feedback_user_message() -> UserMessage:
+    return UserMessage(
+        content=(
+            "The previous response was not valid JSON and could not be parsed. "
+            "Return corrected JSON only. Make sure every array and object is complete, "
+            "all delimiters are valid, and the response fully matches the required schema."
+        )
+    )
+
+
 async def _raise_if_client_disconnected(
     disconnect_checker: Optional[DisconnectChecker],
 ) -> None:
@@ -155,23 +189,57 @@ async def generate_structured_with_schema_retries(
 
     for validation_attempt in range(max_validation_loops):
         content: Optional[dict] = None
+        last_parse_error: Optional[json.JSONDecodeError] = None
         for attempt in range(parse_attempt_count):
             await _raise_if_client_disconnected(disconnect_checker)
-            content = await _generate_structured_content(
-                client,
-                disconnect_checker=disconnect_checker,
-                **get_generate_kwargs(
-                    model=model,
-                    messages=working_messages,
-                    response_format=response_format,
-                ),
-            )
+            try:
+                content = await _generate_structured_content(
+                    client,
+                    disconnect_checker=disconnect_checker,
+                    **get_generate_kwargs(
+                        model=model,
+                        messages=working_messages,
+                        response_format=response_format,
+                    ),
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                last_parse_error = _json_decode_error_from_exception(exc)
+                if last_parse_error is None:
+                    raise
+                LOGGER.warning(
+                    "Structured provider response was malformed "
+                    "(attempt=%s/%s, line=%s, column=%s, position=%s)",
+                    attempt + 1,
+                    parse_attempt_count,
+                    last_parse_error.lineno,
+                    last_parse_error.colno,
+                    last_parse_error.pos,
+                )
+                content = None
             if content is not None:
                 break
             if attempt < parse_attempt_count - 1:
+                if last_parse_error is not None:
+                    working_messages.append(
+                        malformed_structured_output_feedback_user_message()
+                    )
                 await asyncio.sleep(0.5 * (attempt + 1))
 
         if content is None:
+            if last_parse_error is not None:
+                # Registry mode has one initial execution and one correction
+                # execution total. Move to that correction without nesting a
+                # second parse loop around ProviderExecutor fallback.
+                if registry_mode and validation_attempt < max_validation_loops - 1:
+                    working_messages.append(
+                        malformed_structured_output_feedback_user_message()
+                    )
+                    continue
+                raise StructuredGenerationError(
+                    "Structured provider output remained malformed after the retry budget"
+                ) from last_parse_error
             raise HTTPException(
                 status_code=400,
                 detail="LLM did not return any content",
@@ -192,10 +260,12 @@ async def generate_structured_with_schema_retries(
         formatted_validation_errors = " | ".join(validation_errors)
         if validation_attempt == max_validation_loops - 1:
             LOGGER.warning(
-                "Validation error after max fixes, returning last response: %s",
+                "Structured response validation failed after max fixes: %s",
                 formatted_validation_errors,
             )
-            return content
+            raise StructuredGenerationError(
+                "Structured provider output did not match the required schema"
+            )
 
         LOGGER.warning(
             "Validation error, attempting fix %s/%s: %s",

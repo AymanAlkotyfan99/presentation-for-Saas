@@ -24,6 +24,7 @@ export async function authStatusForRequest(
     const response = await fetch(`${fastApiBase()}/api/v1/auth/status`, {
       headers: cookie ? { cookie } : undefined,
       cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) {
       return {

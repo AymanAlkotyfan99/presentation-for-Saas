@@ -80,8 +80,8 @@ const FinalStep = () => {
         router.push(localizePathname('/dashboard', locale))
     }
     const handleGoToUpload = () => {
-        trackEvent(MixpanelEvent.Navigation, { from: pathname, to: "/upload" });
-        router.push(localizePathname('/upload', locale))
+        trackEvent(MixpanelEvent.Navigation, { from: pathname, to: "/create" });
+        router.push(localizePathname('/create', locale))
     }
     return (
         <div className='fixed inset-0 flex h-full w-full flex-col items-center justify-center'>

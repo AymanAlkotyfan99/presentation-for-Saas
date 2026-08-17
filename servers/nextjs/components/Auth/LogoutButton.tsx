@@ -4,6 +4,9 @@ import { useState } from "react";
 import { LogOut } from "lucide-react";
 
 import { getApiUrl } from "@/utils/api";
+import { useI18n } from "@/i18n/catalog";
+import { localizePathname } from "@/i18n/routing";
+import { fetchWithTimeout } from "@/utils/fetchWithTimeout";
 import {
   MixpanelEvent,
   trackEvent,
@@ -12,15 +15,18 @@ import {
 
 type LogoutButtonProps = {
   label?: string;
+  pendingLabel?: string;
   className?: string;
   iconOnly?: boolean;
 };
 
 export default function LogoutButton({
   label = "Logout",
+  pendingLabel = "Signing out...",
   className = "",
   iconOnly = false,
 }: LogoutButtonProps) {
+  const { locale } = useI18n();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogout = async () => {
@@ -33,10 +39,10 @@ export default function LogoutButton({
       source: "logout_button",
     });
     try {
-      const response = await fetch(getApiUrl("/api/v1/auth/logout"), {
+      const response = await fetchWithTimeout(getApiUrl("/api/v1/auth/logout"), {
         method: "POST",
         credentials: "include",
-      });
+      }, 10_000);
       if (response.ok) {
         await trackEventImmediately(MixpanelEvent.Auth_Signed_Out, {
           source: "logout_button",
@@ -56,7 +62,7 @@ export default function LogoutButton({
       });
       // Always route back to auth gate even if backend logout fails.
     } finally {
-      window.location.replace("/");
+      window.location.replace(localizePathname("/", locale));
       setIsSubmitting(false);
     }
   };
@@ -71,7 +77,7 @@ export default function LogoutButton({
       title={label}
     >
       <LogOut className="h-4 w-4" />
-      {!iconOnly ? <span>{isSubmitting ? "Signing out..." : label}</span> : null}
+      {!iconOnly ? <span>{isSubmitting ? pendingLabel : label}</span> : null}
     </button>
   );
 }

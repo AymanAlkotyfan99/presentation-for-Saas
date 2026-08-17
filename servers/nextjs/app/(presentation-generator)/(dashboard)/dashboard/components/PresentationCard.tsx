@@ -1,90 +1,59 @@
-'use client'
-import React from "react";
+"use client";
 
-import { Card } from "@/components/ui/card";
-import { DashboardApi } from "@/app/(presentation-generator)/services/api/dashboard";
-import { Archive, AlertTriangle, Copy, EllipsisVertical, Loader2, Trash } from "lucide-react";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover";
+import { useState } from "react";
+import { Archive, AlertTriangle, CheckCircle2, Copy, Ellipsis, Loader2, Trash2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { notify } from "@/components/ui/sonner";
 
+import { DashboardApi, type PresentationResponse } from "@/app/(presentation-generator)/services/api/dashboard";
 import SlideScale from "@/app/(presentation-generator)/components/PresentationRender";
-import {
-  shouldRenderTemplateV2HtmlPreview,
-  TemplateV2HtmlSlidePreview,
-} from "@/app/(presentation-generator)/components/TemplateV2HtmlSlidePreview";
+import { shouldRenderTemplateV2HtmlPreview, TemplateV2HtmlSlidePreview } from "@/app/(presentation-generator)/components/TemplateV2HtmlSlidePreview";
 import MarkdownRenderer from "@/components/MarkDownRender";
-import { trackEvent, MixpanelEvent } from "@/utils/mixpanel";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { notify } from "@/components/ui/sonner";
 import { useI18n } from "@/i18n/catalog";
-import { formatDate } from "@/lib/locale-format";
 import { localizePathname } from "@/i18n/routing";
+import { formatDate } from "@/lib/locale-format";
+import { MixpanelEvent, trackEvent } from "@/utils/mixpanel";
 
-export const PresentationCard = ({
-  id,
-  title,
-  presentation,
-  viewMode = "grid",
-  onDeleted,
-  onDuplicated
-}: {
+type PresentationCardProps = {
   id: string;
   title: string;
-  presentation: any;
+  presentation: PresentationResponse;
   viewMode?: "grid" | "list";
   onDeleted?: (presentationId: string) => void;
-  onDuplicated?: (presentation: any) => void;
-}) => {
+  onDuplicated?: (presentation: PresentationResponse) => void;
+};
+
+export function PresentationCard({ id, title, presentation, viewMode = "grid", onDeleted, onDuplicated }: PresentationCardProps) {
   const { locale, t } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
-  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
-  const [isDeleting, setIsDeleting] = React.useState(false);
-  const [isDuplicating, setIsDuplicating] = React.useState(false);
-  const isUnsupported = presentation?.version === "v1-standard";
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false);
+  const isUnsupported = presentation.version === "v1-standard";
+  const displayTitle = title || t("presentation.untitled");
 
-  
-
-  const handlePreview = (e: React.MouseEvent) => {
-    e.preventDefault();
+  const openPresentation = () => {
     if (isUnsupported) {
-      notify.warning(
-        t("dashboard.unsupportedPresentation"),
-        t("dashboard.legacyNotice", { release: "Presenton 0.9.3-beta" })
-      );
+      notify.warning(t("dashboard.unsupportedPresentation"), t("dashboard.legacyNotice", { release: "Presenton 0.9.3-beta" }));
       return;
     }
-    trackEvent(MixpanelEvent.Dashboard_Presentation_Opened, {
-      pathname,
-      presentation_id: id,
-      title_length: (title || "").length,
-      slide_count: presentation?.slides?.length || 0,
-    });
+    trackEvent(MixpanelEvent.Dashboard_Presentation_Opened, { pathname, presentation_id: id, title_length: displayTitle.length, slide_count: presentation.slides?.length || 0 });
     router.push(`${localizePathname("/presentation", locale)}?id=${encodeURIComponent(id)}&type=standard`);
   };
-
 
   const handleDelete = async () => {
     if (isDeleting) return;
     setIsDeleting(true);
     const response = await DashboardApi.deletePresentation(id);
-
-    if (response?.success) {
-      trackEvent(MixpanelEvent.Dashboard_Presentation_Deleted, {
-        pathname,
-        presentation_id: id,
-        slide_count: presentation?.slides?.length || 0,
-      });
-      notify.success(t("dashboard.deleteSuccessTitle"), t("dashboard.deleteSuccessDescription"));
+    if (response.success) {
+      notify.success(t("dashboard.deleteSuccessTitle"), t("dashboard.deleteSuccessDescription"), { id: `delete-${id}` });
       setShowDeleteDialog(false);
-      if (onDeleted) {
-        onDeleted(id);
-      }
+      onDeleted?.(id);
     } else {
-      notify.error(t("dashboard.deleteFailedTitle"), t("dashboard.deleteFailed"));
+      notify.error(t("dashboard.deleteFailedTitle"), t("dashboard.deleteFailed"), { id: `delete-${id}` });
     }
     setIsDeleting(false);
   };
@@ -93,186 +62,61 @@ export const PresentationCard = ({
     if (isDuplicating) return;
     setIsDuplicating(true);
     try {
-      const duplicated = await DashboardApi.duplicatePresentation(id);
-      trackEvent(MixpanelEvent.Dashboard_Presentation_Duplicated, {
-        pathname,
-        presentation_id: id,
-        duplicate_presentation_id: duplicated?.id,
-        slide_count: presentation?.slides?.length || 0,
-      });
-      notify.success(t("dashboard.duplicateSuccessTitle"), t("dashboard.duplicateSuccessDescription"));
+      const duplicated = await DashboardApi.duplicatePresentation(id) as PresentationResponse;
+      notify.success(t("dashboard.duplicateSuccessTitle"), t("dashboard.duplicateSuccessDescription"), { id: `duplicate-${id}` });
       onDuplicated?.(duplicated);
     } catch {
-      notify.error(
-        t("dashboard.duplicateFailedTitle"),
-        t("dashboard.duplicateFailed")
-      );
+      notify.error(t("dashboard.duplicateFailedTitle"), t("dashboard.duplicateFailed"), { id: `duplicate-${id}` });
     } finally {
       setIsDuplicating(false);
     }
   };
-  const firstSlide = presentation?.slides?.[0];
-  const useTemplateV2HtmlPreview = shouldRenderTemplateV2HtmlPreview(
-    firstSlide,
-    presentation?.version
+
+  const firstSlide = presentation.slides?.[0];
+  const useHtmlPreview = shouldRenderTemplateV2HtmlPreview(firstSlide, presentation.version);
+  const preview = isUnsupported ? (
+    <div className="flex flex-col items-center gap-2 px-5 text-center text-[#667085]"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F0EDFF] text-[#6F4EF6]"><Archive className="h-4 w-4" /></span><span className="text-xs font-medium">{t("dashboard.previewUnavailable")}</span></div>
+  ) : useHtmlPreview ? (
+    <TemplateV2HtmlSlidePreview slide={firstSlide} fonts={presentation.fonts} />
+  ) : (
+    <SlideScale slide={firstSlide} isClickable={false} presentationLayout={presentation.layout} />
   );
+
   return (
-    <Card
-      suppressHydrationWarning={true}
-      onClick={handlePreview}
-      aria-disabled={isUnsupported}
-      title={isUnsupported ? t("dashboard.unsupportedPresentation") : undefined}
-      className={`bg-[#F8FBFB] font-syne relative shadow-none sm:shadow-none presentation-card rounded-[12px] p-0 group transition-all duration-500 slide-theme overflow-hidden flex flex-col ${
-        isUnsupported
-          ? "cursor-not-allowed border-[#EDEEEF]"
-          : "cursor-pointer hover:shadow-md"
-      }`}
-    >
-     
-      <div
-        id={`dashboard-presentation-card-${id}`}
-        suppressHydrationWarning={true}
-        className={`relative z-40 flex flex-1 ${viewMode === "list" ? "min-h-[122px] flex-row" : "flex-col"}`}
-      >
-        {/* <p className=" text-xs font-syne absolute top-2 flex gap-1 capitalize  items-center left-2 rounded-[100px]  px-2.5 py-1 bg-[#3A3A3AF5] text-white font-semibold  z-40 ">
+    <article className={`group relative overflow-hidden rounded-2xl border border-[#E5E6EB] bg-white transition duration-300 hover:-translate-y-1 hover:border-[#D6D0F8] hover:shadow-[0_16px_38px_rgba(34,29,63,0.11)] motion-reduce:transform-none ${viewMode === "list" ? "flex min-h-[146px]" : "flex flex-col"}`}>
+      <button type="button" onClick={openPresentation} disabled={isUnsupported} aria-label={t("dashboard.openNamed", { title: displayTitle })} className={`relative flex items-center justify-center overflow-hidden bg-[#F5F4FA] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#6F4EF6] ${viewMode === "list" ? "m-3 aspect-video w-[190px] max-w-[38%] shrink-0 rounded-xl" : "aspect-video w-full"}`}>
+        <span className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(111,78,246,0.10),transparent_48%)]" aria-hidden="true" />
+        <span className={`relative block overflow-hidden rounded-lg border border-black/[0.06] bg-white shadow-sm ${viewMode === "list" ? "h-full w-full" : "w-[84%]"}`}>{preview}</span>
+        <span className="absolute end-3 top-3 rounded-full border border-white/70 bg-white/90 px-2 py-1 text-[10px] font-semibold text-[#4B5565] shadow-sm">{t("presentation.slideCount", { count: presentation.n_slides || presentation.slides?.length || 0 })}</span>
+      </button>
 
-          {presentation.type}
-        </p> */}
-
-        <img src="/card_bg.svg" alt="" className="absolute top-0 left-0 w-full h-full object-cover" />
-        <div className={isUnsupported
-          ? `relative flex aspect-video items-center justify-center overflow-hidden rounded-lg border border-[#EDEEEF] bg-white/90 ${viewMode === "list" ? "m-3 w-[170px] shrink-0" : "mx-5 mt-4"}`
-          : `border border-gray-300 rounded-lg overflow-hidden ${viewMode === "list" ? "m-3 w-[170px] shrink-0" : "scale-[0.75] mt-4"}`
-        }>
-
-          {isUnsupported ? (
-            <div className="flex flex-col items-center gap-2 px-5 text-center text-[#666666]">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F4F3FF] text-[#7A5AF8]">
-                <Archive className="h-[18px] w-[18px]" aria-hidden="true" />
-              </span>
-              <p className="text-xs font-medium">{t("dashboard.previewUnavailable")}</p>
-            </div>
-          ) : useTemplateV2HtmlPreview ? (
-            <TemplateV2HtmlSlidePreview
-              slide={firstSlide}
-              fonts={presentation.fonts}
-            />
-          ) : (
-            <SlideScale
-              slide={firstSlide}
-              isClickable={false}
-              presentationLayout={presentation.layout}
-            />
-          )}
-        </div>
-       <p className="absolute end-2 top-1 z-40">{presentation.n_slides}</p>
-        <div className={`z-40 flex bg-white px-5 py-3 ${viewMode === "list" ? "min-w-0 flex-1 items-center border-s border-[#EDEEEF]" : "relative mt-auto w-full border-t border-[#EDEEEF]"}`}>
-          <div className="flex items-center justify-between gap-7 w-full">
-            <div className="flex flex-col items-start gap-1">
-              <div className="text-sm text-[#191919] font-semibold  overflow-hidden line-clamp-1">
-                <MarkdownRenderer content={title} className="text-sm mb-0  font-syne text-[#191919] font-semibold  overflow-hidden line-clamp-1" />
-              </div>
-              <p className="text-[#808080] text-sm font-syne">
-                {formatDate(presentation?.created_at, locale)}
-              </p>
-
-            </div>
-            <Popover>
-              <PopoverTrigger className="w-6 h-6 hover:bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:text-gray-700" onClick={(e) => e.stopPropagation()}>
-                <EllipsisVertical className="w-6 h-6 text-gray-500" />
-              </PopoverTrigger>
-              <PopoverContent align="end" className="bg-white w-[200px]">
-                {!isUnsupported && (
-                  <button
-                    className="flex items-center justify-between w-full px-2 py-1 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={isDuplicating}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      void handleDuplicate();
-                    }}
-                  >
-                    <p>{isDuplicating ? t("dashboard.duplicating") : t("common.duplicate")}</p>
-                    {isDuplicating ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-gray-500" />
-                    ) : (
-                      <Copy className="h-4 w-4 text-gray-500" />
-                    )}
-                  </button>
-                )}
-                <button
-                  className="flex items-center justify-between w-full px-2 py-1 hover:bg-gray-100"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowDeleteDialog(true);
-                  }}
-                >
-                  <p>{t("common.delete")}</p>
-                  <Trash className="w- h-4 text-red-500" />
-                </button>
-              </PopoverContent>
-            </Popover>
-          </div>
-
-        </div>
+      <div className={`flex min-w-0 flex-1 items-center gap-3 bg-white p-4 ${viewMode === "grid" ? "border-t border-[#EEEEF2]" : ""}`}>
+        <button type="button" onClick={openPresentation} disabled={isUnsupported} className="min-w-0 flex-1 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6F4EF6] focus-visible:ring-offset-2">
+          <div className="line-clamp-1 text-sm font-semibold text-[#20232D]" dir="auto"><MarkdownRenderer content={displayTitle} className="mb-0 line-clamp-1 text-sm font-semibold text-[#20232D]" /></div>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#7A8190]"><span>{formatDate(presentation.updated_at || presentation.created_at, locale)}</span>{!isUnsupported && <><span aria-hidden="true">·</span><span className="inline-flex items-center gap-1 text-[#28735C]"><CheckCircle2 className="h-3 w-3" />{t("dashboard.readyStatus")}</span></>}</div>
+        </button>
+        <Popover>
+          <PopoverTrigger asChild><button type="button" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#667085] transition hover:bg-[#F5F4FA] hover:text-[#303442] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6F4EF6]" aria-label={t("dashboard.openMenu", { title: displayTitle })}><Ellipsis className="h-5 w-5" /></button></PopoverTrigger>
+          <PopoverContent align="end" className="w-48 rounded-xl border-[#E5E6EB] bg-white p-1.5 shadow-[0_16px_36px_rgba(34,29,63,0.14)]">
+            {!isUnsupported && <button type="button" disabled={isDuplicating} onClick={() => void handleDuplicate()} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-sm text-[#303442] transition hover:bg-[#F7F7FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6F4EF6] disabled:opacity-60">{isDuplicating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}{isDuplicating ? t("dashboard.duplicating") : t("common.duplicate")}</button>}
+            <button type="button" onClick={() => setShowDeleteDialog(true)} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-sm text-[#B42318] transition hover:bg-[#FFF3F1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D92D20]"><Trash2 className="h-4 w-4" />{t("common.delete")}</button>
+          </PopoverContent>
+        </Popover>
       </div>
-      {showDeleteDialog && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center animate-[fadeIn_150ms_ease-out]"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (isDeleting) return;
-            setShowDeleteDialog(false);
-          }}
-        >
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
-          <div
-            className="relative w-[360px] rounded-2xl bg-white shadow-2xl animate-[scaleIn_200ms_ease-out]"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-          >
-            <div className="flex flex-col items-center p-6 pb-4 text-center">
-              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
-                <AlertTriangle className="h-6 w-6 text-red-500" />
-              </div>
-              <h3 className="mb-2 text-lg font-semibold text-[#191919]">
-                {t("dashboard.deleteTitle")}
-              </h3>
-              <p className="text-sm leading-relaxed text-gray-500">
-                <span className="font-medium text-gray-700" dir="auto">&quot;{title}&quot;</span>.{" "}
-                {t("dashboard.deleteDescription")}
-              </p>
-            </div>
-            <div className="flex border-t border-gray-100">
-              <button
-                onClick={() => setShowDeleteDialog(false)}
-                disabled={isDeleting}
-                className="flex-1 px-4 py-3.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {t("common.cancel")}
-              </button>
-              <button
-                onClick={() => void handleDelete()}
-                disabled={isDeleting}
-                className="flex flex-1 items-center justify-center gap-2 border-s border-gray-100 px-4 py-3.5 text-sm font-medium text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isDeleting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t("dashboard.deleting")}
-                  </>
-                ) : (
-                  t("common.delete")
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </Card>
+
+      <Dialog open={showDeleteDialog} onOpenChange={(open) => !isDeleting && setShowDeleteDialog(open)}>
+        <DialogContent className="w-[calc(100vw-32px)] max-w-md rounded-2xl border-0 p-0 shadow-[0_24px_80px_rgba(24,20,46,0.2)]">
+          <DialogHeader className="px-6 pb-4 pt-7 text-start sm:px-7">
+            <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#FFF0EE] text-[#B42318]"><AlertTriangle className="h-5 w-5" /></span>
+            <DialogTitle className="text-xl font-semibold tracking-[-0.02em] text-[#20232D]" dir="auto">{t("dashboard.deleteNamed", { title: displayTitle })}</DialogTitle>
+            <DialogDescription className="pt-1 text-sm leading-6 text-[#667085]">{t("dashboard.deleteNamedDescription")}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-row border-t border-[#EEEEF2] p-4 sm:justify-end sm:space-x-0">
+            <button type="button" disabled={isDeleting} onClick={() => setShowDeleteDialog(false)} className="min-h-10 rounded-xl px-5 text-sm font-semibold text-[#4B5565] hover:bg-[#F7F7FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6F4EF6] disabled:opacity-60">{t("common.cancel")}</button>
+            <button type="button" disabled={isDeleting} onClick={() => void handleDelete()} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#B42318] px-5 text-sm font-semibold text-white transition hover:bg-[#912018] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B42318] disabled:opacity-60">{isDeleting && <Loader2 className="h-4 w-4 animate-spin" />}{isDeleting ? t("dashboard.deleting") : t("common.delete")}</button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </article>
   );
-};
+}

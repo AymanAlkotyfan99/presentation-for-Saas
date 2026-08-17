@@ -5,6 +5,7 @@ from constants.presentation import MAX_OUTLINE_CONTENT_WORDS
 
 
 OUTLINE_WORD_PATTERN = re.compile(r"\S+")
+OUTLINE_BREAK_TAG_PATTERN = re.compile(r"<\s*br\s*/?\s*>", re.IGNORECASE)
 
 
 def count_outline_words(text: str) -> int:
@@ -30,6 +31,7 @@ def normalize_outline_content(value: Any) -> str:
         return ""
     if not isinstance(value, str):
         value = str(value)
+    value = OUTLINE_BREAK_TAG_PATTERN.sub("\n", value)
     return trim_text_to_word_limit(value, MAX_OUTLINE_CONTENT_WORDS)
 
 

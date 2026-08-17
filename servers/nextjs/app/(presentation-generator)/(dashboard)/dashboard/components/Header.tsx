@@ -3,6 +3,7 @@
 import Wrapper from "@/components/Wrapper";
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { trackEvent, MixpanelEvent } from "@/utils/mixpanel";
 import { ArrowLeft } from "lucide-react";
@@ -13,6 +14,7 @@ import { useI18n } from "@/i18n/catalog";
 
 const PATHS_WITH_HEADER_BACK = [
   "/upload",
+  "/create",
   "/outline",
   "/documents-preview",
   "/template-preview",
@@ -33,7 +35,7 @@ const Header = () => {
   const backToTemplates = pathMatches(pathname, "/template-preview");
 
   const backHref = localizePathname(
-    backToUpload ? "/upload" : backToTemplates ? "/templates" : "/dashboard",
+    backToUpload ? "/create" : backToTemplates ? "/templates" : "/dashboard",
     locale,
   );
   const backLabel = backToUpload
@@ -53,9 +55,11 @@ const Header = () => {
         <div className="flex items-center justify-between py-1">
           <div className="flex items-center gap-3">
             <Link href={localizePathname("/dashboard", locale)} onClick={() => trackEvent(MixpanelEvent.Navigation, { from: pathname, to: "/dashboard" })}>
-              <img
+              <Image
                 src={BRAND_ASSETS.compactIcon}
                 alt={`${DISPLAY_PRODUCT.shortName} logo`}
+                height={40}
+                width={40}
                 className="h-[40px] w-[40px]"
               />
             </Link>

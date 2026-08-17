@@ -6,6 +6,10 @@ import {
   limitOutlines,
   MAX_NUMBER_OF_SLIDES,
 } from "@/utils/presentationLimits";
+import {
+  serializePresentationPrepareBody,
+  type PresentationPrepareRequest,
+} from "@/lib/presentation-prepare";
 import type { PresentationVersion } from "./dashboard";
 import type { Slide } from "../../types/slide";
 
@@ -222,21 +226,16 @@ export class PresentationGenerationApi {
     }
   }
 
-  static async presentationPrepare(presentationData: any) {
+  static async presentationPrepare(
+    presentationData: PresentationPrepareRequest
+  ) {
     try {
-      const body =
-        Array.isArray(presentationData?.outlines)
-          ? {
-            ...presentationData,
-            outlines: limitOutlines(presentationData.outlines),
-          }
-          : presentationData;
       const response = await fetch(
         getApiUrl(`/api/v1/ppt/presentation/prepare`),
         {
           method: "POST",
           headers: getHeader(),
-          body: JSON.stringify(body),
+          body: serializePresentationPrepareBody(presentationData),
           cache: "no-cache",
         }
       );
