@@ -1,8 +1,18 @@
+import asyncio
+from unittest.mock import AsyncMock, patch
+
+import pytest
+from fastapi import HTTPException
+
 from models.presentation_layout import PresentationLayoutModel, SlideLayoutModel
+from models.presentation_outline_model import PresentationOutlineModel, SlideOutlineModel
 from utils.llm_calls.generate_presentation_structure import (
+    PRESENTATION_PREPARE_FAILURE_DETAIL,
+    generate_presentation_structure,
     get_messages,
     get_messages_for_slides_markdown,
 )
+from utils.llm_utils import StructuredGenerationError
 
 
 def _layout() -> PresentationLayoutModel:
@@ -55,3 +65,34 @@ def test_slides_markdown_structure_prompt_includes_both_intent_sources():
 
     assert "# User Instructions:\nUse a bar chart" in prompt
     assert "# Original User Request:\nClimate presentation" in prompt
+
+
+def test_structure_generation_maps_exhausted_parse_retries_to_safe_error():
+    with patch(
+        "utils.llm_calls.generate_presentation_structure.get_client",
+        return_value=object(),
+    ), patch(
+        "utils.llm_calls.generate_presentation_structure.get_llm_config",
+        return_value=object(),
+    ), patch(
+        "utils.llm_calls.generate_presentation_structure.get_model",
+        return_value="test-model",
+    ), patch(
+        "utils.llm_calls.generate_presentation_structure.generate_structured_with_schema_retries",
+        new=AsyncMock(
+            side_effect=StructuredGenerationError("safe internal diagnostic")
+        ),
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            asyncio.run(
+                generate_presentation_structure(
+                    PresentationOutlineModel(
+                        slides=[SlideOutlineModel(content="## Education\nSummary")]
+                    ),
+                    _layout(),
+                )
+            )
+
+    assert exc_info.value.status_code == 502
+    assert exc_info.value.detail == PRESENTATION_PREPARE_FAILURE_DETAIL
+    assert "diagnostic" not in exc_info.value.detail

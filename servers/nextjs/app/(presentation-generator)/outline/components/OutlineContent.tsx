@@ -91,10 +91,10 @@ const OutlineContent: React.FC<OutlineContentProps> = ({
       )}
 
       {isLoading && (!outlines || outlines.length === 0) && (
-        <div className="space-y-5">
+        <div className="space-y-4">
           {[...Array(6)].map((_, index) => (
             <div key={index} className="animate-pulse">
-              <div className="flex items-start gap-3 rounded-[12px] bg-white px-[30px] py-10 shadow-[0_6.6px_6.6px_rgba(0,0,0,0.06)]">
+              <div className="flex items-start gap-4 rounded-2xl border border-[#EDEEF2] bg-white p-6 shadow-[0_8px_24px_rgba(36,31,65,0.06)]">
                 <div className="h-6 w-6 flex-shrink-0 rounded bg-gray-200" />
                 <div className="flex-1 space-y-2">
                   <div className="h-[22px] w-16 rounded-full bg-gray-200" />
@@ -157,7 +157,7 @@ const OutlineContent: React.FC<OutlineContentProps> = ({
           </DndContext>
 
           {!isStreaming && (
-            <div className="flex justify-center">
+            <div className="flex justify-center pt-2">
               <Button
                 onClick={() => {
                   if (!hasReachedSlideLimit) {
@@ -173,7 +173,7 @@ const OutlineContent: React.FC<OutlineContentProps> = ({
                 }
                 variant="outline"
                 className={cn(
-                  "h-[58px] w-full rounded-[12px] border-2 border-dashed border-[#D8D8DF] bg-white font-syne text-sm text-[#7A5AF8] shadow-none hover:bg-[#F4F3FF] hover:text-[#7A5AF8]",
+                  "h-14 w-full rounded-xl border-2 border-dashed border-[#D8D8DF] bg-white font-syne text-sm font-medium text-[#6F4EF6] shadow-none transition hover:border-[#BEB2F8] hover:bg-[#F4F3FF] hover:text-[#5B3FDD] focus-visible:ring-2 focus-visible:ring-[#7A5AF8]/30",
                   hasReachedSlideLimit &&
                     "cursor-not-allowed text-[#A0A0A8] opacity-60 hover:bg-white hover:text-[#A0A0A8]"
                 )}

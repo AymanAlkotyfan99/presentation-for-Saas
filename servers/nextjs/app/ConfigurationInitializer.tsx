@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Image from 'next/image';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { setCanChangeKeys, setLLMConfig } from '@/store/slices/userConfig';
 import { hasValidLLMConfig, normalizeLLMConfig } from '@/utils/storeHelpers';
 import { usePathname, useRouter } from 'next/navigation';
@@ -12,10 +11,38 @@ import { getApiUrl } from '@/utils/api';
 import { notify } from '@/components/ui/sonner';
 import { PRESENTON_SPLASH_MIN_DURATION_MS } from '@/components/ui/presenton-splash-loader';
 import { DISPLAY_PRODUCT } from '@/lib/product-metadata';
+import {
+  localeFromPathname,
+  localizePathname,
+  stripLocalePrefix,
+} from '@/i18n/routing';
+import { fetchWithTimeout } from '@/utils/fetchWithTimeout';
+import { useI18n } from '@/i18n/catalog';
+
+const NAVIGATION_POLL_INTERVAL_MS = 100;
+const NAVIGATION_TIMEOUT_MS = 5000;
+
+function normalizeApplicationPathname(pathname: string) {
+  const stripped = stripLocalePrefix(pathname || '/');
+  if (stripped === '/') return stripped;
+  return stripped.replace(/\/+$/, '') || '/';
+}
+
+function hasReachedNavigationTarget(currentPathname: string, targetPathname: string) {
+  if (
+    normalizeApplicationPathname(currentPathname) !==
+    normalizeApplicationPathname(targetPathname)
+  ) {
+    return false;
+  }
+
+  const targetLocale = localeFromPathname(targetPathname);
+  return !targetLocale || localeFromPathname(currentPathname) === targetLocale;
+}
 
 function ConfigurationLoadingScreen() {
   return (
-    <main
+    <div
       aria-busy="true"
       className="fixed inset-0 z-[2147483000] overflow-hidden bg-white"
       role="status"
@@ -40,17 +67,20 @@ function ConfigurationLoadingScreen() {
           Checking &amp; configuring application assets.
         </p>
       </div> */}
-    </main>
+    </div>
   );
 }
 
 export function ConfigurationInitializer({ children }: { children: React.ReactNode }) {
   const dispatch = useDispatch();
+  const { t } = useI18n();
 
-  const route = usePathname();
-  const shouldShowStartupSplash = !route?.startsWith("/pdf-maker");
-  const isSettingsRoute =
-    route === "/settings" || route?.startsWith("/settings/");
+  const route = usePathname() || '/';
+  const applicationRoute = normalizeApplicationPathname(route);
+  const routeLocale = localeFromPathname(route);
+  const shouldShowStartupSplash = !applicationRoute.startsWith('/pdf-maker');
+  const isPlatformSettingsRoute =
+    applicationRoute === '/admin/platform' || applicationRoute.startsWith('/admin/platform/');
   const [isLoading, setIsLoading] = useState(
     () => shouldShowStartupSplash
   );
@@ -58,10 +88,27 @@ export function ConfigurationInitializer({ children }: { children: React.ReactNo
     () => !shouldShowStartupSplash
   );
   const router = useRouter();
+  const navigationTimers = useRef<{
+    interval: number | null;
+    timeout: number | null;
+  }>({ interval: null, timeout: null });
+
+  const clearNavigationTimers = useCallback(() => {
+    if (navigationTimers.current.interval !== null) {
+      window.clearInterval(navigationTimers.current.interval);
+      navigationTimers.current.interval = null;
+    }
+    if (navigationTimers.current.timeout !== null) {
+      window.clearTimeout(navigationTimers.current.timeout);
+      navigationTimers.current.timeout = null;
+    }
+  }, []);
 
   // Fetch user config state
   useEffect(() => {
     fetchUserConfigState();
+    // Startup configuration is intentionally fetched once for this mounted app session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -77,22 +124,56 @@ export function ConfigurationInitializer({ children }: { children: React.ReactNo
     return () => window.clearTimeout(timeout);
   }, [shouldShowStartupSplash]);
 
-  const setLoadingToFalseAfterNavigatingTo = (pathname: string) => {
-    if (window.location.pathname === pathname) {
+  useEffect(() => clearNavigationTimers, [clearNavigationTimers]);
+
+  const setLoadingToFalseAfterNavigatingTo = useCallback((pathname: string) => {
+    clearNavigationTimers();
+
+    if (hasReachedNavigationTarget(window.location.pathname, pathname)) {
       setIsLoading(false);
       return;
     }
 
-    const interval = setInterval(() => {
-      if (window.location.pathname === pathname) {
-        clearInterval(interval);
+    navigationTimers.current.interval = window.setInterval(() => {
+      if (hasReachedNavigationTarget(window.location.pathname, pathname)) {
+        clearNavigationTimers();
         setIsLoading(false);
       }
-    }, 500);
-  }
+    }, NAVIGATION_POLL_INTERVAL_MS);
+
+    navigationTimers.current.timeout = window.setTimeout(() => {
+      const currentPathname = window.location.pathname;
+      clearNavigationTimers();
+      console.error(
+        `[ConfigurationInitializer] Navigation target was not reached: ${pathname} (current: ${currentPathname})`,
+      );
+      setIsLoading(false);
+    }, NAVIGATION_TIMEOUT_MS);
+  }, [clearNavigationTimers]);
+
+  const navigateToApplicationPath = (pathname: string) => {
+    const target = routeLocale ? localizePathname(pathname, routeLocale) : pathname;
+    router.push(target);
+    setLoadingToFalseAfterNavigatingTo(target);
+  };
+
+  const finishWithUnavailableGeneration = () => {
+    if (applicationRoute === '/') {
+      navigateToApplicationPath('/dashboard');
+      return;
+    }
+    if (!isPlatformSettingsRoute) {
+      notify.error(
+        t('errors.generationUnavailableTitle'),
+        t('errors.generationUnavailableDescription'),
+        { id: 'generation-platform-unavailable' },
+      );
+    }
+    setIsLoading(false);
+  };
 
   const fetchUserConfigState = async () => {
-    if (route.startsWith("/pdf-maker")) {
+    if (applicationRoute.startsWith('/pdf-maker')) {
       setIsLoading(false);
       return;
     }
@@ -101,7 +182,7 @@ export function ConfigurationInitializer({ children }: { children: React.ReactNo
 
     let canChangeKeys = false;
     try {
-      const res = await fetch('/api/can-change-keys');
+      const res = await fetchWithTimeout('/api/can-change-keys', {}, 10_000);
       if (!res.ok) throw new Error(`can-change-keys returned ${res.status}`);
       const data = await res.json();
       canChangeKeys = data.canChange ?? false;
@@ -114,7 +195,7 @@ export function ConfigurationInitializer({ children }: { children: React.ReactNo
     if (canChangeKeys) {
       let llmConfig: LLMConfig = {};
       try {
-        const res = await fetch('/api/user-config');
+        const res = await fetchWithTimeout('/api/user-config', {}, 10_000);
         if (!res.ok) throw new Error(`user-config returned ${res.status}`);
         llmConfig = await res.json();
       } catch (e) {
@@ -129,7 +210,7 @@ export function ConfigurationInitializer({ children }: { children: React.ReactNo
       dispatch(setLLMConfig(llmConfig));
 
       const isValid = hasValidLLMConfig(llmConfig);
-      if (route.startsWith('/pdf-maker')) {
+      if (applicationRoute.startsWith('/pdf-maker')) {
         setIsLoading(false);
         return;
       }
@@ -143,50 +224,40 @@ export function ConfigurationInitializer({ children }: { children: React.ReactNo
               llmConfig.OLLAMA_URL
             );
           } catch (error) {
-            notify.error(
-              "Could not connect to Ollama",
-              error instanceof Error ? error.message : "Check the Ollama URL and try again."
-            );
+            console.error('Configured text service is unavailable:', error);
           }
           if (!isAvailable) {
-            router.push('/');
-            setLoadingToFalseAfterNavigatingTo('/');
+            finishWithUnavailableGeneration();
             return;
           }
         }
         if (llmConfig.LLM === 'custom') {
           const isAvailable = await checkIfSelectedCustomModelIsAvailable(llmConfig);
           if (!isAvailable) {
-            router.push('/');
-            setLoadingToFalseAfterNavigatingTo('/');
+            finishWithUnavailableGeneration();
             return;
           }
         }
         if (llmConfig.LLM === 'deepseek') {
           const isAvailable = await checkIfSelectedDeepSeekModelIsAvailable(llmConfig);
           if (!isAvailable) {
-            router.push('/');
-            setLoadingToFalseAfterNavigatingTo('/');
+            finishWithUnavailableGeneration();
             return;
           }
         }
-        if (route === '/') {
-          router.push('/upload');
-          setLoadingToFalseAfterNavigatingTo('/upload');
+        if (applicationRoute === '/') {
+          navigateToApplicationPath('/dashboard');
         } else {
           setIsLoading(false);
         }
-      } else if (route !== '/' && !(isSettingsRoute && llmConfig.LLM === 'codex')) {
-        router.push('/');
-        setLoadingToFalseAfterNavigatingTo('/');
       } else {
-        setIsLoading(false);
+        finishWithUnavailableGeneration();
       }
     } else {
       try {
-        const res = await fetch("/api/runtime-config", {
+        const res = await fetchWithTimeout("/api/runtime-config", {
           cache: "no-store",
-        });
+        }, 10_000);
         if (res.ok) {
           const runtime = await res.json();
           const runtimeConfig = normalizeLLMConfig(
@@ -194,20 +265,15 @@ export function ConfigurationInitializer({ children }: { children: React.ReactNo
           );
           dispatch(setLLMConfig(runtimeConfig));
           if (!runtime.configured) {
-            notify.error(
-              "Instance not configured",
-              "Ask the administrator to configure the AI providers in Settings."
-            );
-            setIsLoading(false);
+            finishWithUnavailableGeneration();
             return;
           }
         }
       } catch (error) {
         console.error("Failed to fetch runtime configuration:", error);
       }
-      if (route === '/') {
-        router.push('/upload');
-        setLoadingToFalseAfterNavigatingTo('/upload');
+      if (applicationRoute === '/') {
+        navigateToApplicationPath('/dashboard');
       } else {
         setIsLoading(false);
       }
@@ -217,7 +283,7 @@ export function ConfigurationInitializer({ children }: { children: React.ReactNo
 
   const checkIfSelectedCustomModelIsAvailable = async (llmConfig: LLMConfig) => {
     try {
-      const response = await fetch(getApiUrl('/api/v1/ppt/openai/models/available'), {
+      const response = await fetchWithTimeout(getApiUrl('/api/v1/ppt/openai/models/available'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -226,7 +292,7 @@ export function ConfigurationInitializer({ children }: { children: React.ReactNo
           url: llmConfig.CUSTOM_LLM_URL,
           api_key: llmConfig.CUSTOM_LLM_API_KEY,
         }),
-      });
+      }, 15_000);
       const data = await response.json();
       return data.includes(llmConfig.CUSTOM_MODEL);
     } catch (error) {
@@ -237,7 +303,7 @@ export function ConfigurationInitializer({ children }: { children: React.ReactNo
 
   const checkIfSelectedDeepSeekModelIsAvailable = async (llmConfig: LLMConfig) => {
     try {
-      const response = await fetch(getApiUrl('/api/v1/ppt/openai/models/available'), {
+      const response = await fetchWithTimeout(getApiUrl('/api/v1/ppt/openai/models/available'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -246,7 +312,7 @@ export function ConfigurationInitializer({ children }: { children: React.ReactNo
           url: llmConfig.DEEPSEEK_BASE_URL || "https://api.deepseek.com/v1",
           api_key: llmConfig.DEEPSEEK_API_KEY,
         }),
-      });
+      }, 15_000);
       const data = await response.json();
       return data.includes(llmConfig.DEEPSEEK_MODEL);
     } catch (error) {

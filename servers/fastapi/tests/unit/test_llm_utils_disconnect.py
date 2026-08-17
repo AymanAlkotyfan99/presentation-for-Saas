@@ -1,4 +1,5 @@
 import asyncio
+import json
 import threading
 import time
 from types import SimpleNamespace
@@ -7,7 +8,10 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from llmai.shared import ResponseStreamCompletionChunk, ResponseStreamContentChunk
 
-from utils.llm_utils import generate_structured_with_schema_retries
+from utils.llm_utils import (
+    StructuredGenerationError,
+    generate_structured_with_schema_retries,
+)
 
 
 class RetryClient:
@@ -167,7 +171,7 @@ def test_connected_request_keeps_schema_validation_retries(monkeypatch):
     assert all(call["stream"] is True for call in client.calls)
 
 
-def test_registry_mode_has_one_parse_attempt_and_one_schema_correction(monkeypatch):
+def test_registry_mode_rejects_invalid_schema_after_one_correction(monkeypatch):
     monkeypatch.setenv("PROVIDER_REGISTRY_ENABLED", "true")
 
     class BoundedClient:
@@ -180,6 +184,47 @@ def test_registry_mode_has_one_parse_attempt_and_one_schema_correction(monkeypat
             return SimpleNamespace(content=self.responses.pop(0))
 
     client = BoundedClient()
+    with pytest.raises(StructuredGenerationError):
+        asyncio.run(
+            generate_structured_with_schema_retries(
+                client,
+                "test-model",
+                messages=[],
+                response_format=object(),
+                json_schema={
+                    "type": "object",
+                    "properties": {"result": {"type": "string"}},
+                    "required": ["result"],
+                },
+                validate_schema=True,
+                validate_schema_max_loop_count=99,
+            )
+        )
+
+    assert len(client.calls) == 2
+
+
+def _raise_wrapped_json_error(raw_response: str) -> None:
+    try:
+        json.loads(raw_response)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("provider structured response parsing failed") from exc
+
+
+def test_registry_mode_corrects_a_malformed_first_response(monkeypatch):
+    monkeypatch.setenv("PROVIDER_REGISTRY_ENABLED", "true")
+
+    class MalformedThenCorrectedClient:
+        def __init__(self):
+            self.calls = []
+
+        def generate(self, **kwargs):
+            self.calls.append(kwargs)
+            if len(self.calls) == 1:
+                _raise_wrapped_json_error('{\n  "slides": [0, 1, 2\n}')
+            return SimpleNamespace(content={"slides": [0, 1, 2]})
+
+    client = MalformedThenCorrectedClient()
     result = asyncio.run(
         generate_structured_with_schema_retries(
             client,
@@ -188,13 +233,139 @@ def test_registry_mode_has_one_parse_attempt_and_one_schema_correction(monkeypat
             response_format=object(),
             json_schema={
                 "type": "object",
-                "properties": {"result": {"type": "string"}},
-                "required": ["result"],
+                "properties": {
+                    "slides": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "minItems": 3,
+                        "maxItems": 3,
+                    }
+                },
+                "required": ["slides"],
             },
             validate_schema=True,
-            validate_schema_max_loop_count=99,
         )
     )
 
-    assert result == {"still": "wrong"}
+    assert result == {"slides": [0, 1, 2]}
     assert len(client.calls) == 2
+    correction_message = str(client.calls[1]["messages"][-1].content)
+    assert "not valid JSON" in correction_message
+    assert "Return corrected JSON only" in correction_message
+
+
+def test_legacy_mode_corrects_a_malformed_first_response(monkeypatch):
+    monkeypatch.setenv("LLM", "openrouter")
+    monkeypatch.setenv("PROVIDER_REGISTRY_ENABLED", "false")
+
+    class MalformedThenCorrectedClient:
+        def __init__(self):
+            self.calls = []
+
+        def generate(self, **kwargs):
+            self.calls.append(kwargs)
+            if len(self.calls) == 1:
+                _raise_wrapped_json_error('{\n  "slides": [0, 1, 2\n}')
+            return SimpleNamespace(content={"slides": [0, 1, 2]})
+
+    client = MalformedThenCorrectedClient()
+    with patch("utils.llm_utils.asyncio.sleep", new=AsyncMock()):
+        result = asyncio.run(
+            generate_structured_with_schema_retries(
+                client,
+                "test-model",
+                messages=[],
+                response_format=object(),
+                json_schema={
+                    "type": "object",
+                    "properties": {
+                        "slides": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "minItems": 3,
+                            "maxItems": 3,
+                        }
+                    },
+                    "required": ["slides"],
+                },
+                validate_schema=True,
+            )
+        )
+
+    assert result == {"slides": [0, 1, 2]}
+    assert len(client.calls) == 2
+    correction_message = str(client.calls[1]["messages"][-1].content)
+    assert "not valid JSON" in correction_message
+
+
+def test_legacy_mode_exhausts_three_parse_attempts_safely(monkeypatch, caplog):
+    monkeypatch.setenv("LLM", "openrouter")
+    monkeypatch.setenv("PROVIDER_REGISTRY_ENABLED", "false")
+    malformed_response = '{\n  "slides": [0, 1, 2\n}'
+
+    class AlwaysMalformedClient:
+        def __init__(self):
+            self.calls = []
+
+        def generate(self, **kwargs):
+            self.calls.append(kwargs)
+            _raise_wrapped_json_error(malformed_response)
+
+    client = AlwaysMalformedClient()
+    with patch("utils.llm_utils.asyncio.sleep", new=AsyncMock()):
+        with pytest.raises(StructuredGenerationError) as exc_info:
+            asyncio.run(
+                generate_structured_with_schema_retries(
+                    client,
+                    "test-model",
+                    messages=[],
+                    response_format=object(),
+                    json_schema={"type": "object"},
+                    validate_schema=True,
+                )
+            )
+
+    assert len(client.calls) == 3
+    assert malformed_response not in str(exc_info.value)
+    assert malformed_response not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "malformed_response",
+    [
+        '{\n  "slides": [0, 1, 2\n}',
+        '{\n  "slides": {"first": 0]\n}',
+    ],
+)
+def test_registry_mode_exhausts_two_attempts_without_exposing_raw_json(
+    monkeypatch,
+    caplog,
+    malformed_response,
+):
+    monkeypatch.setenv("PROVIDER_REGISTRY_ENABLED", "true")
+
+    class AlwaysMalformedClient:
+        def __init__(self):
+            self.calls = []
+
+        def generate(self, **kwargs):
+            self.calls.append(kwargs)
+            _raise_wrapped_json_error(malformed_response)
+
+    client = AlwaysMalformedClient()
+    with pytest.raises(StructuredGenerationError) as exc_info:
+        asyncio.run(
+            generate_structured_with_schema_retries(
+                client,
+                "test-model",
+                messages=[],
+                response_format=object(),
+                json_schema={"type": "object"},
+                validate_schema=True,
+                validate_schema_max_loop_count=99,
+            )
+        )
+
+    assert len(client.calls) == 2
+    assert malformed_response not in str(exc_info.value)
+    assert malformed_response not in caplog.text

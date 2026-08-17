@@ -13,10 +13,14 @@ import { BRAND_ASSETS } from "@/lib/product-metadata";
 import { notify } from "@/components/ui/sonner";
 import { sanitizeAnalyticsError } from "@/utils/analytics";
 import { MixpanelEvent, trackEvent } from "@/utils/mixpanel";
-import { useTranslations } from "@/i18n/catalog";
+import { useI18n } from "@/i18n/catalog";
 import { apiErrorLocalization } from "@/utils/apiErrorMessages";
 import { LOCALE_COOKIE_NAME, type SupportedLocale } from "@/i18n/config";
 import { recordLocalizationSignal } from "@/i18n/observability";
+import { localizePathname } from "@/i18n/routing";
+import { safeReturnPath } from "@/lib/product-navigation";
+import { CheckCircle2, Presentation, Sparkles } from "lucide-react";
+import { fetchWithTimeout } from "@/utils/fetchWithTimeout";
 
 type AuthStatus = {
   configured: boolean;
@@ -34,12 +38,13 @@ const initialStatus: AuthStatus = {
 };
 
 export default function AuthGate() {
-  const t = useTranslations();
+  const { locale, t } = useI18n();
   const [status, setStatus] = useState<AuthStatus>(initialStatus);
   const [isLoading, setIsLoading] = useState(true);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasMetSplashDuration, setHasMetSplashDuration] = useState(false);
+  const [redirectReason, setRedirectReason] = useState<string | null>(null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
@@ -69,6 +74,8 @@ export default function AuthGate() {
     }
 
     void refreshStatus();
+    // Authentication state is checked once on gate mount; the product shell owns later session checks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -81,26 +88,38 @@ export default function AuthGate() {
       return;
     }
 
+    const params = new URLSearchParams(window.location.search);
+    const requested = safeReturnPath(params.get("next"));
+    let destination = localizePathname("/dashboard", locale);
+    if (requested) {
+      const parsed = new URL(requested, window.location.origin);
+      destination = `${localizePathname(parsed.pathname, locale)}${parsed.search}${parsed.hash}`;
+    }
     setIsRedirecting(true);
-    window.location.replace("/");
-  }, [isLoading, isRedirecting, status.authenticated]);
+    window.location.replace(destination);
+  }, [isLoading, isRedirecting, locale, status.authenticated]);
 
   useEffect(() => {
     if (typeof window === "undefined" || isLoading) {
       return;
     }
     const params = new URLSearchParams(window.location.search);
-    if (params.get("reason") === "unauthorized") {
+    const reason = params.get("reason");
+    setRedirectReason(reason);
+    if (reason === "unauthorized" || reason === "session-expired") {
       if (!status.authenticated) {
         trackEvent(MixpanelEvent.Auth_Unauthorized_Redirect, {
           configured: true,
         });
-        notify.error(t("auth.required"), t("auth.required"), {
+        notify.error(
+          reason === "session-expired" ? t("auth.sessionExpiredTitle") : t("auth.required"),
+          reason === "session-expired" ? t("auth.sessionExpiredDescription") : t("auth.required"),
+          {
           id: "auth-unauthorized-redirect",
           duration: 5000,
-        });
+          },
+        );
       }
-      window.history.replaceState({}, "", window.location.pathname);
     }
   }, [isLoading, status.authenticated, status.configured, t]);
 
@@ -108,11 +127,11 @@ export default function AuthGate() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(getApiUrl("/api/v1/auth/status"), {
+      const response = await fetchWithTimeout(getApiUrl("/api/v1/auth/status"), {
         method: "GET",
         cache: "no-store",
         credentials: "include",
-      });
+      }, 10_000);
 
       if (!response.ok) {
         throw new Error("Could not load login state");
@@ -216,7 +235,7 @@ export default function AuthGate() {
     });
 
     try {
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         getApiUrl("/api/v1/auth/login"),
         {
           method: "POST",
@@ -228,7 +247,8 @@ export default function AuthGate() {
             username: cleanedUsername,
             password,
           }),
-        }
+        },
+        15_000,
       );
 
       const payload = await response.json();
@@ -301,35 +321,57 @@ export default function AuthGate() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-white p-6 font-syne">
-      <section className="relative z-10 w-full max-w-lg rounded-[20px] border border-[#EDEEEF] bg-[#F9F8F8] p-7 sm:p-10">
-        <div className="mb-7">
-          <div className="flex items-center gap-4">
-            <div className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-[4px] bg-[#F4F3FF] p-3">
-              <Image
-                src={BRAND_ASSETS.compactIcon}
-                alt=""
-                width={161}
-                height={166}
-                className="h-10 w-auto object-contain"
-              />
-            </div>
-            <div>
-              <p className="font-syne text-[10px] font-semibold uppercase tracking-[0.14em] text-[#7A5AF8]">
-                {t("auth.secureInstance")}
-              </p>
-              <h1 className="mt-1 font-unbounded text-xl font-normal leading-tight tracking-[-0.03em] text-black sm:text-[22px]">
-                {t("auth.title")}
-              </h1>
-            </div>
+    <div className="relative grid min-h-screen overflow-hidden bg-[#F8F8FB] font-syne lg:grid-cols-[minmax(0,1.05fr)_minmax(480px,0.95fr)]">
+      <section className="relative hidden overflow-hidden bg-[#16132A] px-12 py-14 text-white lg:flex lg:flex-col lg:justify-between">
+        <div className="absolute -end-24 -top-24 h-80 w-80 rounded-full bg-[#7A5AF8]/25 blur-3xl" aria-hidden="true" />
+        <div className="absolute -bottom-28 -start-20 h-96 w-96 rounded-full bg-[#34C7B7]/15 blur-3xl" aria-hidden="true" />
+        <div className="relative flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10">
+            <Image src={BRAND_ASSETS.compactIcon} alt="" width={30} height={30} className="h-8 w-8 object-contain" />
+          </span>
+          <span className="text-xl font-bold tracking-[-0.03em]">Bayanly</span>
+        </div>
+        <div className="relative max-w-xl pb-10">
+          <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-[#DCD5FF]">
+            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+            {t("auth.secureInstance")}
+          </p>
+          <h2 className="text-balance text-4xl font-semibold leading-[1.13] tracking-[-0.04em] xl:text-5xl">
+            {t("auth.loginSupporting")}
+          </h2>
+          <div className="mt-8 grid gap-3 text-sm text-white/75 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+            {["productOnboarding.stepOne", "productOnboarding.stepTwo", "productOnboarding.stepThree"].map((key) => (
+              <span key={key} className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-[#A99AF8]" aria-hidden="true" /> {t(key)}
+              </span>
+            ))}
           </div>
         </div>
+      </section>
 
-        <p className="max-w-md text-sm leading-relaxed text-[#6B7280]">
-          {t("auth.protectedDescription")}
-        </p>
+      <section className="relative flex items-center justify-center px-5 py-10 sm:px-10 lg:bg-white">
+        <div className="w-full max-w-[440px]">
+          <div className="mb-10 flex items-center gap-3 lg:hidden">
+            <Image src={BRAND_ASSETS.compactIcon} alt="" width={36} height={36} className="h-9 w-9 object-contain" />
+            <span className="text-xl font-bold tracking-[-0.03em] text-[#171A24]">Bayanly</span>
+          </div>
+          <div className="mb-8">
+            <span className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EEEAFE] text-[#6344E8]">
+              <Presentation className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <p className="text-sm font-semibold text-[#6F4EF6]">{t("auth.welcomeBack")}</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-[#171A24] sm:text-4xl">{t("auth.title")}</h1>
+            <p className="mt-3 text-sm leading-6 text-[#667085]">{t("auth.protectedDescription")}</p>
+          </div>
 
-        <form onSubmit={handleSubmit} className="mt-7 space-y-5">
+          {redirectReason === "session-expired" && (
+            <div className="mb-6 rounded-xl border border-[#FECACA] bg-[#FFF7F6] px-4 py-3" role="alert">
+              <p className="text-sm font-semibold text-[#9F2D25]">{t("auth.sessionExpiredTitle")}</p>
+              <p className="mt-1 text-xs leading-5 text-[#B5473E]">{t("auth.sessionExpiredDescription")}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <label htmlFor="username" className="block text-sm font-medium text-[#374151]">
               {t("auth.username")}
@@ -348,7 +390,7 @@ export default function AuthGate() {
               title={t("auth.username")}
               required
               spellCheck={false}
-              className="h-12 w-full rounded-lg border border-[#E1E1E5] bg-white px-4 text-sm text-[#191919] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#7A5AF8] focus:ring-2 focus:ring-[#7A5AF8]/15"
+              className="h-12 w-full rounded-xl border border-[#D9DCE3] bg-white px-4 text-sm text-[#191919] outline-none transition placeholder:text-[#9CA3AF] hover:border-[#BBB5E8] focus:border-[#7A5AF8] focus:ring-2 focus:ring-[#7A5AF8]/15"
               disabled={isSubmitting}
             />
           </div>
@@ -367,13 +409,13 @@ export default function AuthGate() {
               minLength={6}
               maxLength={128}
               required
-              className="h-12 w-full rounded-lg border border-[#E1E1E5] bg-white px-4 text-sm text-[#191919] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#7A5AF8] focus:ring-2 focus:ring-[#7A5AF8]/15"
+              className="h-12 w-full rounded-xl border border-[#D9DCE3] bg-white px-4 text-sm text-[#191919] outline-none transition placeholder:text-[#9CA3AF] hover:border-[#BBB5E8] focus:border-[#7A5AF8] focus:ring-2 focus:ring-[#7A5AF8]/15"
               disabled={isSubmitting}
             />
           </div>
 
           {status.configured ? (
-            <p className="rounded-lg border border-[#EDEEEF] bg-white px-4 py-3 text-xs leading-relaxed text-[#6B7280]">
+            <p className="rounded-xl bg-[#F5F4FA] px-4 py-3 text-xs leading-relaxed text-[#667085]">
               {t("auth.administratorCredentials")}
             </p>
           ) : null}
@@ -381,12 +423,13 @@ export default function AuthGate() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full rounded-[58px] border border-[#EDEEEF] bg-[#7C51F8] px-5 py-3 font-syne text-xs font-semibold text-white transition hover:bg-[#6d46e6] disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex min-h-12 w-full items-center justify-center rounded-xl bg-[#6F4EF6] px-5 py-3 text-sm font-semibold text-white shadow-[0_8px_22px_rgba(111,78,246,0.2)] transition hover:-translate-y-0.5 hover:bg-[#6242E8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6F4EF6] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transform-none"
           >
             {isSubmitting ? t("auth.submitting") : t("auth.submit")}
           </button>
-        </form>
+          </form>
+        </div>
       </section>
-    </main>
+    </div>
   );
 }

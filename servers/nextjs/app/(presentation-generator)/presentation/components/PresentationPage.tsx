@@ -646,9 +646,9 @@ const PresentationPage: React.FC<PresentationPageProps> = ({
               onClick={() => {
                 trackEvent(MixpanelEvent.Navigation, {
                   from: pathname,
-                  to: "/upload",
+                  to: "/create",
                 });
-                router.push(localizePathname("/upload", locale));
+                router.push(localizePathname("/create", locale));
               }}
             >
               {t("presentation.goToUpload")}

@@ -23,6 +23,12 @@ const routing = await import(pathToFileURL(outfile).href);
 test("locale routing preserves deep paths and has no prefix loop", () => {
   assert.equal(routing.localizePathname("/presentation", "ar"), "/ar/presentation");
   assert.equal(routing.localizePathname("/en/presentation", "ar"), "/ar/presentation");
+  assert.equal(routing.localizePathname("/upload", "en"), "/en/upload");
+  assert.equal(routing.localizePathname("/upload", "ar"), "/ar/upload");
+  assert.equal(routing.stripLocalePrefix("/en"), "/");
+  assert.equal(routing.stripLocalePrefix("/ar"), "/");
+  assert.equal(routing.stripLocalePrefix("/en/upload"), "/upload");
+  assert.equal(routing.stripLocalePrefix("/ar/upload"), "/upload");
   assert.equal(routing.stripLocalePrefix("/ar/presentation"), "/presentation");
   assert.equal(routing.localeFromPathname("/ar/presentation"), "ar");
 });

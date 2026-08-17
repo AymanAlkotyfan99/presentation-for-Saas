@@ -8,6 +8,16 @@ import {
   type ApiErrorResponse,
 } from "@/utils/apiErrorMessages";
 
+export class ApiResponseError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiResponseError";
+    this.status = status;
+  }
+}
+
 // API Response Handler Utility
 export class ApiResponseHandler {
   static async handleResponse(response: Response, defaultErrorMessage: string): Promise<any> {
@@ -58,7 +68,7 @@ export class ApiResponseHandler {
     }
 
     // Throw error with appropriate message
-    throw new Error(errorMessage);
+    throw new ApiResponseError(errorMessage, response.status);
   }
 
 

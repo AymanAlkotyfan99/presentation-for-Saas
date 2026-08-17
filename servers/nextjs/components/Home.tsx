@@ -21,7 +21,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!canChangeKeys) {
-      router.push(localizePathname("/upload", locale));
+      router.push(localizePathname("/dashboard", locale));
     }
   }, [canChangeKeys, locale, router]);
 
