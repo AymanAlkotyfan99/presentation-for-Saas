@@ -68,8 +68,11 @@ The script refuses a non-empty database. PostgreSQL/Redis/MinIO integration suit
 From `servers/nextjs`:
 
 ```bash
+cd ../fastapi
+uv sync --locked --no-dev
+cd ../nextjs
 npm ci
-npm test
+PYTHON=../fastapi/.venv/bin/python npm test
 npm run check:i18n
 npm run check:canonical
 npm run lint
@@ -77,6 +80,11 @@ NEXT_PUBLIC_FAST_API=http://localhost:8000 \
 NEXT_PUBLIC_URL=http://localhost:3000 \
 npm run build
 ```
+
+The Node suite includes canonical revision replay/checksum parity against FastAPI. Clean environments
+MUST provision the locked FastAPI runtime first and SHOULD set `PYTHON` to that environment's
+absolute interpreter path. The test otherwise accepts only the sibling FastAPI `.venv`; it does not
+fall back to an unmanaged system Python.
 
 There is no separate type-check script; `next build` is the repository's TypeScript/build validation. Use focused Node tests during development, for example:
 

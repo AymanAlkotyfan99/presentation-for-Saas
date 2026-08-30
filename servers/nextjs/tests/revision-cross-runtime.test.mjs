@@ -52,19 +52,19 @@ test("property-style command replay and canonical checksums agree across TypeScr
     if (choice === 5) commands.push({ ...base, type: "RESIZE_ELEMENTS", payload: { slideId, geometryById: { [target]: { x: 50 + Number.parseInt(target.slice(-2), 16), y: 80 + Number.parseInt(target.slice(-2), 16), width: 40 + Math.round(random() * 100), height: 40 + Math.round(random() * 80) } } } });
   }
   const typescriptDocument = frontend.applyCommandBatch(minimal, commands);
-  const candidates = process.platform === "win32"
-    ? [
-        process.env.PYTHON,
-        path.join(repositoryRoot, "servers/fastapi/.venv/Scripts/python.exe"),
-        "python",
-      ].filter(Boolean)
-    : [
-        process.env.PYTHON,
-        path.join(repositoryRoot, "servers/fastapi/.venv/bin/python"),
-        "python3",
-        "python",
-      ].filter(Boolean);
-  const python = candidates.find((candidate) => ["python", "python3"].includes(candidate) || existsSync(candidate));
+  const configuredPython = process.env.PYTHON?.trim();
+  const python = configuredPython
+    ? path.resolve(configuredPython)
+    : path.join(
+        repositoryRoot,
+        process.platform === "win32"
+          ? "servers/fastapi/.venv/Scripts/python.exe"
+          : "servers/fastapi/.venv/bin/python",
+      );
+  assert.ok(
+    existsSync(python),
+    "Cross-runtime parity requires the locked FastAPI interpreter; run uv sync in servers/fastapi or set PYTHON to that environment's absolute interpreter path.",
+  );
   const run = spawnSync(python, ["scripts/apply_revision_commands.py"], {
     cwd: path.join(repositoryRoot, "servers/fastapi"),
     input: JSON.stringify({ document: minimal, commands }), encoding: "utf8",

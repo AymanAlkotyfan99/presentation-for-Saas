@@ -63,9 +63,11 @@ uv run --locked python -m pytest --verbose --tb=short
 ### Next.js
 
 ```bash
-cd servers/nextjs
+cd servers/fastapi
+uv sync --locked --no-dev
+cd ../nextjs
 npm ci
-npm test
+PYTHON=../fastapi/.venv/bin/python npm test
 npm run lint
 NEXT_PUBLIC_FAST_API=http://localhost:8000 \
 NEXT_PUBLIC_URL=http://localhost:3000 \
