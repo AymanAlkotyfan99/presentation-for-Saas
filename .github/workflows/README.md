@@ -1,9 +1,17 @@
 # GitHub Actions workflows
 
+## Branch policy
+
+The maintained branches are `dev`, `staging`, and `production`; there is no
+`main` branch. Development, test, and security workflow branch filters use
+those three names for pushes and pull-request target branches. These filters do
+not establish sprint or feature branches.
+
 ## Test All Applications (`test-all.yml`)
 
-The test workflow runs on pushes and pull requests to `main`, and can also be
-started manually. It enforces the checks that exist in the current repository:
+The test workflow runs on pushes to and pull requests targeting `dev`,
+`staging`, and `production`, and can also be started manually. It enforces the
+checks that exist in the current repository:
 
 - repository tooling: template-converter tests and bundled export verification;
 - FastAPI: every pytest test using the Python version and locked dependencies
@@ -15,6 +23,19 @@ started manually. It enforces the checks that exist in the current repository:
   and reproducible CycloneDX SBOMs retained as workflow artifacts.
 
 No test step is allowed to fail silently.
+
+## Governance Quality (`quality.yml`)
+
+The governance workflow runs on pushes to and pull requests targeting the
+three maintained branches, and can also be started manually. It enforces the
+repository governance, architecture, localization, generated-contract, product
+identity, secret-scan, and Compose gates without production credentials.
+
+## Secret Scan (`secret-scan.yml`)
+
+The secret scan runs on pushes to and pull requests targeting the three
+maintained branches. It tests the scanner before checking repository text files
+for production-shaped credentials.
 
 ## Run the CI checks locally
 

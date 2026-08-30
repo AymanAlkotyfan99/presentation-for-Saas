@@ -31,7 +31,11 @@ container.db
 .next-build
 .cursor
 .vscode
-.agents
+# Agent-local data is private by default.
+# Only repository-shared Codex/Spec Kit skills are version-controlled.
+.agents/*
+!.agents/skills/
+!.agents/skills/**
 skills-lock.json
 .DS_Store
 .codex

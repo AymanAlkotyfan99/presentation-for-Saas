@@ -2,9 +2,15 @@ name: Test All Applications
 
 on:
   push:
-    branches: [main]
+    branches:
+      - dev
+      - staging
+      - production
   pull_request:
-    branches: [main]
+    branches:
+      - dev
+      - staging
+      - production
   workflow_dispatch:
 
 permissions:
