@@ -29,6 +29,7 @@ from utils.llm_utils import (
 from utils.schema_utils import prepare_schema_for_validation, remove_fields_from_schema
 from modules.providers.application.legacy_search_facade import (
     build_web_search_query,
+    format_web_search_context,
     get_web_search_route,
     get_selected_web_search_provider,
     get_web_search_results,
@@ -345,8 +346,6 @@ async def generate_ppt_outline(
                     f"Searching with {actual_provider_display_name}: {search_query}"
                 )
             search_results = await get_web_search_results(search_query)
-            from utils.web_search import format_web_search_context
-
             search_context = format_web_search_context(search_results)
             if emit_statuses:
                 yield OutlineGenerationStatus("Web research complete")

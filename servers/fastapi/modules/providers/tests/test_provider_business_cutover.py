@@ -32,6 +32,8 @@ PNG_1X1 = base64.b64decode(
 
 
 def test_official_adapters_execute_controlled_http_and_image_becomes_managed_asset(tmp_path, monkeypatch):
+    monkeypatch.setenv("DISABLE_IMAGE_GENERATION", "false")
+    monkeypatch.setenv("DISABLE_AI_IMAGE_GENERATION", "false")
     monkeypatch.setenv("POLICY_ROUTING_ENABLED", "true")
     monkeypatch.setenv("PROVIDER_FALLBACK_ENABLED", "false")
     monkeypatch.setenv("DURABLE_JOBS_ENABLED", "true")
@@ -136,6 +138,8 @@ def test_official_adapters_execute_controlled_http_and_image_becomes_managed_ass
 
 
 def test_controlled_image_and_search_failures_are_bounded_and_normalized(tmp_path, monkeypatch):
+    monkeypatch.setenv("DISABLE_IMAGE_GENERATION", "false")
+    monkeypatch.setenv("DISABLE_AI_IMAGE_GENERATION", "false")
     monkeypatch.setenv("POLICY_ROUTING_ENABLED", "true")
     monkeypatch.setenv("PROVIDER_FALLBACK_ENABLED", "false")
 

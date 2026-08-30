@@ -101,7 +101,7 @@ Legacy tables live under `models/sql`; modular workspace, job, asset, and provid
 
 Alembic under `servers/fastapi/alembic` is the schema-evolution authority. `migrations.py` handles startup upgrade and compatibility stamping for recognized legacy schemas. Compose sets `MIGRATE_DATABASE_ON_STARTUP=true`; the lifespan also calls `create_db_and_tables` for compatibility. New evolution still requires an Alembic revision: `create_all` is not migration authority. `scripts/check_migrations.py` enforces one base/head and can exercise a disposable PostgreSQL upgrade/idempotency smoke.
 
-`servers/fastapi/openai_spec.json` is the checked-in artifact for the intended HTTP contract workflow, and `scripts/generate_openapi_spec.py --check` compares it with the schema generated from the application. At this governance audit baseline the check reports that the checked-in artifact is stale, so it MUST NOT be described as current until a separately approved API-contract synchronization regenerates and reviews it.
+`servers/fastapi/openai_spec.json` is the checked-in artifact for the intended HTTP contract workflow, and `scripts/generate_openapi_spec.py --check` compares it with the schema generated from the application. The governance-audit drift was synchronized through the owning generator after review; future route or schema changes MUST keep check mode green and MUST NOT edit the generated artifact manually.
 
 ## Provider and outbound-network boundaries
 

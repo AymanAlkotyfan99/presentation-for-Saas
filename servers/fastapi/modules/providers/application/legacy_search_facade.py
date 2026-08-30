@@ -78,7 +78,8 @@ async def get_web_search_results(query: str) -> list[WebSearchResult]:
 
 
 __all__ = [
-    "build_web_search_query", "get_selected_web_search_provider",
+    "build_web_search_query", "format_web_search_context",
+    "get_selected_web_search_provider",
     "get_web_search_context", "get_web_search_results", "get_web_search_route",
     "should_expose_external_web_search_tool", "should_use_native_web_search",
 ]

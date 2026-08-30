@@ -134,9 +134,17 @@ npm run lint:main
 
 ## Known baseline blockers
 
-The complete CI baseline is not green at this governance audit. A targeted FastAPI platform/security run completed with `147 passed, 1 skipped, 3 failed`. Two failures are in provider image-execution expectations under the CI configuration `DISABLE_IMAGE_GENERATION=true`; the third provider-boundary failure reports a direct search implementation in `utils/llm_calls/generate_presentation_outlines.py`. These tests remain active and blocking: they are not skipped, xfailed, weakened, suppressed, or allowed to continue on error.
+The governance-audit baseline blockers were remediated on 2026-08-30. Under the documented CI
+configuration with `DISABLE_IMAGE_GENERATION=true`, the exact targeted FastAPI platform/security
+baseline now completes with `150 passed, 1 skipped`. The remaining skip reports that symlink
+creation is unavailable for the Windows test account. The three formerly failing tests remain
+active and passing; they were not skipped, xfailed, weakened, suppressed, or allowed to continue
+on error.
 
-The checked-in `servers/fastapi/openai_spec.json` is also stale: `uv run --locked python scripts/generate_openapi_spec.py --check` fails until a separately approved API-contract synchronization is performed. Do not report the complete CI baseline as green while these blockers remain.
+The checked-in `servers/fastapi/openai_spec.json` was synchronized through
+`scripts/generate_openapi_spec.py`, and `uv run --locked python scripts/generate_openapi_spec.py
+--check` passes. This evidence clears the named governance-audit blockers only; the broader suite
+and all other mandatory gates must still be run and reported for each affected change.
 
 ## Manual acceptance and E2E
 
