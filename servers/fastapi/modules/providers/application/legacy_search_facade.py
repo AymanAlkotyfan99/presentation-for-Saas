@@ -56,19 +56,29 @@ def get_web_search_route(provider=None):
 
 
 async def get_web_search_context(query: str) -> str:
+    return format_web_search_context(await get_web_search_results(query))
+
+
+async def get_web_search_results(query: str) -> list[WebSearchResult]:
     if provider_platform_active():
         result = await execute_search(query, operation="search.presentation_outline")
-        return format_web_search_context(
-            [WebSearchResult(item.title, item.url, item.snippet or "") for item in result.items]
-        )
+        return [
+            WebSearchResult(
+                item.title,
+                item.url,
+                item.snippet or "",
+                item.published_at,
+            )
+            for item in result.items
+        ]
     _require_legacy()
-    from utils.web_search import get_web_search_context as legacy
+    from utils.web_search import get_web_search_results as legacy
 
     return await legacy(query)
 
 
 __all__ = [
     "build_web_search_query", "get_selected_web_search_provider",
-    "get_web_search_context", "get_web_search_route",
+    "get_web_search_context", "get_web_search_results", "get_web_search_route",
     "should_expose_external_web_search_tool", "should_use_native_web_search",
 ]

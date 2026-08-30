@@ -66,6 +66,25 @@ test("renders template v2 text run underlines in generated HTML", async () => {
   );
 });
 
+test("HTML export keeps compact technical identifiers atomic", async () => {
+  const { templateV2UiToHtml } = await importRenderer();
+  const html = templateV2UiToHtml({
+    elements: [
+      {
+        type: "text",
+        position: { x: 0, y: 0 },
+        size: { width: 80, height: 30 },
+        font: { family: "Arial", size: 18, color: "#111827" },
+        runs: [{ text: "AR/VR" }],
+      },
+    ],
+  });
+
+  assert.match(html, /white-space:nowrap[^>]*>AR\/VR<\/span>/);
+  assert.doesNotMatch(html, /overflow-wrap:anywhere/);
+  assert.doesNotMatch(html, /word-break:break-word/);
+});
+
 test("renders legacy text-decoration underline fields", async () => {
   const { templateV2UiToHtml } = await importRenderer();
 

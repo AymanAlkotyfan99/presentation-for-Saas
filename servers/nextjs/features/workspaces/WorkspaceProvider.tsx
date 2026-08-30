@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { normalizeCapabilities, can as hasCapability } from "./capabilities";
-import { workspaceApi } from "./api";
+import { getRuntimeCapabilities, workspaceApi } from "./api";
 import type { WorkspacePermission, WorkspaceSummary } from "./types";
 
 interface WorkspaceContextValue {
@@ -20,7 +20,7 @@ const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
-  const [available, setAvailable] = useState(true);
+  const [available, setAvailable] = useState(false);
   const [current, setCurrent] = useState<WorkspaceSummary | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +29,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
+      const runtimeCapabilities = await getRuntimeCapabilities();
+      if (!runtimeCapabilities.workspaces) {
+        setAvailable(false);
+        setCurrent(null);
+        setWorkspaces([]);
+        setError(null);
+        return;
+      }
       const [nextCurrent, nextWorkspaces] = await Promise.all([workspaceApi.current(), workspaceApi.list()]);
       setCurrent(nextCurrent);
       setWorkspaces(nextWorkspaces);
@@ -36,7 +44,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       setError(null);
     } catch (cause) {
       const status = (cause as { status?: number }).status;
-      if (status === 404) setAvailable(false);
+      setAvailable(false);
+      if (status === 404) setError(null);
       else setError(cause instanceof Error ? cause.message : "Workspace request failed");
     } finally {
       setLoading(false);

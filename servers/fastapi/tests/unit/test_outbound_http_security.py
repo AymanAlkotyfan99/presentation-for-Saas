@@ -1,5 +1,6 @@
 import asyncio
 from dataclasses import replace
+import socket
 
 import pytest
 
@@ -7,6 +8,7 @@ from utils.outbound_http import (
     AiohttpPinnedTransport,
     AllowedOrigin,
     OutboundDNSBlocked,
+    OutboundDNSUnavailable,
     OutboundRedirectBlocked,
     OutboundRequestPolicy,
     OutboundRequestTimeout,
@@ -15,6 +17,7 @@ from utils.outbound_http import (
     SecureHTTPResponse,
     SecureOutboundClient,
     read_limited_response_body,
+    resolve_hostname,
     validate_outbound_url,
 )
 
@@ -268,6 +271,50 @@ def test_timeout_is_a_stable_outbound_error():
     with pytest.raises(OutboundRequestTimeout) as exc:
         run(client.request("GET", "https://provider.example/data"))
     assert exc.value.code == "OUTBOUND_REQUEST_TIMEOUT"
+
+
+def test_dns_resolution_retries_transient_failures(monkeypatch):
+    class ResolverLoop:
+        calls = 0
+
+        async def getaddrinfo(self, *_args, **_kwargs):
+            self.calls += 1
+            if self.calls < 3:
+                raise socket.gaierror(socket.EAI_AGAIN, "temporary failure")
+            return [
+                (socket.AF_INET, socket.SOCK_STREAM, 6, "", (PUBLIC_IPV4, 443))
+            ]
+
+    loop = ResolverLoop()
+    monkeypatch.setattr("utils.outbound_http.asyncio.get_running_loop", lambda: loop)
+    original_sleep = asyncio.sleep
+    monkeypatch.setattr(
+        "utils.outbound_http.asyncio.sleep", lambda _delay: original_sleep(0)
+    )
+
+    assert run(resolve_hostname("provider.example", 443)) == (PUBLIC_IPV4,)
+    assert loop.calls == 3
+
+
+def test_dns_resolution_has_stable_unavailable_error_after_retry(monkeypatch):
+    class ResolverLoop:
+        calls = 0
+
+        async def getaddrinfo(self, *_args, **_kwargs):
+            self.calls += 1
+            raise socket.gaierror(socket.EAI_AGAIN, "temporary failure")
+
+    loop = ResolverLoop()
+    monkeypatch.setattr("utils.outbound_http.asyncio.get_running_loop", lambda: loop)
+    original_sleep = asyncio.sleep
+    monkeypatch.setattr(
+        "utils.outbound_http.asyncio.sleep", lambda _delay: original_sleep(0)
+    )
+
+    with pytest.raises(OutboundDNSUnavailable) as exc:
+        run(resolve_hostname("provider.example", 443))
+    assert exc.value.code == "OUTBOUND_DNS_UNAVAILABLE"
+    assert loop.calls == 3
 
 
 def test_transport_ignores_proxy_environment(monkeypatch):

@@ -3,7 +3,11 @@ from typing import Any, Optional
 
 from llmai.shared import JSONSchemaResponse, SystemMessage, UserMessage
 
-from utils.llm_utils import DisconnectChecker, generate_structured_with_schema_retries
+from utils.llm_utils import (
+    DisconnectChecker,
+    StructuredGenerationError,
+    generate_structured_with_schema_retries,
+)
 
 SEARCH_QUERY_GENERATION_PROMPT = """
 Generate a concise web search query that finds useful factual context for a presentation.
@@ -48,25 +52,30 @@ async def generate_web_search_query(
         json_schema=SEARCH_QUERY_RESPONSE_SCHEMA,
         strict=False,
     )
-    response = await generate_structured_with_schema_retries(
-        client,
-        model,
-        messages=[
-            SystemMessage(content=SEARCH_QUERY_GENERATION_PROMPT),
-            UserMessage(
-                content=(
-                    f"TODAY'S DATE: {datetime.now().strftime('%Y-%m-%d')}\n\n"
-                    f"CONTENT: {content}\n\n"
-                    f"INSTRUCTIONS: {instructions or ''}"
-                )
-            ),
-        ],
-        response_format=response_format,
-        json_schema=SEARCH_QUERY_RESPONSE_SCHEMA,
-        strict=False,
-        validate_schema=True,
-        disconnect_checker=disconnect_checker,
-    )
+    try:
+        response = await generate_structured_with_schema_retries(
+            client,
+            model,
+            messages=[
+                SystemMessage(content=SEARCH_QUERY_GENERATION_PROMPT),
+                UserMessage(
+                    content=(
+                        f"TODAY'S DATE: {datetime.now().strftime('%Y-%m-%d')}\n\n"
+                        f"CONTENT: {content}\n\n"
+                        f"INSTRUCTIONS: {instructions or ''}"
+                    )
+                ),
+            ],
+            response_format=response_format,
+            json_schema=SEARCH_QUERY_RESPONSE_SCHEMA,
+            strict=False,
+            validate_schema=True,
+            disconnect_checker=disconnect_checker,
+        )
+    except StructuredGenerationError:
+        # Search-query planning is optional. Exhausted structured-output
+        # validation must not fail an otherwise valid presentation request.
+        return None
     query = response.get("query")
     if not isinstance(query, str):
         return None

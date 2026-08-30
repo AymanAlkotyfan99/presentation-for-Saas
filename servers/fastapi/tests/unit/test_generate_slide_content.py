@@ -31,6 +31,18 @@ def test_slide_content_user_prompt_includes_one_indexed_slide_number():
     assert "# Slide Number:\n1" in prompt
 
 
+def test_slide_content_retry_prompt_includes_safe_quality_rule_feedback():
+    prompt = generate_slide_content.get_user_prompt(
+        "Slide outline",
+        language="English",
+        quality_feedback=["LANGUAGE.UNEXPECTED_SCRIPT_EN"],
+    )
+
+    assert "# REQUIRED QUALITY CORRECTION:" in prompt
+    assert "LANGUAGE.UNEXPECTED_SCRIPT_EN" in prompt
+    assert "Do not mention the validation or rule IDs" in prompt
+
+
 def test_slide_content_generation_skips_schema_without_content_fields(monkeypatch):
     monkeypatch.setattr(
         generate_slide_content,
@@ -99,6 +111,7 @@ def test_slide_content_generation_normalizes_object_schema_and_calls_llm(
         return {
             "title": "Generated title",
             "__speaker_note__": "Speaker note",
+            "__quality__": {"quantitative_claims": [], "charts": []},
         }
 
     monkeypatch.setattr(generate_slide_content, "get_client", lambda **_kwargs: object())
@@ -131,5 +144,6 @@ def test_slide_content_generation_normalizes_object_schema_and_calls_llm(
     assert result["title"] == "Generated title"
     assert captured["json_schema"]["type"] == "object"
     assert "__speaker_note__" in captured["json_schema"]["properties"]
+    assert "__quality__" in captured["json_schema"]["properties"]
     assert captured["response_format"].json_schema == captured["json_schema"]
     assert "# Slide Number:\n2" in captured["messages"][1].content

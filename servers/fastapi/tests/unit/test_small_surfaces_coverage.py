@@ -140,6 +140,17 @@ def test_api_error_model_from_exception(exc: Exception, status: int, substr: str
     assert substr in model.detail
 
 
+def test_api_error_model_preserves_structured_http_detail():
+    detail = {
+        "code": "PRESENTATION_QUALITY_CONTRACT_FAILED",
+        "rules": ["FACT.METRIC_EVIDENCE_MISSING"],
+    }
+    model = APIErrorModel.from_exception(HTTPException(status_code=422, detail=detail))
+
+    assert model.status_code == 422
+    assert model.detail == detail
+
+
 def test_slide_model_get_new_slide_branches():
     pid = uuid.uuid4()
     base = SlideModel(

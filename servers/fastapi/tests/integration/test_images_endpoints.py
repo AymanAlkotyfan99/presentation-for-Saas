@@ -4,14 +4,22 @@ from unittest.mock import AsyncMock, Mock, patch
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from PIL import Image
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 from api.v1.ppt.endpoints.images import IMAGES_ROUTER
 from models.sql.image_asset import ImageAsset
 from services.database import get_async_session
+from utils.api_errors import StableAPIError
 
 
 def _build_client(fake_async_session):
     app = FastAPI()
+
+    @app.exception_handler(StableAPIError)
+    async def stable_api_error(_request: Request, exc: StableAPIError):
+        return JSONResponse(status_code=exc.status_code, content=exc.response_body())
+
     app.include_router(IMAGES_ROUTER)
     app.dependency_overrides[get_async_session] = lambda: fake_async_session
     return TestClient(app)
@@ -90,6 +98,38 @@ def test_search_images_uses_configured_key_for_redacted_runtime_secret(
         call.kwargs["api_key"] == "server-pexels-key"
         for call in service.get_image_from_pexels.await_args_list
     )
+
+
+def test_search_images_returns_stable_dns_failure_without_secret(
+    fake_async_session,
+):
+    client = _build_client(fake_async_session)
+    with patch(
+        "api.v1.ppt.endpoints.images.get_images_directory", return_value="/tmp"
+    ), patch(
+        "api.v1.ppt.endpoints.images.get_pexels_api_key_env",
+        return_value="server-secret-key",
+    ), patch(
+        "api.v1.ppt.endpoints.images.ImageGenerationService"
+    ) as mock_service_cls:
+        service = Mock()
+        service.get_image_from_pexels = AsyncMock(
+            side_effect=StableAPIError(
+                503,
+                "IMAGE_PROVIDER_DNS_UNAVAILABLE",
+                "The image provider name could not be resolved.",
+            )
+        )
+        mock_service_cls.return_value = service
+
+        response = client.get(
+            "/images/search?query=business&provider=pexels&strict_api_key=true",
+            headers={"X-Provider-Api-Key": "server-secret-key"},
+        )
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "IMAGE_PROVIDER_DNS_UNAVAILABLE"
+    assert "server-secret-key" not in response.text
 
 
 def test_generate_image_returns_image_path_and_persists_image_asset(fake_async_session):

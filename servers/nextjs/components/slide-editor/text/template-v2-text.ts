@@ -1001,6 +1001,14 @@ function splitOversizedTextSegment(
     return [{ text, width: fullWidth }];
   }
 
+  // Compact technical identifiers are semantic atoms. Splitting AR/VR into
+  // AR/V + R changes readability and is never a valid fit strategy. Generated
+  // decks are checked for no-wrap fit by the server quality gate; manual edits
+  // may visibly overflow until the user widens the box, but are not corrupted.
+  if (isCompactNonBreakingToken(text)) {
+    return [{ text, width: fullWidth }];
+  }
+
   const characters = Array.from(text);
   const segments: Array<{ text: string; width: number }> = [];
   let start = 0;
@@ -1033,6 +1041,10 @@ function splitOversizedTextSegment(
   }
 
   return segments;
+}
+
+export function isCompactNonBreakingToken(text: string) {
+  return /^[^\s/]{1,12}(?:[/+&.-][^\s/]{1,12})+$/u.test(text);
 }
 
 export function measureNoWrapTextWidth(text: string, font: RenderTextFont) {

@@ -33,7 +33,11 @@ describe("workspace switching and permission UI", () => {
       cy.stub(window, "fetch").callsFake(async (_input, init) => {
         if (init?.method === "PUT") return new Response(JSON.stringify(team), { status: 200, headers: { "Content-Type": "application/json" } });
         const url = String(_input);
-        const body = url.endsWith("/current") ? personal : [personal, team];
+        const body = url.endsWith("/runtime/capabilities")
+          ? { workspaces: true, providerRegistry: false }
+          : url.endsWith("/current")
+            ? personal
+            : [personal, team];
         return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
       });
     });

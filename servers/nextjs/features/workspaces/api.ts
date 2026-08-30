@@ -1,6 +1,24 @@
 import { getApiUrl } from "@/utils/api";
 import type { WorkspaceInvitation, WorkspaceMember, WorkspaceRole, WorkspaceSummary } from "./types";
 
+export interface RuntimeCapabilities {
+  workspaces: boolean;
+  providerRegistry: boolean;
+}
+
+export async function getRuntimeCapabilities(): Promise<RuntimeCapabilities> {
+  const response = await fetch(getApiUrl("/api/v1/runtime/capabilities"), {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const error = new Error("Runtime capabilities request failed") as Error & { status?: number };
+    error.status = response.status;
+    throw error;
+  }
+  return response.json();
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(getApiUrl(`/api/v1/workspaces${path}`), {
     ...init,

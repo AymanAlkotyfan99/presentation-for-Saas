@@ -36,6 +36,7 @@ class WebSearchResult:
     title: str
     url: str
     snippet: str = ""
+    published_at: str | None = None
 
 
 def supports_native_web_search(provider: LLMProvider | None = None) -> bool:
@@ -161,15 +162,19 @@ async def search_web(query: str, max_results: int | None = None) -> list[WebSear
 
 
 async def get_web_search_context(query: str) -> str:
-    try:
-        results = await search_web(query)
-    except Exception:
-        LOGGER.warning("Continuing without external web search context")
-        return ""
+    results = await get_web_search_results(query)
     context = format_web_search_context(results)
     if not context:
         LOGGER.warning("External web search returned no usable context")
     return context
+
+
+async def get_web_search_results(query: str) -> list[WebSearchResult]:
+    try:
+        return await search_web(query)
+    except Exception:
+        LOGGER.warning("Continuing without external web search context")
+        return []
 
 
 def format_web_search_context(results: list[WebSearchResult]) -> str:
@@ -180,7 +185,9 @@ def format_web_search_context(results: list[WebSearchResult]) -> str:
     ]
     for index, result in enumerate(results, start=1):
         lines.append(
-            f"{index}. {_clean_outline_web_text(result.title)}\n"
+            f"Source ID: web-{index}\n"
+            f"Title: {_clean_outline_web_text(result.title)}\n"
+            f"URL: {result.url}\n"
             f"Summary: {_clean_outline_web_text(result.snippet)}"
         )
     return "\n\n".join(lines)

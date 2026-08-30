@@ -84,6 +84,12 @@ class OutboundDNSBlocked(OutboundSecurityError):
     code = "OUTBOUND_DNS_BLOCKED"
 
 
+class OutboundDNSUnavailable(OutboundDNSBlocked):
+    """The resolver was unavailable or returned no records after bounded retries."""
+
+    code = "OUTBOUND_DNS_UNAVAILABLE"
+
+
 class OutboundRedirectBlocked(OutboundSecurityError):
     code = "OUTBOUND_REDIRECT_BLOCKED"
 
@@ -109,6 +115,7 @@ def public_outbound_error(error: BaseException) -> dict[str, str]:
     messages = {
         OutboundURLBlocked.code: "The outbound destination is not permitted",
         OutboundDNSBlocked.code: "The outbound destination did not resolve safely",
+        OutboundDNSUnavailable.code: "The outbound destination name could not be resolved",
         OutboundRedirectBlocked.code: "The outbound redirect is not permitted",
         OutboundRequestTimeout.code: "The outbound request timed out",
         OutboundResponseTooLarge.code: "The outbound response exceeded the size limit",
@@ -242,19 +249,26 @@ DNSResolver = Callable[[str, int], Awaitable[tuple[str, ...]]]
 
 
 async def resolve_hostname(hostname: str, port: int) -> tuple[str, ...]:
-    try:
-        records = await asyncio.get_running_loop().getaddrinfo(
-            hostname,
-            port,
-            family=socket.AF_UNSPEC,
-            type=socket.SOCK_STREAM,
-        )
-    except socket.gaierror as error:
-        raise OutboundDNSBlocked("Hostname resolution failed") from error
-    addresses = tuple(dict.fromkeys(record[4][0] for record in records))
-    if not addresses:
-        raise OutboundDNSBlocked("Hostname did not resolve")
-    return addresses
+    last_error: socket.gaierror | None = None
+    for attempt, delay in enumerate((0.0, 0.1, 0.25)):
+        if delay:
+            await asyncio.sleep(delay)
+        try:
+            records = await asyncio.get_running_loop().getaddrinfo(
+                hostname,
+                port,
+                family=socket.AF_UNSPEC,
+                type=socket.SOCK_STREAM,
+            )
+        except socket.gaierror as error:
+            last_error = error
+            continue
+        addresses = tuple(dict.fromkeys(record[4][0] for record in records))
+        if addresses:
+            return addresses
+        LOGGER.debug("DNS returned no records: host=%s attempt=%s", hostname, attempt + 1)
+
+    raise OutboundDNSUnavailable("Hostname resolution failed") from last_error
 
 
 def _coerce_address(raw_address: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address:

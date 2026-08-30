@@ -1,8 +1,10 @@
 import asyncio
 import base64
 import json
+import logging
 import os
 import secrets
+from typing import NoReturn
 from weakref import WeakKeyDictionary
 
 import aiohttp
@@ -42,15 +44,125 @@ from utils.image_provider import (
 )
 from utils.asset_directory_utils import absolute_fastapi_asset_url
 from utils.image_generation_error import normalize_image_generation_error
-from utils.outbound_http import SecureClientSession, validate_outbound_url
+from utils.api_errors import StableAPIError
+from utils.outbound_http import (
+    OutboundDNSUnavailable,
+    OutboundRequestTimeout,
+    OutboundResponseTooLarge,
+    OutboundSecurityError,
+    OutboundTransportError,
+    SecureClientSession,
+    safe_url_for_log,
+    validate_outbound_url,
+)
 import uuid
 
 
+LOGGER = logging.getLogger(__name__)
 COMFYUI_MAX_SEED = 0xFFFFFFFFFFFFFFFF
 COMFYUI_SEED_SOURCE_VALUE_KEYS = {"value", "int", "integer", "number"}
 _IMAGE_GENERATION_LOCKS: WeakKeyDictionary[
     asyncio.AbstractEventLoop, asyncio.Lock
 ] = WeakKeyDictionary()
+
+
+def _raise_stock_network_error(provider: str, origin: str, error: BaseException) -> NoReturn:
+    if isinstance(error, OutboundDNSUnavailable):
+        status, code, detail = (
+            503,
+            "IMAGE_PROVIDER_DNS_UNAVAILABLE",
+            "The image provider name could not be resolved. Check the deployment network and try again.",
+        )
+    elif isinstance(error, OutboundRequestTimeout):
+        status, code, detail = (
+            504,
+            "IMAGE_PROVIDER_TIMEOUT",
+            "The image provider took too long to respond.",
+        )
+    elif isinstance(error, OutboundTransportError):
+        status, code, detail = (
+            502,
+            "IMAGE_PROVIDER_UNREACHABLE",
+            "The image provider could not be reached.",
+        )
+    elif isinstance(error, OutboundResponseTooLarge):
+        status, code, detail = (
+            502,
+            "IMAGE_PROVIDER_RESPONSE_INVALID",
+            "The image provider returned an invalid response.",
+        )
+    else:
+        status, code, detail = (
+            400,
+            "IMAGE_PROVIDER_DESTINATION_BLOCKED",
+            "The image provider destination is not permitted.",
+        )
+    LOGGER.warning(
+        "Stock image provider request failed: provider=%s origin=%s code=%s",
+        provider,
+        safe_url_for_log(origin),
+        code,
+        exc_info=error,
+    )
+    raise StableAPIError(status, code, detail) from error
+
+
+def _raise_stock_response_error(provider: str, origin: str, status: int) -> NoReturn:
+    if status in {401, 403}:
+        code, public_status, detail = (
+            "IMAGE_PROVIDER_CREDENTIALS_REJECTED",
+            401,
+            "The image provider rejected the configured credentials.",
+        )
+    elif status == 429:
+        code, public_status, detail = (
+            "IMAGE_PROVIDER_RATE_LIMITED",
+            429,
+            "The image provider rate limit was reached.",
+        )
+    elif status >= 500:
+        code, public_status, detail = (
+            "IMAGE_PROVIDER_UPSTREAM_ERROR",
+            502,
+            "The image provider is temporarily unavailable.",
+        )
+    else:
+        code, public_status, detail = (
+            "IMAGE_PROVIDER_REQUEST_REJECTED",
+            400,
+            "The image provider rejected the request.",
+        )
+    LOGGER.warning(
+        "Stock image provider response rejected: provider=%s origin=%s upstream_status=%s code=%s",
+        provider,
+        safe_url_for_log(origin),
+        status,
+        code,
+    )
+    raise StableAPIError(public_status, code, detail)
+
+
+def _stock_response_json(provider: str, origin: str, response_body: bytes) -> dict:
+    try:
+        data = json.loads(response_body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        LOGGER.warning(
+            "Stock image provider returned malformed JSON: provider=%s origin=%s",
+            provider,
+            safe_url_for_log(origin),
+        )
+        raise StableAPIError(
+            502,
+            "IMAGE_PROVIDER_RESPONSE_INVALID",
+            "The image provider returned an invalid response.",
+        ) from error
+    if not isinstance(data, dict):
+        raise StableAPIError(
+            502,
+            "IMAGE_PROVIDER_RESPONSE_INVALID",
+            "The image provider returned an invalid response.",
+        )
+    return data
 
 
 def _get_image_generation_lock() -> asyncio.Lock:
@@ -349,87 +461,86 @@ class ImageGenerationService:
     ) -> str | list[str]:
         per_page = max(1, min(limit, 80))
         resolved_api_key = (api_key or get_pexels_api_key_env() or "").strip()
+        origin = "https://api.pexels.com"
 
-        async with SecureClientSession() as session:
-            response = await session.get(
-                "https://api.pexels.com/v1/search",
-                params={"query": prompt, "per_page": per_page},
-                headers={"Authorization": resolved_api_key} if resolved_api_key else {},
-                timeout=aiohttp.ClientTimeout(total=20),
-            )
-
-            if response.status in {401, 403}:
-                raise HTTPException(status_code=401, detail="Invalid Pexels API key")
-            if response.status != 200:
-                error_text = await response.text()
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"Pexels request failed: {error_text}",
+        try:
+            async with SecureClientSession() as session:
+                response = await session.get(
+                    f"{origin}/v1/search",
+                    params={"query": prompt, "per_page": per_page},
+                    headers={"Authorization": resolved_api_key} if resolved_api_key else {},
+                    timeout=aiohttp.ClientTimeout(total=20),
                 )
+        except OutboundSecurityError as error:
+            _raise_stock_network_error("pexels", origin, error)
 
-            data = await response.json()
-            photos = data.get("photos", [])
-            image_urls = [
-                photo.get("src", {}).get("large")
-                for photo in photos
-                if photo.get("src", {}).get("large")
-            ]
+        if response.status != 200:
+            _raise_stock_response_error("pexels", origin, response.status)
 
-            if limit <= 1:
-                return image_urls[0] if image_urls else ""
-            return image_urls[:limit]
+        data = _stock_response_json("pexels", origin, await response.read())
+        photos = data.get("photos", [])
+        if not isinstance(photos, list):
+            raise StableAPIError(
+                502,
+                "IMAGE_PROVIDER_RESPONSE_INVALID",
+                "The image provider returned an invalid response.",
+            )
+        image_urls = [
+            photo.get("src", {}).get("large")
+            for photo in photos
+            if isinstance(photo, dict)
+            and isinstance(photo.get("src"), dict)
+            and photo.get("src", {}).get("large")
+        ]
+
+        if limit <= 1:
+            return image_urls[0] if image_urls else ""
+        return image_urls[:limit]
 
     async def get_image_from_pixabay(
         self, prompt: str, api_key: str | None = None, limit: int = 1
     ) -> str | list[str]:
         per_page = max(3, min(limit, 200))
         resolved_api_key = (api_key or get_pixabay_api_key_env() or "").strip()
+        origin = "https://pixabay.com"
 
-        async with SecureClientSession() as session:
-            response = await session.get(
-                "https://pixabay.com/api/",
-                params={
-                    "key": resolved_api_key,
-                    "q": prompt[:99],
-                    "image_type": "photo",
-                    "per_page": per_page,
-                },
-                timeout=aiohttp.ClientTimeout(total=20),
+        try:
+            async with SecureClientSession() as session:
+                response = await session.get(
+                    f"{origin}/api/",
+                    params={
+                        "key": resolved_api_key,
+                        "q": prompt[:99],
+                        "image_type": "photo",
+                        "per_page": per_page,
+                    },
+                    timeout=aiohttp.ClientTimeout(total=20),
+                )
+        except OutboundSecurityError as error:
+            _raise_stock_network_error("pixabay", origin, error)
+
+        if response.status == 400 and b"api key" in (await response.read()).lower():
+            _raise_stock_response_error("pixabay", origin, 401)
+        if response.status != 200:
+            _raise_stock_response_error("pixabay", origin, response.status)
+
+        data = _stock_response_json("pixabay", origin, await response.read())
+        hits = data.get("hits", [])
+        if not isinstance(hits, list):
+            raise StableAPIError(
+                502,
+                "IMAGE_PROVIDER_RESPONSE_INVALID",
+                "The image provider returned an invalid response.",
             )
+        image_urls = [
+            hit.get("largeImageURL")
+            for hit in hits
+            if isinstance(hit, dict) and hit.get("largeImageURL")
+        ]
 
-            if response.status in {401, 403}:
-                error_text = await response.text()
-                raise HTTPException(
-                    status_code=401,
-                    detail=f"Invalid Pixabay API key: {error_text}",
-                )
-            if response.status == 400:
-                error_text = await response.text()
-                if "api key" in error_text.lower():
-                    raise HTTPException(
-                        status_code=401,
-                        detail=f"Invalid Pixabay API key: {error_text}",
-                    )
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Pixabay request invalid: {error_text}",
-                )
-            if response.status != 200:
-                error_text = await response.text()
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"Pixabay request failed: {error_text}",
-                )
-
-            data = await response.json()
-            hits = data.get("hits", [])
-            image_urls = [
-                hit.get("largeImageURL") for hit in hits if hit.get("largeImageURL")
-            ]
-
-            if limit <= 1:
-                return image_urls[0] if image_urls else ""
-            return image_urls[:limit]
+        if limit <= 1:
+            return image_urls[0] if image_urls else ""
+        return image_urls[:limit]
 
     async def generate_image_comfyui(self, prompt: str, output_directory: str) -> str:
         """

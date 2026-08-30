@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from constants.presentation import MAX_NUMBER_OF_SLIDES
-from models.presentation_outline_model import PresentationOutlineModel
+from models.presentation_outline_model import EvidenceSourceModel, PresentationOutlineModel
 from models.sql.presentation import PresentationModel
 from models.sse_response import (
     SSECompleteResponse,
@@ -30,9 +30,14 @@ from utils.outline_utils import (
 )
 from utils.outline_limits import normalize_outline_payload
 from utils.llm_calls.generate_presentation_outlines import (
+    OutlineGenerationEvidence,
     OutlineGenerationStatus,
     generate_ppt_outline,
     get_messages as get_outline_messages,
+)
+from modules.presentations.quality.evidence import (
+    attach_shared_evidence,
+    user_evidence_source,
 )
 from utils.sse import safe_sse_stream
 from modules.providers.application.legacy_search_facade import get_selected_web_search_provider, get_web_search_route
@@ -133,6 +138,7 @@ async def stream_outlines(
                 additional_context = "\n\n".join(documents)
 
         presentation_outlines_text = ""
+        research_evidence: list[EvidenceSourceModel] = []
 
         if presentation.n_slides > 0:
             n_slides_to_generate = get_no_of_outlines_to_generate_for_n_slides(
@@ -197,6 +203,10 @@ async def stream_outlines(
                 yield SSEStatusResponse(status=chunk.message).to_string()
                 continue
 
+            if isinstance(chunk, OutlineGenerationEvidence):
+                research_evidence = list(chunk.sources)
+                continue
+
             if isinstance(chunk, HTTPException):
                 yield SSEErrorResponse(detail=chunk.detail).to_string()
                 return
@@ -224,6 +234,23 @@ async def stream_outlines(
                 presentation_outlines_json,
                 MAX_NUMBER_OF_SLIDES,
             )
+        )
+        shared_evidence = list(research_evidence)
+        user_source = user_evidence_source(presentation.content)
+        if user_source:
+            shared_evidence.append(user_source)
+        if additional_context:
+            document_source = user_evidence_source(
+                additional_context,
+                source_id="user-documents",
+                title="User-provided source documents",
+            )
+            if document_source:
+                shared_evidence.append(document_source)
+        attach_shared_evidence(
+            presentation_outlines,
+            shared_evidence,
+            replace=True,
         )
 
         if (

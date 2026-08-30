@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { isAuthDisabled } from "@/utils/auth";
+import { cache } from "react";
 
 export type AuthStatus = {
   configured: boolean;
@@ -34,7 +35,7 @@ function getServerFastApiBase(): string {
  * Used by server layouts so 404/unknown routes are not conflated with unauthenticated access
  * (the layout only runs for routes that exist and sit under the layout’s segment).
  */
-export async function getServerAuthStatus(): Promise<AuthStatus> {
+export const getServerAuthStatus = cache(async (): Promise<AuthStatus> => {
   if (isAuthDisabled()) {
     return {
       configured: true,
@@ -86,7 +87,7 @@ export async function getServerAuthStatus(): Promise<AuthStatus> {
       role: null,
     };
   }
-}
+});
 
 /**
  * If credentials are not configured yet, send the user to `/` (setup in AuthGate).

@@ -12,6 +12,7 @@ from enums.web_search_provider import WebSearchProvider
 from models.presentation_outline_model import PresentationOutlineModel
 from tests.mocks.llm import content_event
 from utils.llm_calls import generate_presentation_outlines as outline_module
+from utils.web_search import WebSearchResult
 
 
 def _collect_async_chunks(generator) -> list[Any]:
@@ -74,7 +75,7 @@ def test_get_user_prompt_marks_instructions_as_non_content_constraints():
 def test_system_prompt_forbids_sources_in_outlines():
     prompt = outline_module.get_system_prompt()
 
-    assert "Do not include URLs" in prompt
+    assert "Do not display URLs" in prompt
     assert "without mentioning sources" in prompt
     assert "Give each slide one clear purpose" in prompt
     assert "Vary audience-facing content structures where appropriate" in prompt
@@ -89,9 +90,9 @@ def test_system_prompt_requires_content_only_outlines_for_visual_instructions():
         "Never include or paraphrase commands, configuration, or meta-commentary"
         in prompt
     )
-    assert "compact Markdown table with labels and numeric values" in prompt
-    assert "Preserve supplied data" in prompt
-    assert "otherwise add a small relevant dataset" in prompt
+    assert "include a compact Markdown table only when" in prompt
+    assert "exact numeric values" in prompt
+    assert "Never invent a dataset" in prompt
     assert "it must not contain the words 'create a bar chart'" in prompt
     assert "never copy production instructions into slide content" in prompt
 
@@ -136,7 +137,7 @@ def test_generate_ppt_outline_default_openai_uses_native_search_tool(monkeypatch
     ), patch.object(
         outline_module, "stream_generate_events", side_effect=fake_stream_generate_events
     ):
-        _collect_async_chunks(
+        chunks = _collect_async_chunks(
             outline_module.generate_ppt_outline(
                 content="Who is the current PM of Nepal?",
                 n_slides=1,
@@ -240,8 +241,14 @@ def test_generate_ppt_outline_injects_external_search_context_without_hosted_too
         return_value="latest current market facts",
     ), patch.object(
         outline_module,
-        "get_web_search_context",
-        return_value="Web search results:\nSummary: Current market facts",
+        "get_web_search_results",
+        return_value=[
+            WebSearchResult(
+                "Current market facts",
+                "https://example.com/current-market",
+                "Current market facts",
+            )
+        ],
     ), patch.object(
         outline_module,
         "get_generate_kwargs",
@@ -249,7 +256,7 @@ def test_generate_ppt_outline_injects_external_search_context_without_hosted_too
     ), patch.object(
         outline_module, "stream_generate_events", side_effect=fake_stream_generate_events
     ):
-        _collect_async_chunks(
+        chunks = _collect_async_chunks(
             outline_module.generate_ppt_outline(
                 content="current market",
                 n_slides=1,
@@ -260,7 +267,15 @@ def test_generate_ppt_outline_injects_external_search_context_without_hosted_too
 
     assert captured_kwargs["tools"] is None
     assert "Current market facts" in str(captured_kwargs["messages"][1].content)
-    assert "URL:" not in str(captured_kwargs["messages"][1].content)
+    assert "Source ID: web-1" in str(captured_kwargs["messages"][1].content)
+    assert "URL: https://example.com/current-market" in str(captured_kwargs["messages"][1].content)
+    evidence_events = [
+        chunk
+        for chunk in chunks
+        if isinstance(chunk, outline_module.OutlineGenerationEvidence)
+    ]
+    assert evidence_events[0].sources[0].id == "web-1"
+    assert evidence_events[0].sources[0].url == "https://example.com/current-market"
 
 
 def test_generate_ppt_outline_emits_provider_aware_external_search_statuses():
@@ -280,7 +295,9 @@ def test_generate_ppt_outline_emits_provider_aware_external_search_statuses():
     ), patch.object(
         outline_module, "generate_web_search_query", return_value="current Nepal PM"
     ), patch.object(
-        outline_module, "get_web_search_context", return_value="Current facts"
+        outline_module,
+        "get_web_search_results",
+        return_value=[WebSearchResult("Current facts", "https://example.com/nepal", "Current facts")],
     ), patch.object(
         outline_module, "get_generate_kwargs", side_effect=lambda **kwargs: kwargs
     ), patch.object(
@@ -355,7 +372,7 @@ def test_generate_ppt_outline_uses_fallback_query_when_query_generation_fails():
 
     async def capture_search_context(query):
         searched_queries.append(query)
-        return ""
+        return []
 
     with patch.object(outline_module, "get_model", return_value="fake-model"), patch.object(
         outline_module, "get_client", return_value=object()
@@ -369,7 +386,7 @@ def test_generate_ppt_outline_uses_fallback_query_when_query_generation_fails():
         side_effect=fail_query_generation,
     ), patch.object(
         outline_module,
-        "get_web_search_context",
+        "get_web_search_results",
         side_effect=capture_search_context,
     ), patch.object(
         outline_module,
@@ -399,7 +416,7 @@ def test_generate_ppt_outline_uses_fallback_query_when_generated_query_is_null()
 
     async def capture_search_context(query):
         searched_queries.append(query)
-        return ""
+        return []
 
     with patch.object(outline_module, "get_model", return_value="fake-model"), patch.object(
         outline_module, "get_client", return_value=object()
@@ -413,7 +430,7 @@ def test_generate_ppt_outline_uses_fallback_query_when_generated_query_is_null()
         return_value=None,
     ), patch.object(
         outline_module,
-        "get_web_search_context",
+        "get_web_search_results",
         side_effect=capture_search_context,
     ), patch.object(
         outline_module,

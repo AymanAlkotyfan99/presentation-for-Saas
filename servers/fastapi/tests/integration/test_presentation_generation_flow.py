@@ -137,15 +137,11 @@ def test_generate_presentation_handler_full_flow_uses_mocked_dependencies():
                 path="/tmp/generated/deck.pptx",
             )
         ),
-    ), patch.object(
-        presentation_endpoint.CONCURRENT_SERVICE,
-        "run_task",
-        new=Mock(),
-    ), patch.object(
-        presentation_endpoint,
-        "random",
-        new=Mock(randint=Mock(return_value=0)),
-    ):
+        ), patch.object(
+            presentation_endpoint.CONCURRENT_SERVICE,
+            "run_task",
+            new=Mock(),
+        ):
         response = _run(
             presentation_endpoint.generate_presentation_handler(
                 request=request,
@@ -162,6 +158,123 @@ def test_generate_presentation_handler_full_flow_uses_mocked_dependencies():
     assert all(slide.ui is not None for slide in session.added_all)
     assert get_slide_content.call_args_list[0].kwargs["slide_number"] == 1
     assert get_slide_content.call_args_list[1].kwargs["slide_number"] == 2
+
+
+def test_quality_layout_recovery_is_single_shot_and_provider_neutral():
+    layout = PresentationLayoutModel(
+        name="quality-recovery",
+        ordered=False,
+        slides=[
+            SlideLayoutModel(
+                id="metrics",
+                json_schema={
+                    "type": "object",
+                    "properties": {"metric_value": {"type": "string"}},
+                },
+            ),
+            SlideLayoutModel(
+                id="plain",
+                json_schema={
+                    "type": "object",
+                    "properties": {"title": {"type": "string"}},
+                },
+            ),
+        ],
+    )
+    quality_failure = HTTPException(
+        status_code=422,
+        detail={
+            "code": "PRESENTATION_QUALITY_CONTRACT_FAILED",
+            "rules": ["FACT.METRIC_EVIDENCE_MISSING"],
+        },
+    )
+    generated = AsyncMock(side_effect=[quality_failure, {"title": "Qualitative outcome"}])
+    budget = presentation_endpoint.RepairBudget(
+        max_layout_reselections=1,
+        max_slide_regenerations=1,
+    )
+
+    with patch.object(
+        presentation_endpoint,
+        "get_slide_content_from_type_and_outline",
+        generated,
+    ):
+        selected, content = _run(
+            presentation_endpoint._generate_slide_content_with_layout_recovery(
+                layout_model=layout,
+                layout_index=0,
+                outline=SlideOutlineModel(content="Qualitative education outcome"),
+                language="English",
+                tone="professional",
+                verbosity="standard",
+                instructions=None,
+                slide_index=0,
+                repair_budget=budget,
+                presentation_id="presentation-safe-id",
+                slide_id="slide-safe-id",
+            )
+        )
+
+    assert selected == 1
+    assert content == {"title": "Qualitative outcome"}
+    assert generated.await_count == 2
+    assert budget.slide_regenerations_used == 1
+
+
+def test_language_quality_failure_gets_one_rule_informed_field_regeneration():
+    layout = PresentationLayoutModel(
+        name="quality-field-recovery",
+        ordered=False,
+        slides=[
+            SlideLayoutModel(
+                id="plain",
+                json_schema={
+                    "type": "object",
+                    "properties": {"title": {"type": "string"}},
+                },
+            )
+        ],
+    )
+    quality_failure = HTTPException(
+        status_code=422,
+        detail={
+            "code": "PRESENTATION_QUALITY_CONTRACT_FAILED",
+            "rules": ["LANGUAGE.UNEXPECTED_SCRIPT_EN"],
+        },
+    )
+    generated = AsyncMock(side_effect=[quality_failure, {"title": "Correct English"}])
+    budget = presentation_endpoint.RepairBudget(max_slide_regenerations=1)
+
+    with patch.object(
+        presentation_endpoint,
+        "get_slide_content_from_type_and_outline",
+        generated,
+    ):
+        selected, content = _run(
+            presentation_endpoint._generate_slide_content_with_layout_recovery(
+                layout_model=layout,
+                layout_index=0,
+                outline=SlideOutlineModel(content="English education outcome"),
+                language="English",
+                tone="professional",
+                verbosity="standard",
+                instructions=None,
+                slide_index=0,
+                repair_budget=budget,
+                presentation_id="presentation-safe-id",
+                slide_id="slide-safe-id",
+            )
+        )
+
+    assert selected == 0
+    assert content == {"title": "Correct English"}
+    assert generated.await_count == 2
+    assert generated.await_args_list[1].kwargs["quality_feedback"] == [
+        "LANGUAGE.UNEXPECTED_SCRIPT_EN"
+    ]
+    assert generated.await_args_list[1].kwargs["presentation_id"] == "presentation-safe-id"
+    assert generated.await_args_list[1].kwargs["slide_id"] == "slide-safe-id"
+    assert budget.slide_regenerations_used == 1
 
 
 def test_generate_presentation_handler_uses_template_layout():
@@ -226,15 +339,11 @@ def test_generate_presentation_handler_uses_template_layout():
                 path="/tmp/generated/deck.pptx",
             )
         ),
-    ), patch.object(
-        presentation_endpoint.CONCURRENT_SERVICE,
-        "run_task",
-        new=Mock(),
-    ), patch.object(
-        presentation_endpoint,
-        "random",
-        new=Mock(randint=Mock(return_value=0)),
-    ):
+        ), patch.object(
+            presentation_endpoint.CONCURRENT_SERVICE,
+            "run_task",
+            new=Mock(),
+        ):
         _run(
             presentation_endpoint.generate_presentation_handler(
                 request=request,
@@ -482,7 +591,7 @@ def test_prepare_presentation_preserves_payload_icon_weight():
     stream_layout = presentation_endpoint._get_presentation_stream_layout(presentation)
     assert stream_layout.icon_weight == "thin"
     assert stream_layout.icon_type == "thin"
-    assert presentation.language == ""
+    assert presentation.language == "English"
 
 
 def test_prepare_presentation_clears_stale_language_for_reviewed_outlines():
@@ -525,7 +634,7 @@ def test_prepare_presentation_clears_stale_language_for_reviewed_outlines():
         )
 
     assert response.presentation_id == presentation_id
-    assert presentation.language == ""
+    assert presentation.language == "Chinese"
 
 
 def test_prepare_presentation_rejects_too_many_outlines():
