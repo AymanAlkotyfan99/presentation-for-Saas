@@ -10,11 +10,13 @@ import {
 
 export class ApiResponseError extends Error {
   readonly status: number;
+  readonly code?: string;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = "ApiResponseError";
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -39,9 +41,11 @@ export class ApiResponseHandler {
 
     // Handle error responses
     let errorMessage = defaultErrorMessage;
+    let errorCode: string | undefined;
     
     try {
       const errorData: ApiErrorResponse = await response.json();
+      errorCode = typeof errorData.code === "string" ? errorData.code : undefined;
       errorMessage = extractApiErrorMessage(
         errorData,
         defaultErrorMessage,
@@ -68,7 +72,7 @@ export class ApiResponseHandler {
     }
 
     // Throw error with appropriate message
-    throw new ApiResponseError(errorMessage, response.status);
+    throw new ApiResponseError(errorMessage, response.status, errorCode);
   }
 
 

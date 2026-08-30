@@ -3,7 +3,7 @@
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { spawn, spawnSync } from "child_process";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { request } from "http";
 import {
   chmodSync,
@@ -33,6 +33,8 @@ const fastapiDir = join(__dirname, "servers/fastapi");
 const nextjsDir = join(__dirname, "servers/nextjs");
 const nextjsStandaloneServer = join(nextjsDir, "server.js");
 const nextjsCli = join(nextjsDir, "node_modules/next/dist/bin/next");
+const nextjsPackageLock = join(nextjsDir, "package-lock.json");
+const nextjsInstallStamp = join(nextjsDir, "node_modules/.presenton-lock-sha256");
 const exportSyncScript = join(__dirname, "scripts/sync-presentation-export.cjs");
 const nginxSourceConfigPath = join(__dirname, "nginx.conf");
 const nginxRuntimeConfigPath = "/etc/nginx/nginx.conf";
@@ -156,6 +158,17 @@ const writeUserConfig = (config) => {
 
 // Setup node_modules for development
 const setupNodeModules = () => {
+  const lockFingerprint = createHash("sha256")
+    .update(readFileSync(nextjsPackageLock))
+    .digest("hex");
+  const installedFingerprint = existsSync(nextjsInstallStamp)
+    ? readFileSync(nextjsInstallStamp, "utf8").trim()
+    : "";
+  if (existsSync(nextjsCli) && installedFingerprint === lockFingerprint) {
+    console.log("Reusing Next.js node_modules (package lock unchanged)");
+    return Promise.resolve();
+  }
+
   return new Promise((resolve, reject) => {
     console.log("Setting up node_modules for Next.js...");
     const npmProcess = spawn("npm", ["ci", "--no-audit", "--no-fund"], {
@@ -171,6 +184,10 @@ const setupNodeModules = () => {
 
     npmProcess.on("exit", (code) => {
       if (code === 0) {
+        writeFileSync(nextjsInstallStamp, `${lockFingerprint}\n`, {
+          encoding: "utf8",
+          mode: 0o644,
+        });
         console.log("npm ci completed successfully");
         resolve();
       } else {

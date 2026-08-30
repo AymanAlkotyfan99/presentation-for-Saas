@@ -88,6 +88,20 @@ test("layout text runs do not infer spaces across color boundaries", () => {
   assert.equal(rendered.includes("Prod uc tivity"), false);
 });
 
+test("compact technical identifiers are never split across characters", () => {
+  const compactFont = { ...baseFont, size: 18, letterSpacing: 0 };
+  const lines = textModule.layoutRenderTextRuns(
+    [{ text: "AR/VR", font: compactFont }],
+    20,
+    "word",
+  );
+
+  assert.equal(textModule.isCompactNonBreakingToken("AR/VR"), true);
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0].length, 1);
+  assert.equal(lines[0][0].text, "AR/VR");
+});
+
 test("raw render text runs do not infer spaces across styled word fragments", () => {
   const element = {
     type: "text",

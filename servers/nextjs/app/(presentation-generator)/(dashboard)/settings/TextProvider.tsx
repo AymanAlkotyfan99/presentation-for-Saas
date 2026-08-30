@@ -60,11 +60,14 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
   const [availableModels, setAvailableModels] = useState<ModelOption[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsChecked, setModelsChecked] = useState(false);
+  const [modelDiscoveryFailed, setModelDiscoveryFailed] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [deepseekAdvancedOpen, setDeepseekAdvancedOpen] = useState(() =>
     !!(llmConfig.DEEPSEEK_BASE_URL || "").trim()
   );
   const isFirstRender = useRef(true);
+  const modelRequestId = useRef(0);
+  const activeModelRequest = useRef<AbortController | null>(null);
 
   const selectedProvider = (llmConfig.LLM ||
     "openai") as keyof typeof LLM_PROVIDERS;
@@ -185,17 +188,24 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
   }, [currentDeepseekBaseUrl]);
 
   useEffect(() => {
+    activeModelRequest.current?.abort();
+    activeModelRequest.current = null;
+    modelRequestId.current += 1;
+    setModelsLoading(false);
+    setModelDiscoveryFailed(false);
+
     if (isFirstRender.current) {
       isFirstRender.current = false;
-      return;
+      return () => activeModelRequest.current?.abort();
     }
 
     if (selectedProvider === "ollama") {
-      return;
+      return () => activeModelRequest.current?.abort();
     }
 
     setAvailableModels([]);
     setModelsChecked(false);
+    return () => activeModelRequest.current?.abort();
   }, [
     selectedProvider,
     currentApiKey,
@@ -206,7 +216,6 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
     currentFireworksUrl,
     currentTogetherUrl,
     currentModelField,
-    onInputChange,
   ]);
 
   const onApiKeyChange = (llm: keyof typeof LLM_PROVIDERS, value: string) => {
@@ -246,7 +255,6 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
   };
 
   const fetchAvailableModels = async () => {
-    if (modelsLoading) return;
     if (isManualModelProvider) return;
     if (selectedProvider === "openai" && !currentApiKey) return;
     if (selectedProvider === "deepseek" && !currentApiKey) return;
@@ -259,7 +267,12 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
     if (selectedProvider === "custom" && !currentCustomUrl) return;
     if (selectedProvider === "litellm" && !currentLitellmUrl) return;
 
+    activeModelRequest.current?.abort();
+    const controller = new AbortController();
+    const requestId = ++modelRequestId.current;
+    activeModelRequest.current = controller;
     setModelsLoading(true);
+    setModelDiscoveryFailed(false);
     try {
       let response: Response;
       if (selectedProvider === "google") {
@@ -273,6 +286,7 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
             body: JSON.stringify({
               api_key: currentApiKey,
             }),
+            signal: controller.signal,
           }
         );
       } else if (selectedProvider === "anthropic") {
@@ -286,6 +300,7 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
             body: JSON.stringify({
               api_key: currentApiKey,
             }),
+            signal: controller.signal,
           }
         );
       } else {
@@ -314,9 +329,12 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
               url: openAiCompatibleUrl,
               api_key: currentApiKey,
             }),
+            signal: controller.signal,
           }
         );
       }
+
+      if (controller.signal.aborted || requestId !== modelRequestId.current) return;
 
       if (response.ok) {
         const data = await response.json();
@@ -332,13 +350,8 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
         setAvailableModels(normalizedModels);
         setModelsChecked(true);
 
-        if (normalizedModels.length > 0 && currentModelField) {
+        if (normalizedModels.length > 0 && currentModelField && !currentModel) {
           const modelValues = normalizedModels.map((model) => model.value);
-          if (currentModel && modelValues.includes(currentModel)) {
-            onInputChange(currentModel, currentModelField);
-            return;
-          }
-
           const preferredDefault =
             selectedProvider === "openai"
               ? "gpt-4.1"
@@ -368,29 +381,29 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
           onInputChange(nextModel, currentModelField);
         }
       } else {
-        console.error("Failed to fetch models");
-        setAvailableModels([]);
-        setModelsChecked(true);
-        notify.error(
-          t("settings.loadModelsFailed"),
-          t("settings.loadModelsFailedDescription")
-        );
+        throw new Error(`Model discovery returned ${response.status}`);
       }
     } catch (error) {
-      console.error("Error fetching models:", error);
+      if (
+        controller.signal.aborted ||
+        requestId !== modelRequestId.current ||
+        (error instanceof DOMException && error.name === "AbortError")
+      ) return;
+      console.error("Model discovery failed for the selected provider");
       notify.error(
         selectedProvider === "ollama"
           ? t("onboarding.ollamaConnectionFailed")
           : t("settings.loadModelsFailed"),
         t("settings.loadModelsFailedDescription")
       );
-      setAvailableModels([]);
-      setModelsChecked(true);
-      if (selectedProvider === "ollama" && currentModelField) {
-        onInputChange("", currentModelField);
-      }
+      // Preserve the configured model and last successful list on refresh errors.
+      setModelDiscoveryFailed(true);
+      setModelsChecked(false);
     } finally {
-      setModelsLoading(false);
+      if (requestId === modelRequestId.current) {
+        activeModelRequest.current = null;
+        setModelsLoading(false);
+      }
     }
   };
 
@@ -939,6 +952,13 @@ const TextProvider = ({ onInputChange, llmConfig }: OpenAIConfigProps) => {
         <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="text-sm text-yellow-800">
             {t("settings.noModelsFound")}
+          </p>
+        </div>
+      )}
+      {selectedProvider !== "ollama" && modelDiscoveryFailed && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
+          <p className="text-sm text-red-800">
+            {t("settings.loadModelsFailedDescription")}
           </p>
         </div>
       )}

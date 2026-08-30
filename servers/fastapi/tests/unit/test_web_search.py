@@ -87,7 +87,7 @@ def test_auto_does_not_expose_external_search_when_native_tools_are_unavailable(
     )
 
 
-def test_format_web_search_context_excludes_source_urls():
+def test_format_web_search_context_preserves_ingested_source_id_and_url():
     context = web_search.format_web_search_context(
         [
             web_search.WebSearchResult(
@@ -102,9 +102,9 @@ def test_format_web_search_context_excludes_source_urls():
     )
 
     assert "Web search results" in context
-    assert "https://example.com/presenton" not in context
+    assert "Source ID: web-1" in context
+    assert "URL: https://example.com/presenton" in context
     assert "https://example.com/docs" not in context
-    assert "URL:" not in context
     assert "[6]" not in context
     assert "documentation" in context
     assert "Presentation generation" in context

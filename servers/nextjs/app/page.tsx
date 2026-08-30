@@ -1,25 +1,18 @@
 import AuthGate from "@/components/Auth/AuthGate";
-import Home from "@/components/Home";
-import { ConfigurationInitializer } from "./ConfigurationInitializer";
 import { isAuthDisabled } from "@/utils/auth";
 import { getServerAuthStatus } from "@/utils/serverAuth";
+import { requestLocale } from "@/i18n/server";
+import { localizePathname } from "@/i18n/routing";
+import { redirect } from "next/navigation";
 
 const page = async () => {
     if (isAuthDisabled()) {
-        return (
-            <ConfigurationInitializer>
-                <Home />
-            </ConfigurationInitializer>
-        );
+        redirect(localizePathname("/dashboard", await requestLocale()));
     }
 
     const status = await getServerAuthStatus();
     if (status.configured && status.authenticated) {
-        return (
-            <ConfigurationInitializer>
-                <Home />
-            </ConfigurationInitializer>
-        );
+        redirect(localizePathname("/dashboard", await requestLocale()));
     }
 
     return <AuthGate />;

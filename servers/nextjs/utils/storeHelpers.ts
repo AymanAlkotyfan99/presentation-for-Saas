@@ -48,20 +48,84 @@ export const normalizeLLMConfig = (llmConfig: LLMConfig): LLMConfig => {
   return normalizedConfig;
 };
 
+export type ProviderConfigSection = "text" | "image" | "web-search";
+
+const TEXT_PROVIDER_FIELDS: (keyof LLMConfig)[] = [
+  "LLM",
+  "OPENAI_API_KEY", "OPENAI_MODEL",
+  "DEEPSEEK_API_KEY", "DEEPSEEK_MODEL", "DEEPSEEK_BASE_URL",
+  "GOOGLE_API_KEY", "GOOGLE_MODEL",
+  "VERTEX_API_KEY", "VERTEX_MODEL", "VERTEX_PROJECT", "VERTEX_LOCATION", "VERTEX_BASE_URL",
+  "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_MODEL", "AZURE_OPENAI_ENDPOINT",
+  "AZURE_OPENAI_BASE_URL", "AZURE_OPENAI_API_VERSION", "AZURE_OPENAI_DEPLOYMENT",
+  "BEDROCK_REGION", "BEDROCK_API_KEY", "BEDROCK_AWS_ACCESS_KEY_ID",
+  "BEDROCK_AWS_SECRET_ACCESS_KEY", "BEDROCK_AWS_SESSION_TOKEN", "BEDROCK_PROFILE_NAME", "BEDROCK_MODEL",
+  "OPENROUTER_API_KEY", "OPENROUTER_MODEL", "OPENROUTER_BASE_URL",
+  "FIREWORKS_API_KEY", "FIREWORKS_MODEL", "FIREWORKS_BASE_URL",
+  "TOGETHER_API_KEY", "TOGETHER_MODEL", "TOGETHER_BASE_URL",
+  "CEREBRAS_API_KEY", "CEREBRAS_MODEL", "CEREBRAS_BASE_URL",
+  "LITELLM_BASE_URL", "LITELLM_API_KEY", "LITELLM_MODEL",
+  "LMSTUDIO_BASE_URL", "LMSTUDIO_API_KEY", "LMSTUDIO_MODEL",
+  "ANTHROPIC_API_KEY", "ANTHROPIC_MODEL",
+  "OLLAMA_URL", "OLLAMA_MODEL",
+  "CUSTOM_LLM_URL", "CUSTOM_LLM_API_KEY", "CUSTOM_MODEL",
+  "CODEX_MODEL", "CODEX_ACCESS_TOKEN", "CODEX_REFRESH_TOKEN", "CODEX_TOKEN_EXPIRES",
+  "CODEX_ACCOUNT_ID", "CODEX_USERNAME", "CODEX_EMAIL", "CODEX_IS_PRO",
+  "DISABLE_THINKING", "EXTENDED_REASONING", "USE_CUSTOM_URL",
+];
+
+const IMAGE_PROVIDER_FIELDS: (keyof LLMConfig)[] = [
+  "DISABLE_IMAGE_GENERATION", "IMAGE_PROVIDER", "PEXELS_API_KEY", "PIXABAY_API_KEY",
+  "COMFYUI_URL", "COMFYUI_WORKFLOW", "OPEN_WEBUI_IMAGE_URL", "OPEN_WEBUI_IMAGE_API_KEY",
+  "OPENAI_COMPAT_IMAGE_BASE_URL", "OPENAI_COMPAT_IMAGE_API_KEY", "OPENAI_COMPAT_IMAGE_MODEL",
+  "DALL_E_3_QUALITY", "GPT_IMAGE_1_5_QUALITY",
+];
+
+const WEB_SEARCH_PROVIDER_FIELDS: (keyof LLMConfig)[] = [
+  "WEB_GROUNDING", "WEB_SEARCH_PROVIDER", "WEB_SEARCH_MAX_RESULTS", "SEARXNG_BASE_URL",
+  "TAVILY_API_KEY", "EXA_API_KEY", "BRAVE_SEARCH_API_KEY", "SERPER_API_KEY",
+];
+
+function copyFields(config: LLMConfig, fields: (keyof LLMConfig)[]): LLMConfig {
+  const patch: Record<string, unknown> = {};
+  for (const field of fields) {
+    if (Object.prototype.hasOwnProperty.call(config, field)) {
+      patch[field] = config[field];
+    }
+  }
+  return patch as LLMConfig;
+}
+
+/** Build the smallest persistence patch owned by one Settings section. */
+export function providerConfigPatchForSection(
+  inputConfig: LLMConfig,
+  section: ProviderConfigSection,
+): LLMConfig {
+  const config = normalizeLLMConfig(inputConfig);
+  if (section === "text") return copyFields(config, TEXT_PROVIDER_FIELDS);
+  if (section === "web-search") return copyFields(config, WEB_SEARCH_PROVIDER_FIELDS);
+
+  const fields = [...IMAGE_PROVIDER_FIELDS];
+  // These credentials are intentionally shared by their text and image APIs.
+  if (["dall-e-3", "gpt-image-1.5"].includes(config.IMAGE_PROVIDER || "")) {
+    fields.push("OPENAI_API_KEY");
+  }
+  if (["gemini_flash", "nanobanana_pro"].includes(config.IMAGE_PROVIDER || "")) {
+    fields.push("GOOGLE_API_KEY");
+  }
+  return copyFields(config, fields);
+}
+
 /**
  * Returns a user-facing validation message, or null when the config is valid.
  */
-export const getLLMConfigValidationError = (
+export const getTextProviderConfigValidationError = (
   inputConfig: LLMConfig
 ): string | null => {
   const llmConfig = normalizeLLMConfig(inputConfig);
 
   if (!llmConfig.LLM) {
     return "Select a text provider.";
-  }
-
-  if (!llmConfig.DISABLE_IMAGE_GENERATION && !llmConfig.IMAGE_PROVIDER) {
-    return "Select an image provider, or turn off image generation.";
   }
 
   const llm = llmConfig.LLM;
@@ -197,7 +261,19 @@ export const getLLMConfigValidationError = (
     return "Unsupported or unknown text provider.";
   }
 
-  if (!llmConfig.DISABLE_IMAGE_GENERATION) {
+  return null;
+};
+
+export const getImageProviderConfigValidationError = (
+  inputConfig: LLMConfig
+): string | null => {
+  const llmConfig = normalizeLLMConfig(inputConfig);
+  if (llmConfig.DISABLE_IMAGE_GENERATION) return null;
+  if (!llmConfig.IMAGE_PROVIDER) {
+    return "Select an image provider, or turn off image generation.";
+  }
+
+  {
     switch (llmConfig.IMAGE_PROVIDER) {
       case "pexels":
         if (!isProvided(llmConfig.PEXELS_API_KEY)) {
@@ -253,6 +329,13 @@ export const getLLMConfigValidationError = (
     }
   }
 
+  return null;
+};
+
+export const getWebSearchProviderConfigValidationError = (
+  inputConfig: LLMConfig
+): string | null => {
+  const llmConfig = normalizeLLMConfig(inputConfig);
   if (llmConfig.WEB_GROUNDING) {
     if (!isProvided(llmConfig.WEB_SEARCH_PROVIDER)) {
       return "Select a web search provider, or turn off web search.";
@@ -287,6 +370,12 @@ export const getLLMConfigValidationError = (
 
   return null;
 };
+
+/** Full validation remains the atomic contract for onboarding and generation. */
+export const getLLMConfigValidationError = (inputConfig: LLMConfig): string | null =>
+  getTextProviderConfigValidationError(inputConfig) ??
+  getImageProviderConfigValidationError(inputConfig) ??
+  getWebSearchProviderConfigValidationError(inputConfig);
 
 /** Codex is selected but no model chosen - block navigation away from Settings. */
 export function isCodexMissingSelectedModel(llmConfig: LLMConfig): boolean {
@@ -331,22 +420,38 @@ export function syncStoreAfterCodexSignOut(): void {
   );
 }
 
-export const handleSaveLLMConfig = async (llmConfig: LLMConfig) => {
+export const handleSaveLLMConfig = async (
+  llmConfig: LLMConfig,
+  options: { section?: ProviderConfigSection } = {},
+) => {
   const normalizedConfig = normalizeLLMConfig(llmConfig);
-  const validationError = getLLMConfigValidationError(normalizedConfig);
+  const validationError = options.section === "text"
+    ? getTextProviderConfigValidationError(normalizedConfig)
+    : options.section === "image"
+      ? getImageProviderConfigValidationError(normalizedConfig)
+      : options.section === "web-search"
+        ? getWebSearchProviderConfigValidationError(normalizedConfig)
+        : getLLMConfigValidationError(normalizedConfig);
   if (validationError) {
     throw new Error(validationError);
   }
 
+  const payload = options.section
+    ? providerConfigPatchForSection(normalizedConfig, options.section)
+    : normalizedConfig;
+
   const response = await fetch("/api/user-config", {
     method: "POST",
-    body: JSON.stringify(normalizedConfig),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
     throw new Error(`Unable to save user configuration (${response.status})`);
   }
 
-  store.dispatch(setLLMConfig(normalizedConfig));
+  const persistedConfig = normalizeLLMConfig(await response.json() as LLMConfig);
+  store.dispatch(setLLMConfig(persistedConfig));
+  return persistedConfig;
 };
 
 export const hasValidLLMConfig = (llmConfig: LLMConfig) =>

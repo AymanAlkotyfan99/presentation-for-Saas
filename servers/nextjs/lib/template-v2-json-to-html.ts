@@ -786,7 +786,7 @@ function renderText(item: JsonRecord, mode: RenderMode): string {
   const runHtml = runs
     .map((run) => {
       const runFont = { ...font, ...readRecord(run.font) };
-      return `<span style="${fontStyle(runFont)}">${escapeHtml(
+      return `<span style="${fontStyle(runFont)}">${renderPlainTextWithAtomicIdentifiers(
         readStringValue(run.text)
       )}</span>`;
     })
@@ -816,7 +816,7 @@ function renderTextList(item: JsonRecord, mode: RenderMode): string {
             `<span style="${fontStyle({
               ...font,
               ...readRecord(run.font),
-            })}">${escapeHtml(readStringValue(run.text))}</span>`
+            })}">${renderPlainTextWithAtomicIdentifiers(readStringValue(run.text))}</span>`
         )
         .join("");
       return `<li style="${textOverflowStyle()}">${html}</li>`;
@@ -2554,7 +2554,19 @@ function tableCellStyle(
 }
 
 function textOverflowStyle(): string {
-  return "overflow:visible;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;";
+  return "overflow:visible;white-space:pre-wrap;overflow-wrap:normal;word-break:normal;";
+}
+
+function renderPlainTextWithAtomicIdentifiers(value: string): string {
+  return value
+    .split(/(\s+)/u)
+    .map((part) => {
+      const escaped = escapeHtml(part);
+      return /^[^\s/]{1,12}(?:[/+&.-][^\s/]{1,12})+$/u.test(part)
+        ? `<span style="white-space:nowrap">${escaped}</span>`
+        : escaped;
+    })
+    .join("");
 }
 
 function tableCellFont(cellValue: unknown, tableFont: JsonRecord): JsonRecord {

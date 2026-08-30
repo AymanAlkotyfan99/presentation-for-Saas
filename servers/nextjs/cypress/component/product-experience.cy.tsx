@@ -70,7 +70,11 @@ function stubWorkspaceRequests() {
   cy.window().then((window) => {
     cy.stub(window, "fetch").callsFake(async (input) => {
       const url = String(input);
-      const body = url.endsWith("/current") ? personalWorkspace : [personalWorkspace];
+      const body = url.endsWith("/runtime/capabilities")
+        ? { workspaces: true, providerRegistry: false }
+        : url.endsWith("/current")
+          ? personalWorkspace
+          : [personalWorkspace];
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { "Content-Type": "application/json" },

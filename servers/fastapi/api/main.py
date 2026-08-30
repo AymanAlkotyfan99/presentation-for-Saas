@@ -19,6 +19,7 @@ from api.v1.admin.router import API_V1_ADMIN_ROUTER
 from api.v1.mock.router import API_V1_MOCK_ROUTER
 from api.v1.ppt.router import API_V1_PPT_ROUTER
 from api.v1.webhook.router import API_V1_WEBHOOK_ROUTER
+from api.runtime_capabilities import RUNTIME_CAPABILITIES_ROUTER
 from modules.workspaces.api import WORKSPACES_ROUTER
 from modules.jobs.api import JOBS_ROUTER
 from modules.assets.api import ASSETS_ROUTER
@@ -103,6 +104,7 @@ app.include_router(WORKSPACES_ROUTER)
 app.include_router(JOBS_ROUTER)
 app.include_router(ASSETS_ROUTER)
 app.include_router(PROVIDERS_ROUTER)
+app.include_router(RUNTIME_CAPABILITIES_ROUTER)
 
 # Mount app_data and static assets (direct FastAPI access; nginx also serves /static in Docker).
 app_data_dir = get_app_data_directory_env()

@@ -13,7 +13,7 @@ from llmai.shared import (
     WebSearchTool,
 )
 
-from models.presentation_outline_model import PresentationOutlineModel
+from models.presentation_outline_model import EvidenceSourceModel, PresentationOutlineModel
 from constants.presentation import MAX_NUMBER_OF_SLIDES, MAX_OUTLINE_CONTENT_WORDS
 from utils.get_dynamic_models import get_presentation_outline_model_with_n_slides
 from utils.llm_calls.generate_web_search_query import generate_web_search_query
@@ -26,12 +26,12 @@ from utils.llm_utils import (
     serialize_structured_content,
     stream_generate_events,
 )
-from utils.schema_utils import prepare_schema_for_validation
+from utils.schema_utils import prepare_schema_for_validation, remove_fields_from_schema
 from modules.providers.application.legacy_search_facade import (
     build_web_search_query,
     get_web_search_route,
     get_selected_web_search_provider,
-    get_web_search_context,
+    get_web_search_results,
     should_expose_external_web_search_tool,
     should_use_native_web_search,
 )
@@ -42,6 +42,11 @@ LOGGER = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class OutlineGenerationStatus:
     message: str
+
+
+@dataclass(frozen=True)
+class OutlineGenerationEvidence:
+    sources: tuple[EvidenceSourceModel, ...]
 
 
 def _web_search_provider_display_name(provider_name: str) -> str:
@@ -71,7 +76,7 @@ def get_system_prompt(
     )
 
     title_slide_instruction = (
-        "Include presenter name in first slide."
+        "Do not invent presenter, author, organization, company, department, event, or date metadata."
         if include_title_slide
         else "Do not include presenter name in any slides."
     )
@@ -102,9 +107,9 @@ def get_system_prompt(
         "Do not write phrases such as 'create a bar chart', 'add an image', 'use a table', "
         "'show this as', 'the slide should', or 'place on the left'.\n"
         "Use visual requests only to choose content for the specified slide. For any chart "
-        "request, include a compact Markdown table with labels and numeric values. Preserve "
-        "supplied data; otherwise add a small relevant dataset and clearly label estimates "
-        "or illustrative values. Do not mention the chart instruction.\n"
+        "request, include a compact Markdown table only when the supplied user content or "
+        "identified evidence sources contain the exact numeric values. Never invent a dataset "
+        "to satisfy a chart request. If no supported data exists, write qualitative content.\n"
         "Example: for 'slide 5: create a bar chart of Q1 10, Q2 20', slide 5 may contain "
         "a title and a Quarter | Value Markdown table, but it must not contain the words "
         "'create a bar chart'.\n"
@@ -145,8 +150,9 @@ def get_system_prompt(
         f"{slide_outline_structure}\n"
         f"{content_only_rules}"
         "Slide content must not contain any presentation branding/styling information.\n"
-        "Title slide must only contain title, presenter name, date and overview.\n"
-        "Do not include URLs, hyperlinks, citations, footnotes, references, or source lists in slide outlines.\n"
+        "Title slide must only contain the title, an optional user-provided subtitle, and overview.\n"
+        "Do not display URLs, hyperlinks, citations, footnotes, references, or source lists in slide outline prose. "
+        "Evidence source IDs are non-visual generation metadata and may only be used by the structured quality contract.\n"
         "Make sure data is consistent across all slides.\n"
         "When a web search tool is available, use it for current, factual, or external information.\n"
         "When web search results are supplied in Context, use their factual content without mentioning sources.\n"
@@ -332,14 +338,32 @@ async def generate_ppt_outline(
             )
 
         search_context = ""
+        search_results = []
         if search_query:
             if emit_statuses:
                 yield OutlineGenerationStatus(
                     f"Searching with {actual_provider_display_name}: {search_query}"
                 )
-            search_context = await get_web_search_context(search_query)
+            search_results = await get_web_search_results(search_query)
+            from utils.web_search import format_web_search_context
+
+            search_context = format_web_search_context(search_results)
             if emit_statuses:
                 yield OutlineGenerationStatus("Web research complete")
+        if search_results:
+            yield OutlineGenerationEvidence(
+                sources=tuple(
+                    EvidenceSourceModel(
+                        id=f"web-{index}",
+                        provenance="web_search",
+                        title=result.title,
+                        url=result.url,
+                        snippet=result.snippet,
+                        published_at=result.published_at,
+                    )
+                    for index, result in enumerate(search_results, start=1)
+                )
+            )
         if search_context:
             additional_context = "\n\n".join(
                 part for part in (additional_context, search_context) if part
@@ -353,7 +377,10 @@ async def generate_ppt_outline(
                 else "Drafting your presentation outline"
             )
         outline_schema = prepare_schema_for_validation(
-            response_model.model_json_schema(),
+            remove_fields_from_schema(
+                response_model.model_json_schema(),
+                ["evidence"],
+            ),
             strict=False,
         )
         response_format = JSONSchemaResponse(

@@ -5,8 +5,11 @@ import { notify } from "@/components/ui/sonner";
 import { RootState } from "@/store/store";
 import { useSelector } from "react-redux";
 import {
-  getLLMConfigValidationError,
+  getImageProviderConfigValidationError,
+  getTextProviderConfigValidationError,
+  getWebSearchProviderConfigValidationError,
   handleSaveLLMConfig,
+  type ProviderConfigSection,
 } from "@/utils/storeHelpers";
 import { isOllamaModelAvailable } from "@/utils/providerUtils";
 import { useRouter, usePathname } from "next/navigation";
@@ -33,6 +36,7 @@ import {
 import { useI18n } from "@/i18n/catalog";
 import { localizePathname } from "@/i18n/routing";
 import { ProviderRegistryPanel } from "@/features/providers/ProviderRegistryPanel";
+import { ApiResponseError } from "@/app/(presentation-generator)/services/api/api-error-handler";
 
 const STOCK_IMAGE_PROVIDERS = new Set(["pexels", "pixabay"]);
 
@@ -117,20 +121,12 @@ const SettingsPage = () => {
     const providerApiKey =
       provider === "pexels" ? llmConfig.PEXELS_API_KEY : llmConfig.PIXABAY_API_KEY;
 
-    try {
-      await ImagesApi.searchStockImages("business", 1, {
-        provider,
-        apiKey: providerApiKey,
-        strictApiKey: true,
-      });
-      return true;
-    } catch {
-      notify.error(
-        t("settings.saveFailed"),
-        t("errors.network")
-      );
-      return false;
-    }
+    await ImagesApi.searchStockImages("business", 1, {
+      provider,
+      apiKey: providerApiKey,
+      strictApiKey: true,
+    });
+    return true;
   };
 
 
@@ -151,8 +147,17 @@ const SettingsPage = () => {
     }
   };
   const handleSaveConfig = async () => {
+    const persistenceSection: ProviderConfigSection | null =
+      selectedProvider === "text-provider"
+        ? "text"
+        : selectedProvider === "image-provider"
+          ? "image"
+          : selectedProvider === "web-search-provider"
+            ? "web-search"
+            : null;
+    if (!persistenceSection) return;
 
-    if (llmConfig.LLM === 'codex') {
+    if (persistenceSection === "text" && llmConfig.LLM === 'codex') {
       const isAuthenticated = await checkCurrentAuthStatus();
       if (!isAuthenticated) {
         requestChatGptReauth({
@@ -165,21 +170,23 @@ const SettingsPage = () => {
     trackEvent(MixpanelEvent.Settings_SaveConfiguration_Button_Clicked, {
       pathname,
     });
-    const validationError = getLLMConfigValidationError(llmConfig);
+    const validationError = persistenceSection === "text"
+      ? getTextProviderConfigValidationError(llmConfig)
+      : persistenceSection === "image"
+        ? getImageProviderConfigValidationError(llmConfig)
+        : getWebSearchProviderConfigValidationError(llmConfig);
     if (validationError) {
-      notify.warning(t("settings.saveFailed"), t("errors.validation"));
-      if (
-        selectedProvider === "image-provider" &&
-        ((llmConfig.LLM === "openai" && !String(llmConfig.OPENAI_MODEL || "").trim()) ||
-          (llmConfig.LLM === "deepseek" && !String(llmConfig.DEEPSEEK_MODEL || "").trim()))
-      ) {
-        setSelectedProvider("text-provider");
-      }
-      return;
-    }
-
-    const providerReady = await ensureSelectedStockProviderReady();
-    if (!providerReady) {
+      const validationMessage = persistenceSection === "text"
+        ? t("settings.textValidationFailed")
+        : persistenceSection === "image"
+          ? t("settings.imageValidationFailed")
+          : t("settings.webSearchValidationFailed");
+      const validationDescription = persistenceSection === "text"
+        ? t("settings.textValidationDescription")
+        : persistenceSection === "image"
+          ? t("settings.imageValidationDescription")
+          : t("settings.webSearchValidationDescription");
+      notify.warning(validationMessage, validationDescription);
       return;
     }
 
@@ -191,7 +198,11 @@ const SettingsPage = () => {
         text: t("common.saving"),
       }));
       trackEvent(MixpanelEvent.Settings_SaveConfiguration_API_Call);
+      if (persistenceSection === "image") {
+        await ensureSelectedStockProviderReady();
+      }
       if (
+        persistenceSection === "text" &&
         llmConfig.LLM === "ollama" &&
         llmConfig.OLLAMA_MODEL &&
         !(await isOllamaModelAvailable(
@@ -203,7 +214,7 @@ const SettingsPage = () => {
           `The selected model "${llmConfig.OLLAMA_MODEL}" is not available at ${llmConfig.OLLAMA_URL}. Check models and select an available model.`
         );
       }
-      await handleSaveLLMConfig(llmConfig);
+      await handleSaveLLMConfig(llmConfig, { section: persistenceSection });
       notify.success(
         t("settings.saved"),
         t("settings.saved")
@@ -214,8 +225,24 @@ const SettingsPage = () => {
         isDisabled: false,
         text: t("common.save"),
       }));
-    } catch {
-      notify.error(t("settings.saveFailed"), t("settings.saveFailed"));
+    } catch (error) {
+      const providerErrorMessages: Record<string, string> = {
+        IMAGE_PROVIDER_DNS_UNAVAILABLE: t("settings.imageProviderDnsUnavailable"),
+        IMAGE_PROVIDER_TIMEOUT: t("settings.imageProviderTimedOut"),
+        IMAGE_PROVIDER_UNREACHABLE: t("settings.imageProviderUnreachable"),
+        IMAGE_PROVIDER_DESTINATION_BLOCKED: t("settings.imageProviderDestinationBlocked"),
+        IMAGE_PROVIDER_CREDENTIALS_REJECTED: t("settings.imageProviderCredentialsRejected"),
+        IMAGE_PROVIDER_RATE_LIMITED: t("settings.imageProviderRateLimited"),
+        IMAGE_PROVIDER_REQUEST_REJECTED: t("settings.imageProviderRequestRejected"),
+        IMAGE_PROVIDER_UPSTREAM_ERROR: t("settings.imageProviderUpstreamError"),
+        IMAGE_PROVIDER_RESPONSE_INVALID: t("settings.imageProviderResponseInvalid"),
+      };
+      const message = error instanceof ApiResponseError && error.code
+        ? providerErrorMessages[error.code] || error.message
+        : error instanceof Error
+          ? error.message
+          : t("settings.saveFailed");
+      notify.error(t("settings.saveFailed"), message);
       setButtonState((prev) => ({
         ...prev,
         isLoading: false,
@@ -413,7 +440,7 @@ const SettingsPage = () => {
       </main>
 
       {/* Fixed Bottom Button — hidden on Sign out; nothing to save there */}
-      {!['session', 'admin', 'provider-registry'].includes(selectedProvider) ? (
+      {!['session', 'admin', 'provider-registry', 'privacy'].includes(selectedProvider) ? (
         <div className="mx-auto fixed bottom-20 end-5">
           <button
             onClick={handleSaveConfig}
