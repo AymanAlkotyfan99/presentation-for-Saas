@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
@@ -9,7 +9,9 @@ import { build } from "esbuild";
 
 const nextRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = path.resolve(nextRoot, "../..");
-const temporary = await mkdtemp(path.join(repositoryRoot, ".cache/revision-parity-"));
+const cacheRoot = path.join(repositoryRoot, ".cache");
+await mkdir(cacheRoot, { recursive: true });
+const temporary = await mkdtemp(path.join(cacheRoot, "revision-parity-"));
 const outfile = path.join(temporary, "commands.mjs");
 await build({
   bundle: true,

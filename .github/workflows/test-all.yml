@@ -125,6 +125,9 @@ jobs:
       - name: Create test directories
         run: mkdir -p "$APP_DATA_DIRECTORY" "$TEMP_DIRECTORY"
 
+      - name: Validate migrations on PostgreSQL
+        run: uv run --locked python scripts/check_migrations.py
+
       - name: Run all pytest tests
         run: uv run --locked python -m pytest --verbose --tb=short
 
@@ -133,9 +136,6 @@ jobs:
 
       - name: Verify checked-in OpenAPI contract
         run: uv run --locked python scripts/generate_openapi_spec.py --check
-
-      - name: Validate migrations on PostgreSQL
-        run: uv run --locked python scripts/check_migrations.py
 
       - name: Generate Python SBOM
         run: |

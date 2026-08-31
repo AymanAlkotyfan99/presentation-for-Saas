@@ -31,6 +31,7 @@ Install and run the complete suite from `servers/fastapi`:
 
 ```bash
 uv sync --locked --dev
+uv run --locked python scripts/check_migrations.py
 APP_DATA_DIRECTORY=/tmp/bayanly-tests/app-data \
 TEMP_DIRECTORY=/tmp/bayanly-tests/temp \
 DATABASE_URL=sqlite+aiosqlite:////tmp/bayanly-tests/test.db \
@@ -39,7 +40,6 @@ DISABLE_IMAGE_GENERATION=true \
 uv run --locked python -m pytest --verbose --tb=short
 uv run --locked python -m compileall -q api models services utils
 uv run --locked python scripts/generate_openapi_spec.py --check
-uv run --locked python scripts/check_migrations.py
 ```
 
 Run the narrowest relevant test first. Examples:
@@ -61,7 +61,11 @@ MIGRATION_TEST_DATABASE_URL=postgresql+psycopg://USER:PASSWORD@localhost:5432/DI
 uv run --locked python scripts/check_migrations.py
 ```
 
-The script refuses a non-empty database. PostgreSQL/Redis/MinIO integration suites also fail closed unless their environment points at explicitly disposable local services; otherwise they skip. Do not aim them at shared or production resources.
+The migration check must run before pytest when `MIGRATION_TEST_DATABASE_URL` is set: it refuses a
+non-empty database, upgrades the disposable PostgreSQL database through the real Alembic chain,
+and leaves that schema in place for the PostgreSQL integration tests. PostgreSQL/Redis/MinIO
+integration suites also fail closed unless their environment points at explicitly disposable local
+services; otherwise they skip. Do not aim them at shared or production resources.
 
 ## Next.js
 
