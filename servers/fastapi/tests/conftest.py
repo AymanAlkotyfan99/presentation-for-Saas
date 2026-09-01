@@ -4,6 +4,13 @@ from typing import Any
 
 import pytest
 
+from tests.support.account_lifecycle import (
+    DeterministicAccountLifecycleClock,
+    DisposableAccountIdentityBuilder,
+    InMemoryAccountLifecycleMailbox,
+    account_lifecycle_test_keyring,
+)
+
 
 class FakeAsyncSession:
     def __init__(self, get_results: dict[Any, Any] | None = None):
@@ -68,3 +75,25 @@ def load_snapshot(snapshots_dir: Path):
         return json.loads(path.read_text(encoding="utf-8"))
 
     return _load
+
+
+@pytest.fixture
+def account_lifecycle_clock() -> DeterministicAccountLifecycleClock:
+    return DeterministicAccountLifecycleClock()
+
+
+@pytest.fixture
+def account_lifecycle_keyring() -> dict[str, bytes]:
+    return account_lifecycle_test_keyring()
+
+
+@pytest.fixture
+def disposable_account_identity_builder(
+    request: pytest.FixtureRequest,
+) -> DisposableAccountIdentityBuilder:
+    return DisposableAccountIdentityBuilder(seed=request.node.nodeid)
+
+
+@pytest.fixture
+def in_memory_account_lifecycle_mailbox() -> InMemoryAccountLifecycleMailbox:
+    return InMemoryAccountLifecycleMailbox()

@@ -1,0 +1,32 @@
+{
+  "locale": "en",
+  "api": {
+    "status": {
+      "authenticated": false,
+      "capabilities": {
+        "publicSignup": false,
+        "emailVerification": false,
+        "passwordRecovery": false,
+        "notificationDelivery": false
+      }
+    },
+    "registration": {
+      "statusCode": 202,
+      "body": {
+        "status": "accepted",
+        "code": "ACCOUNT_REQUEST_ACCEPTED"
+      }
+    }
+  },
+  "mailbox": {
+    "messages": [
+      {
+        "notificationId": "00000000-0000-4000-8000-000000000101",
+        "recipient": "account-en-001@example.test",
+        "purpose": "EMAIL_VERIFICATION",
+        "token": "[REDACTED]",
+        "actionUrl": "/en/verify#token=[REDACTED]"
+      }
+    ]
+  }
+}
