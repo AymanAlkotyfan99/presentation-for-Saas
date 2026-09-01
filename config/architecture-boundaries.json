@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "routeOwners": {
+    "servers/fastapi/api/runtime_capabilities.py": "runtime",
     "servers/fastapi/api/v1/admin/router.py": "identity-access",
     "servers/fastapi/api/v1/async_tasks/router.py": "task-orchestration",
     "servers/fastapi/api/v1/auth/router.py": "identity-access",

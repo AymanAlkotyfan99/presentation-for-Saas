@@ -1,0 +1,52 @@
+name: Governance quality
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - staging
+      - production
+  push:
+    branches:
+      - dev
+      - staging
+      - production
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  governance:
+    name: Governance and repository policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up repository Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Validate governance documents and workflow policy
+        run: npm run check:governance
+
+      - name: Enforce architecture boundaries
+        run: npm run check:architecture
+
+      - name: Verify localization and canonical generated contracts
+        run: npm run localization:check && npm run canonical:check
+
+      - name: Verify generated product metadata and brand consistency
+        run: npm run product:metadata:check && npm run brand:scan
+
+      - name: Scan tracked files for production-shaped credentials
+        run: |
+          python3 -m unittest scripts/tests/test_scan_secrets.py
+          python3 scripts/scan_secrets.py
+
+      - name: Validate Docker Compose
+        run: docker compose config --quiet

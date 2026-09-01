@@ -2,9 +2,15 @@ name: Test All Applications
 
 on:
   push:
-    branches: [main]
+    branches:
+      - dev
+      - staging
+      - production
   pull_request:
-    branches: [main]
+    branches:
+      - dev
+      - staging
+      - production
   workflow_dispatch:
 
 permissions:
@@ -119,6 +125,9 @@ jobs:
       - name: Create test directories
         run: mkdir -p "$APP_DATA_DIRECTORY" "$TEMP_DIRECTORY"
 
+      - name: Validate migrations on PostgreSQL
+        run: uv run --locked python scripts/check_migrations.py
+
       - name: Run all pytest tests
         run: uv run --locked python -m pytest --verbose --tb=short
 
@@ -127,9 +136,6 @@ jobs:
 
       - name: Verify checked-in OpenAPI contract
         run: uv run --locked python scripts/generate_openapi_spec.py --check
-
-      - name: Validate migrations on PostgreSQL
-        run: uv run --locked python scripts/check_migrations.py
 
       - name: Generate Python SBOM
         run: |
@@ -163,6 +169,22 @@ jobs:
           cache: npm
           cache-dependency-path: servers/nextjs/package-lock.json
 
+      - name: Set up Python for revision parity
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version-file: .python-version
+
+      - name: Set up uv for revision parity
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: 0.7.22
+          enable-cache: true
+          cache-dependency-glob: servers/fastapi/uv.lock
+
+      - name: Install locked FastAPI runtime dependencies
+        working-directory: servers/fastapi
+        run: uv sync --locked --no-dev
+
       - name: Install dependencies
         run: npm ci
 
@@ -170,6 +192,8 @@ jobs:
         run: npm audit --audit-level=high
 
       - name: Run Node.js tests
+        env:
+          PYTHON: ${{ github.workspace }}/servers/fastapi/.venv/bin/python
         run: npm test
 
       - name: Verify localization and canonical generated contracts
@@ -186,6 +210,9 @@ jobs:
 
       - name: Run English/Arabic locale routing E2E
         run: npm run test:locale-e2e
+
+      - name: Run product journey E2E
+        run: npm run test:product-e2e
 
       - name: Run Cypress component tests
         run: npm run test:cypress

@@ -14,6 +14,7 @@
     "canonical:generate": "node scripts/generate-presentation-document.mjs",
     "canonical:check": "node scripts/generate-presentation-document.mjs --check",
     "canonical:fixtures": "node --test servers/nextjs/tests/presentation-document.test.mjs",
+    "check:governance": "node scripts/check-governance.mjs",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check:architecture": "npm run check:boundaries",
     "convert:template": "node scripts/convert-template.mjs",

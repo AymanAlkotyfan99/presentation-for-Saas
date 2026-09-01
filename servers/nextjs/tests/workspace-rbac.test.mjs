@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -8,7 +7,9 @@ import { build } from "esbuild";
 
 const nextRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = path.resolve(nextRoot, "../..");
-const temporary = await mkdtemp(path.join(repositoryRoot, ".cache/workspace-rbac-"));
+const cacheRoot = path.join(repositoryRoot, ".cache");
+await mkdir(cacheRoot, { recursive: true });
+const temporary = await mkdtemp(path.join(cacheRoot, "workspace-rbac-"));
 const outfile = path.join(temporary, "capabilities.mjs");
 await build({
   bundle: true,

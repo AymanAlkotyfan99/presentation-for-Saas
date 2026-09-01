@@ -21,7 +21,7 @@ async function waitForServer() {
 try {
   await waitForServer();
   const cypressCli = resolve("node_modules", "cypress", "bin", "cypress");
-  const cypress = spawn(process.execPath, [cypressCli, "run", "--e2e", "--browser", "electron", "--config", `baseUrl=http://127.0.0.1:${port}`], { env: environment, stdio: "inherit", windowsHide: true });
+  const cypress = spawn(process.execPath, [cypressCli, "run", "--e2e", "--browser", "electron", "--spec", "cypress/e2e/locale-routing.cy.ts", "--config", `baseUrl=http://127.0.0.1:${port}`], { env: environment, stdio: "inherit", windowsHide: true });
   const status = await new Promise((resolvePromise, reject) => {
     cypress.once("error", reject);
     cypress.once("exit", resolvePromise);

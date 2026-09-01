@@ -193,7 +193,7 @@ describe('<UploadPage />', () => {
   describe('Validation', () => {
     it('should show error when no prompt or documents provided', () => {
       // Click next without entering prompt or uploading files
-      cy.contains('button', 'Generate presentation').click()
+      cy.contains('button', 'Create outline').click()
       // Check for error toast
       checkToast('This field is required.')
     })
@@ -204,8 +204,8 @@ describe('<UploadPage />', () => {
       // Enter prompt
       cy.get('[data-testid="prompt-input"]').type('Create a presentation about AI')
 
-      // Click generate
-      cy.contains('button', 'Generate presentation').click()
+      // Create the outline
+      cy.contains('button', 'Create outline').click()
 
       // Wait for API call with longer timeout
       cy.wait('@createPresentation', { timeout: 10000 })
@@ -241,8 +241,8 @@ describe('<UploadPage />', () => {
         ]
       }).as('decomposeDoc')
 
-      // Click generate
-      cy.contains('button', 'Generate presentation').click()
+      // Create the outline
+      cy.contains('button', 'Create outline').click()
 
       // Wait for upload, decompose, and outline creation API calls
       cy.wait('@uploadDoc', { timeout: 10000 })
@@ -269,9 +269,9 @@ describe('<UploadPage />', () => {
         body: { error: 'Internal Server Error' }
       }).as('apiError')
 
-      // Enter prompt and try to generate
+      // Enter prompt and try to create the outline
       cy.get('[data-testid="prompt-input"]').type('Test presentation')
-      cy.contains('button', 'Generate presentation').click()
+      cy.contains('button', 'Create outline').click()
 
       // Check for error toast
       checkToast('Presentation generation failed.')
