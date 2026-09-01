@@ -1,0 +1,1 @@
+"""Transactional account-notification boundary."""

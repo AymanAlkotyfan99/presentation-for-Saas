@@ -47,6 +47,13 @@ from modules.providers.persistence.models import (
     ProviderCircuitModel, ProviderHealthModel, ProviderSnapshotModel, RoutingPolicyModel,
     ProviderUsageModel,
 )
+from modules.identity.persistence.models import (
+    AccountLifecycleAuditEvent,
+    AccountLoginIdentifier,
+    AccountPurposeChallenge,
+    PendingRegistration,
+)
+from modules.notifications.persistence.models import NotificationDelivery
 from utils.architecture_flags import legacy_owner_bridge_enabled, workspace_rbac_enforcement_enabled
 from utils.get_env import get_migrate_database_on_startup_env
 from utils.db_utils import get_database_url_and_connect_args, get_pool_kwargs
@@ -213,6 +220,11 @@ async def create_db_and_tables():
                         PresentationDocumentModel.__table__,
                         PresentationRevisionModel.__table__,
                         PresentationRevisionPatchModel.__table__,
+                        PendingRegistration.__table__,
+                        AccountLoginIdentifier.__table__,
+                        AccountPurposeChallenge.__table__,
+                        AccountLifecycleAuditEvent.__table__,
+                        NotificationDelivery.__table__,
                     ],
                 )
             )

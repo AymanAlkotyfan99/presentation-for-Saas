@@ -129,6 +129,29 @@ def test_personal_workspace_provisioning_is_deterministic_atomic_and_idempotent(
     asyncio.run(scenario())
 
 
+def test_public_username_compatibility_uses_neutral_deterministic_workspace_name(
+    tmp_path,
+):
+    async def scenario():
+        engine, sessions = await database(tmp_path, "nullable-public-user.db")
+        async with sessions() as session:
+            user = User(username=None, hashed_password="not-a-secret-hash")
+            session.add(user)
+            await session.flush()
+            workspace = await ensure_personal_workspace(session, user)
+            await session.commit()
+            assert workspace.id == user.id
+            assert workspace.personal_owner_id == user.id
+            assert workspace.name == "Personal workspace"
+            membership = await session.scalar(select(MembershipModel))
+            assert membership.user_id == user.id
+            assert membership.role == Role.OWNER
+            assert membership.status == MembershipStatus.ACTIVE
+        await engine.dispose()
+
+    asyncio.run(scenario())
+
+
 def test_workspace_selection_validates_membership_and_stale_cookie_falls_back(tmp_path):
     async def scenario():
         engine, sessions = await database(tmp_path)

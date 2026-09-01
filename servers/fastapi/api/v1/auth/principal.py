@@ -17,7 +17,7 @@ from utils.architecture_flags import service_accounts_enabled
 @dataclass(frozen=True)
 class AuthPrincipal:
     user_id: uuid.UUID | None
-    username: str
+    username: str | None
     is_admin: bool
     method: Literal["jwt", "api_key", "service_account"]
     workspace_id: uuid.UUID | None = None

@@ -25,7 +25,13 @@ class QueueClass(str, Enum):
     IMAGE = "image"
     EXPORT = "export"
     WEBHOOK = "webhook"
+    NOTIFICATION = "notification"
     MAINTENANCE = "maintenance"
+
+
+class JobAuthorityKind(str, Enum):
+    WORKSPACE = "WORKSPACE"
+    SYSTEM_ACCOUNT_LIFECYCLE = "SYSTEM_ACCOUNT_LIFECYCLE"
 
 
 class RetryClass(str, Enum):

@@ -20,10 +20,16 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    text,
 )
 from sqlmodel import Field, SQLModel
 
-from modules.jobs.domain.models import JobStatus, QueueClass, RetryClass
+from modules.jobs.domain.models import (
+    JobAuthorityKind,
+    JobStatus,
+    QueueClass,
+    RetryClass,
+)
 from utils.datetime_utils import get_current_utc_datetime
 
 
@@ -44,6 +50,29 @@ class JobModel(SQLModel, table=True):
             "workspace_id", "idempotency_scope", "idempotency_key",
             name="uq_jobs_workspace_idempotency",
         ),
+        Index(
+            "uq_jobs_system_idempotency",
+            "authority_kind",
+            "idempotency_scope",
+            "idempotency_key",
+            unique=True,
+            sqlite_where=text(
+                "workspace_id IS NULL AND "
+                "authority_kind = 'SYSTEM_ACCOUNT_LIFECYCLE'"
+            ),
+            postgresql_where=text(
+                "workspace_id IS NULL AND "
+                "authority_kind = 'SYSTEM_ACCOUNT_LIFECYCLE'"
+            ),
+        ),
+        CheckConstraint(
+            "(authority_kind = 'WORKSPACE' AND workspace_id IS NOT NULL) OR "
+            "(authority_kind = 'SYSTEM_ACCOUNT_LIFECYCLE' AND "
+            "workspace_id IS NULL AND owner_id IS NULL AND actor_id IS NULL AND "
+            "actor_service_account_id IS NULL AND operation IN "
+            "('account.notification.deliver.v1', 'account.pending.reconcile.v1'))",
+            name="ck_jobs_authority_scope",
+        ),
         CheckConstraint("progress >= 0 AND progress <= 100", name="ck_jobs_progress"),
         CheckConstraint("attempt_count >= 0 AND max_attempts >= 1", name="ck_jobs_attempts"),
         Index("ix_jobs_queue_available", "queue_class", "status", "available_at"),
@@ -52,8 +81,17 @@ class JobModel(SQLModel, table=True):
     )
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    workspace_id: UUID = Field(
-        sa_column=Column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    workspace_id: UUID | None = Field(
+        default=None,
+        sa_column=Column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True)
+    )
+    authority_kind: JobAuthorityKind = Field(
+        default=JobAuthorityKind.WORKSPACE,
+        sa_column=Column(
+            _enum(JobAuthorityKind, "job_authority_kind"),
+            nullable=False,
+            default=JobAuthorityKind.WORKSPACE,
+        ),
     )
     owner_id: UUID | None = Field(
         default=None,
@@ -120,7 +158,7 @@ class JobAttemptModel(SQLModel, table=True):
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     job_id: UUID = Field(sa_column=Column(ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False))
-    workspace_id: UUID = Field(sa_column=Column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False))
+    workspace_id: UUID | None = Field(default=None, sa_column=Column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True))
     attempt_number: int = Field(sa_column=Column(Integer, nullable=False))
     worker_id: str = Field(sa_column=Column(String(128), nullable=False))
     lease_token: UUID = Field(default_factory=uuid4, sa_column=Column(Uuid(), nullable=False))
@@ -143,7 +181,7 @@ class OutboxMessageModel(SQLModel, table=True):
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     message_id: UUID = Field(default_factory=uuid4)
-    workspace_id: UUID = Field(sa_column=Column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False))
+    workspace_id: UUID | None = Field(default=None, sa_column=Column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True))
     job_id: UUID = Field(sa_column=Column(ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False))
     topic: str = Field(sa_column=Column(String(96), nullable=False))
     queue_class: QueueClass = Field(sa_column=Column(_enum(QueueClass, "outbox_queue_class"), nullable=False))
@@ -163,7 +201,7 @@ class ConsumerInboxModel(SQLModel, table=True):
     )
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    workspace_id: UUID = Field(sa_column=Column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False))
+    workspace_id: UUID | None = Field(default=None, sa_column=Column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True))
     job_id: UUID = Field(sa_column=Column(ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False))
     consumer_id: str = Field(sa_column=Column(String(128), nullable=False))
     message_id: UUID
@@ -176,7 +214,7 @@ class DeadLetterModel(SQLModel, table=True):
     __table_args__ = (Index("ix_dead_letters_workspace_created", "workspace_id", "created_at"),)
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    workspace_id: UUID = Field(sa_column=Column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False))
+    workspace_id: UUID | None = Field(default=None, sa_column=Column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True))
     job_id: UUID = Field(sa_column=Column(ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False))
     operation: str = Field(sa_column=Column(String(96), nullable=False))
     attempt_number: int = Field(sa_column=Column(Integer, nullable=False))
@@ -191,7 +229,7 @@ class JobEventModel(SQLModel, table=True):
     __table_args__ = (Index("ix_job_events_workspace_job_id", "workspace_id", "job_id", "id"),)
 
     id: int | None = Field(default=None, primary_key=True)
-    workspace_id: UUID = Field(sa_column=Column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False))
+    workspace_id: UUID | None = Field(default=None, sa_column=Column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True))
     job_id: UUID = Field(sa_column=Column(ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False))
     event_type: str = Field(sa_column=Column(String(64), nullable=False))
     safe_data: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
