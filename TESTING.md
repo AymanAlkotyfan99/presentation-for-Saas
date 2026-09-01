@@ -103,10 +103,13 @@ Run browser coverage for affected interaction/routing surfaces:
 
 ```bash
 npm run test:locale-e2e
+npm run test:product-e2e
 npm run test:cypress
 ```
 
-`test:product-e2e` is an available focused product-journey command, but is not currently a CI gate.
+The locale and product-journey commands are separate CI gates: the locale runner scopes the locale
+routing spec against the production build, while the product runner owns its controlled mock API
+and scopes the product-journey spec. `test:cypress` remains the component-test runner.
 
 ## Electron
 

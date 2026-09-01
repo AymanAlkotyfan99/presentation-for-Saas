@@ -211,6 +211,9 @@ jobs:
       - name: Run English/Arabic locale routing E2E
         run: npm run test:locale-e2e
 
+      - name: Run product journey E2E
+        run: npm run test:product-e2e
+
       - name: Run Cypress component tests
         run: npm run test:cypress
 
