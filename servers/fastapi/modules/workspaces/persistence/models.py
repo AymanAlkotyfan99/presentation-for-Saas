@@ -54,12 +54,22 @@ class InvitationModel(SQLModel, table=True):
     __table_args__ = (
         UniqueConstraint("token_digest", name="uq_invitations_token_digest"),
         CheckConstraint("length(token_digest) = 64", name="ck_invitations_token_digest"),
+        CheckConstraint(
+            "identity_kind IS NULL OR identity_kind IN ('USERNAME', 'EMAIL')",
+            name="ck_invitations_identity_kind",
+        ),
         Index("ix_invitations_workspace_state", "workspace_id", "accepted_at", "revoked_at", "expires_at"),
         Index("ix_invitations_identity", "workspace_id", "invited_identity"),
     )
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     workspace_id: UUID = Field(sa_column=Column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False))
-    invited_identity: str = Field(sa_column=Column(String(128), nullable=False))
+    invited_identity: str = Field(sa_column=Column(String(320), nullable=False))
+    normalized_identity: str | None = Field(
+        default=None, sa_column=Column(String(320), nullable=True)
+    )
+    identity_kind: str | None = Field(
+        default=None, sa_column=Column(String(16), nullable=True)
+    )
     role: Role = Field(sa_column=Column(_enum(Role, "invitation_role"), nullable=False))
     token_digest: str = Field(exclude=True, sa_column=Column(String(64), nullable=False))
     created_by: UUID | None = Field(default=None, sa_column=Column(ForeignKey("user.id", ondelete="SET NULL"), nullable=True))

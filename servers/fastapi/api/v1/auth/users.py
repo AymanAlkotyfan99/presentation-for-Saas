@@ -10,11 +10,11 @@ from fastapi_users.authentication.strategy.jwt import JWTStrategy
 from fastapi_users.db import BaseUserDatabase
 from fastapi_users.jwt import decode_jwt, generate_jwt
 from fastapi_users.password import PasswordHelper, PasswordHelperProtocol
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.v1.auth.schemas import InternalUserCreate
 from models.sql.user import User
+from modules.identity.persistence.identifiers import resolve_user_owned_identifier
 from services.database import get_async_session
 from api.v1.auth.config import (
     SESSION_COOKIE_NAME,
@@ -55,10 +55,7 @@ class UsernameUserDatabase(BaseUserDatabase[User, uuid.UUID]):
 
     async def get_by_email(self, email: str) -> User | None:
         """FastAPI Users names this hook after email; Presenton passes a username."""
-        statement = select(User).where(
-            func.lower(User.username) == func.lower(email.strip())
-        )
-        return (await self.session.execute(statement)).unique().scalar_one_or_none()
+        return await resolve_user_owned_identifier(self.session, email)
 
     async def get_by_oauth_account(
         self, oauth: str, account_id: str

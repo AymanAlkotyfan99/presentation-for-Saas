@@ -16,7 +16,9 @@ async def ensure_personal_workspace(session: AsyncSession, user: User) -> Worksp
         # Reusing the user UUID in a separate table gives migrations and runtime
         # retries a portable deterministic identity without database extensions.
         workspace = WorkspaceModel(
-            id=user.id, name=user.username, is_personal=True,
+            id=user.id,
+            name=user.username or "Personal workspace",
+            is_personal=True,
             personal_owner_id=user.id, created_by=user.id,
         )
         session.add(workspace)

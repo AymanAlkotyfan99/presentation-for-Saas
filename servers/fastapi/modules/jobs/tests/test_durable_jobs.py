@@ -9,7 +9,13 @@ from sqlmodel import SQLModel, select
 
 from models.sql.user import User
 from modules.jobs.application.submit import JobSubmission, submit_job
-from modules.jobs.domain.models import JobStatus, QueueClass, RetryClass, assert_transition
+from modules.jobs.domain.models import (
+    JobAuthorityKind,
+    JobStatus,
+    QueueClass,
+    RetryClass,
+    assert_transition,
+)
 from modules.jobs.outbox import QueueDelivery, dispatch_outbox_batch
 from modules.jobs.persistence.models import (
     ConsumerInboxModel,
@@ -19,6 +25,7 @@ from modules.jobs.persistence.models import (
     JobModel,
     OutboxMessageModel,
 )
+from modules.notifications.persistence.models import NotificationDelivery
 from modules.jobs.workers.registry import JobRegistry, OperationDefinition
 from modules.jobs.workers.runtime import JobHandlerError, JobWorker
 from modules.workspaces.domain.models import MembershipStatus, Permission, Role
@@ -139,6 +146,31 @@ def test_authoritative_state_machine_keeps_terminal_states_stable():
         assert_transition(JobStatus.CANCELLED, JobStatus.RUNNING)
     with pytest.raises(ValueError):
         assert_transition(JobStatus.DEAD_LETTER, JobStatus.RUNNING)
+
+
+def test_account_lifecycle_job_and_delivery_mappings_preserve_safe_defaults():
+    assert QueueClass.NOTIFICATION.value == "notification"
+    assert JobModel.model_fields["authority_kind"].default == (
+        JobAuthorityKind.WORKSPACE
+    )
+    assert all(
+        model.__table__.c.workspace_id.nullable
+        for model in (
+            JobModel,
+            JobAttemptModel,
+            OutboxMessageModel,
+            ConsumerInboxModel,
+            DeadLetterModel,
+            JobEventModel,
+        )
+    )
+    assert {
+        "recipient",
+        "email",
+        "token",
+        "body",
+        "provider_response",
+    }.isdisjoint(NotificationDelivery.model_fields)
 
 
 def test_submit_is_atomic_deduplicated_conflict_safe_and_secret_free(tmp_path):

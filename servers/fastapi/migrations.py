@@ -37,7 +37,12 @@ REVISION_DURABLE_JOBS = "a1c3e5f7b9d2"
 REVISION_MANAGED_ASSETS = "b2d4f6a8c0e1"
 REVISION_PROVIDER_REGISTRY = "c3e5f7a9b1d2"
 REVISION_PROVIDER_USAGE = "d4f6a8c0e2b3"
-REVISION_CURRENT_HEAD = REVISION_PROVIDER_USAGE
+REVISION_ACCOUNT_LIFECYCLE_EXPAND = "e5a7c9d1f3b4"
+REVISION_CURRENT_HEAD = REVISION_ACCOUNT_LIFECYCLE_EXPAND
+
+# These historical image revisions were published and then deliberately
+# consolidated. Arbitrary unknown revisions are never inferred silently.
+REPAIRABLE_ORPHAN_REVISIONS = frozenset({"2d7c8f9a0b1c"})
 
 
 async def migrate_database_on_startup() -> None:
@@ -64,6 +69,7 @@ def _run_migrations() -> None:
     # Alembic uses synchronous engines; strip async driver prefixes.
     database_url = to_sync_sqlalchemy_url(database_url)
 
+    _assert_linear_migration_graph(config)
     config.set_main_option("sqlalchemy.url", database_url)
     _repair_orphan_alembic_revision(config, database_url)
     _stamp_legacy_database_if_needed(config, database_url)
@@ -103,6 +109,11 @@ def _repair_orphan_alembic_revision(config: Config, database_url: str) -> None:
             ).scalar_one_or_none()
             if not version_num or version_num in known:
                 return
+            if version_num not in REPAIRABLE_ORPHAN_REVISIONS:
+                raise RuntimeError(
+                    "Database references an unknown Alembic revision; "
+                    "automatic migration repair refused"
+                )
             print(
                 f"Alembic revision {version_num!r} is missing from the codebase; "
                 "inferring applied migrations from schema and re-stamping.",
@@ -117,12 +128,58 @@ def _repair_orphan_alembic_revision(config: Config, database_url: str) -> None:
         engine.dispose()
 
 
+def _assert_linear_migration_graph(config: Config) -> None:
+    script = ScriptDirectory.from_config(config)
+    heads = script.get_heads()
+    bases = script.get_bases()
+    if len(heads) != 1 or len(bases) != 1:
+        raise RuntimeError(
+            "Expected exactly one linear Alembic graph "
+            f"(heads={heads}, bases={bases})"
+        )
+    revisions = list(script.walk_revisions())
+    known = {revision.revision for revision in revisions}
+    child_counts = {revision: 0 for revision in known}
+    for current in revisions:
+        parents = tuple(current._normalized_down_revisions)
+        if len(parents) > 1:
+            raise RuntimeError(
+                f"Alembic revision {current.revision} merges multiple parents; "
+                "the migration graph must remain linear"
+            )
+        missing = [parent for parent in parents if parent not in known]
+        if missing:
+            raise RuntimeError(
+                f"Alembic revision {current.revision} has unknown parents {missing}"
+            )
+        for parent in parents:
+            child_counts[parent] += 1
+    divergent = sorted(
+        revision for revision, child_count in child_counts.items() if child_count > 1
+    )
+    if divergent:
+        raise RuntimeError(
+            "Alembic migration graph branches from revisions "
+            f"{divergent}; the migration graph must remain linear"
+        )
+
+
 def _infer_revision_from_schema(
     inspector,
     tables: set[str],
     _head_revision: str,
 ) -> str:
     """Best-effort: map existing SQLite/Postgres schema to our linear migration chain."""
+    if {
+        "account_pending_registrations",
+        "account_login_identifiers",
+        "account_purpose_challenges",
+        "account_lifecycle_audit_events",
+        "account_notification_deliveries",
+    }.issubset(tables) and "jobs" in tables and _has_column(
+        inspector, "jobs", "authority_kind"
+    ):
+        return REVISION_ACCOUNT_LIFECYCLE_EXPAND
     if {
         "workspaces",
         "memberships",

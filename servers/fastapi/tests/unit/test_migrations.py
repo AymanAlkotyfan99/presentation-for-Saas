@@ -2,9 +2,96 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, inspect, text
+import pytest
 
 import migrations
+
+
+class _DivergentGraph:
+    def get_heads(self):
+        return ["head-a", "head-b"]
+
+    def get_bases(self):
+        return ["base"]
+
+
+class _Revision:
+    def __init__(self, revision, *parents):
+        self.revision = revision
+        self._normalized_down_revisions = parents
+
+
+class _MergedGraph:
+    def get_heads(self):
+        return ["merge"]
+
+    def get_bases(self):
+        return ["base"]
+
+    def walk_revisions(self):
+        return iter(
+            (
+                _Revision("merge", "left", "right"),
+                _Revision("left", "base"),
+                _Revision("right", "base"),
+                _Revision("base"),
+            )
+        )
+
+
+def test_migration_graph_rejects_multiple_heads(monkeypatch):
+    monkeypatch.setattr(
+        migrations.ScriptDirectory,
+        "from_config",
+        lambda _config: _DivergentGraph(),
+    )
+    with pytest.raises(RuntimeError, match="exactly one linear Alembic graph"):
+        migrations._assert_linear_migration_graph(_alembic_config("sqlite://"))
+
+
+def test_migration_graph_rejects_branch_and_merge_with_one_head(monkeypatch):
+    monkeypatch.setattr(
+        migrations.ScriptDirectory,
+        "from_config",
+        lambda _config: _MergedGraph(),
+    )
+    with pytest.raises(RuntimeError, match="merges multiple parents"):
+        migrations._assert_linear_migration_graph(_alembic_config("sqlite://"))
+
+
+def test_unknown_database_revision_is_not_silently_repaired(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'unknown-revision.db'}"
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)")
+            )
+            connection.execute(
+                text("INSERT INTO alembic_version (version_num) VALUES ('unknown123')")
+            )
+        with pytest.raises(RuntimeError, match="unknown Alembic revision"):
+            migrations._repair_orphan_alembic_revision(
+                _alembic_config(database_url), database_url
+            )
+    finally:
+        engine.dispose()
+
+
+def test_account_lifecycle_expand_schema_infers_current_head(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'account-head.db'}"
+    command.upgrade(_alembic_config(database_url), "head")
+    engine = create_engine(database_url)
+    try:
+        inspector = inspect(engine)
+        assert migrations._infer_revision_from_schema(
+            inspector,
+            set(inspector.get_table_names()),
+            migrations.REVISION_CURRENT_HEAD,
+        ) == migrations.REVISION_ACCOUNT_LIFECYCLE_EXPAND
+    finally:
+        engine.dispose()
 
 
 def _alembic_config(database_url: str) -> Config:

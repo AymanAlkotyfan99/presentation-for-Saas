@@ -55,11 +55,20 @@ from modules.providers.persistence.models import (  # noqa: F401, E402
     EncryptedProviderSecretModel, ProviderAccountModel, ProviderCapabilityModel,
     ProviderCircuitModel, ProviderHealthModel, ProviderSnapshotModel, ProviderUsageModel, RoutingPolicyModel,
 )
+from modules.identity.persistence.models import (  # noqa: F401, E402
+    AccountLifecycleAuditEvent,
+    AccountLoginIdentifier,
+    AccountPurposeChallenge,
+    PendingRegistration,
+)
+from modules.notifications.persistence.models import (  # noqa: F401, E402
+    NotificationDelivery,
+)
 
 alembic_config = context.config
 
 if alembic_config.config_file_name is not None:
-    fileConfig(alembic_config.config_file_name)
+    fileConfig(alembic_config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = SQLModel.metadata
 

@@ -1,4 +1,5 @@
 import asyncio
+from datetime import UTC, datetime, timedelta
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -8,8 +9,14 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from api.v1.auth.router import API_V1_AUTH_ROUTER
 from api.v1.auth.rate_limit import LOGIN_RATE_LIMITER, login_rate_limit_key
 from api.v1.auth.users import PASSWORD_HELPER
+from api.v1.auth.users import UsernameUserDatabase, serialize_user
 from models.sql.access_token import AccessToken
 from models.sql.user import User
+from modules.identity.persistence.identifiers import add_identifier_claim
+from modules.identity.persistence.models import (
+    AccountLoginIdentifier,
+    PendingRegistration,
+)
 from services.database import get_async_session
 from api.v1.auth.config import SESSION_COOKIE_NAME
 
@@ -22,6 +29,8 @@ def _build_client(tmp_path) -> tuple[TestClient, object]:
         async with engine.begin() as connection:
             await connection.run_sync(User.__table__.create)
             await connection.run_sync(AccessToken.__table__.create)
+            await connection.run_sync(PendingRegistration.__table__.create)
+            await connection.run_sync(AccountLoginIdentifier.__table__.create)
 
     asyncio.run(create_user_table())
 
@@ -269,5 +278,46 @@ def test_database_rejects_a_second_primary_administrator(monkeypatch, tmp_path):
         return False
 
     assert asyncio.run(insert_second_admin()) is True
+    client.close()
+    asyncio.run(engine.dispose())
+
+
+def test_identifier_compatibility_keeps_legacy_username_and_rejects_pending_owner(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("USER_CONFIG_PATH", str(tmp_path / "userConfig.json"))
+    client, engine = _build_client(tmp_path)
+
+    async def scenario():
+        session_maker = async_sessionmaker(engine, expire_on_commit=False)
+        async with session_maker() as session:
+            legacy = User(username="legacy-user", hashed_password="legacy-hash")
+            shadowed = User(
+                username="pending@example.com", hashed_password="shadowed-hash"
+            )
+            pending = PendingRegistration(
+                state="PENDING",
+                email_original="pending@example.com",
+                email_normalized="pending@example.com",
+                preferred_locale="en",
+                claim_generation=1,
+                reclaim_after=datetime.now(UTC) + timedelta(hours=72),
+            )
+            session.add_all([legacy, shadowed, pending])
+            await session.flush()
+            await add_identifier_claim(
+                session,
+                normalized_value="pending@example.com",
+                kind="EMAIL",
+                pending_registration_id=pending.id,
+            )
+            await session.commit()
+
+            database = UsernameUserDatabase(session)
+            assert (await database.get_by_email("LEGACY-USER")).id == legacy.id
+            assert await database.get_by_email("pending@example.com") is None
+            assert serialize_user(legacy)["username"] == "legacy-user"
+
+    asyncio.run(scenario())
     client.close()
     asyncio.run(engine.dispose())

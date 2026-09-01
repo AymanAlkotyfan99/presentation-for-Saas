@@ -19,7 +19,7 @@ class InternalUserCreate(BaseModel):
 
 class PublicUser(BaseModel):
     id: uuid.UUID
-    username: str
+    username: str | None
     role: str
     created_at: datetime | None = None
     preferred_locale: Literal["en", "ar"] | None = None
