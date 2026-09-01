@@ -1,0 +1,32 @@
+{
+  "locale": "ar",
+  "api": {
+    "status": {
+      "authenticated": false,
+      "capabilities": {
+        "publicSignup": false,
+        "emailVerification": false,
+        "passwordRecovery": false,
+        "notificationDelivery": false
+      }
+    },
+    "registration": {
+      "statusCode": 202,
+      "body": {
+        "status": "accepted",
+        "code": "ACCOUNT_REQUEST_ACCEPTED"
+      }
+    }
+  },
+  "mailbox": {
+    "messages": [
+      {
+        "notificationId": "00000000-0000-4000-8000-000000000102",
+        "recipient": "account-ar-001@example.test",
+        "purpose": "EMAIL_VERIFICATION",
+        "token": "[REDACTED]",
+        "actionUrl": "/ar/verify#token=[REDACTED]"
+      }
+    ]
+  }
+}

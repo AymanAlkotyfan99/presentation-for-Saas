@@ -14,9 +14,14 @@
 // ***********************************************************
 
 // Import commands.js using ES2015 syntax:
-import './commands'
+import "./commands";
 
-import { mount } from 'cypress/react'
+import axe, { type AxeResults, type RunOptions } from "axe-core";
+import { mount } from "cypress/react";
+
+import { configureAccountLifecycleArtifactSafety } from "./account-lifecycle-artifacts";
+
+configureAccountLifecycleArtifactSafety();
 
 // Augment the Cypress namespace to include type definitions for
 // your custom command.
@@ -25,12 +30,29 @@ import { mount } from 'cypress/react'
 declare global {
   namespace Cypress {
     interface Chainable {
-      mount: typeof mount
+      mount: typeof mount;
+      checkAccountLifecycleAccessibility(options?: RunOptions): Chainable<AxeResults>;
     }
   }
 }
 
-Cypress.Commands.add('mount', mount)
+Cypress.Commands.add("mount", mount);
+
+Cypress.Commands.add(
+  "checkAccountLifecycleAccessibility",
+  (options: RunOptions = {}) =>
+    cy.document({ log: false }).then(async (document) => {
+      const results = await axe.run(document, options);
+      const blocking = results.violations.filter(({ impact }) =>
+        impact === "critical" || impact === "serious",
+      );
+      expect(
+        blocking,
+        blocking.map(({ id, impact }) => `${impact}:${id}`).join(", "),
+      ).to.have.length(0);
+      return results;
+    }),
+);
 
 // Example use:
 // cy.mount(<MyComponent />)

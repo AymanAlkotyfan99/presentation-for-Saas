@@ -16,6 +16,10 @@ dependencies = [
     "aiosqlite>=0.21.0",
     "asyncpg>=0.30.0",
     "dirtyjson>=1.0.8",
+    # Planned Sprint 10.10 identity normalization owns this direct import.
+    # PyPI/GitHub provenance, Unlicense, and the existing transitive lock were
+    # reviewed; the approved contract disables deliverability network checks.
+    "email-validator>=2.3.0",
     "fastapi[standard]>=0.116.1",
     "fastapi-users[sqlalchemy]>=14.0.1",
     "fastembed-vectorstore>=0.5.2",
